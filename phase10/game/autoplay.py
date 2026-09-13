@@ -42,7 +42,7 @@ def play_hand(phase: int, cfg: GameConfig, rng: random.Random) -> PhaseHand:
             h.lay_down()
             break
         if not h.stock:
-            h._fail("stock_empty")
+            h.mark_failed("stock_empty")
             break
 
         base = _short(h.hand, spec, cfg)

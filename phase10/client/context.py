@@ -1,0 +1,266 @@
+"""Archipelago client for Phase 10.
+
+The game is played through commands in the client console rather than a bespoke
+GUI -- a card game reads fine as text, and it keeps everything in one process
+with no rendering layer to maintain.
+
+Commands run on the UI thread while sending is async, so checks are queued here
+and drained by phase10_loop rather than awaited inline.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import random
+from typing import Any
+
+from CommonClient import (
+    ClientCommandProcessor,
+    CommonContext,
+    logger,
+    server_loop,
+)
+from NetUtils import ClientStatus
+
+from ..game.autoplay import choose_discard
+from ..game.engine import HandState
+from ..game.phases import PHASES, phase_description
+from .session import Phase10Session
+
+
+def render_hand(hand) -> str:
+    return "  ".join(f"[{i}]{card}" for i, card in enumerate(hand.hand))
+
+
+def render_group(index: int, group) -> str:
+    cards = " ".join(str(c) for c in group)
+    return f"  group {index}  {cards}"
+
+
+class Phase10CommandProcessor(ClientCommandProcessor):
+    ctx: Phase10Context
+
+    def _require_hand(self):
+        hand = self.ctx.session.hand
+        if hand is None or hand.state is not HandState.IN_PROGRESS:
+            self.output("No hand in progress. Start one with /play <phase>.")
+            return None
+        return hand
+
+    def _cmd_phases(self) -> None:
+        """List every phase, what it needs, and whether it is available."""
+        s = self.ctx.session
+        unlocked = s.unlocked_phases
+        for phase in range(1, 11):
+            if phase in s.cleared_phases:
+                mark = "done"
+            elif phase in unlocked:
+                mark = "open"
+            else:
+                mark = "  --"
+            self.output(f"  {mark}  Phase {phase:>2}: {phase_description(phase)}")
+
+    def _cmd_status(self) -> None:
+        """Show the deck and draw budget your items have built."""
+        s = self.ctx.session
+        c = s.config
+        self.output(
+            f"hand size {c.hand_size} | wilds in deck {c.wilds_in_deck} "
+            f"| draws per hand {c.max_draws} | skips {c.skips_in_deck}"
+        )
+        self.output(
+            f"phases unlocked {len(s.unlocked_phases)}/10 "
+            f"| cleared {len(s.cleared_phases)}/10 | hands won {s.hands_won}"
+        )
+        if s.locked_phase:
+            self.output(f"Phase Lock: you must replay Phase {s.locked_phase}.")
+
+    def _cmd_play(self, phase: str) -> None:
+        """Start a hand for the given phase. Usage: /play 3"""
+        try:
+            number = int(phase)
+            if number not in PHASES:
+                raise ValueError
+        except ValueError:
+            self.output("Give a phase number from 1 to 10.")
+            return
+        try:
+            self.ctx.session.start_hand(number, self.ctx.rng)
+        except ValueError as e:
+            self.output(str(e))
+            return
+        self.output(f"Phase {number}: {phase_description(number)}")
+        self._cmd_hand()
+
+    def _cmd_hand(self) -> None:
+        """Show your hand, the discard top, and your remaining draws."""
+        hand = self.ctx.session.hand
+        if hand is None:
+            self.output("No hand in progress. Start one with /play <phase>.")
+            return
+        self.output(render_hand(hand))
+        self.output(
+            f"discard top {hand.discard_top} | draws left {hand.draws_left} "
+            f"| stock {len(hand.stock)}"
+        )
+        if hand.can_lay_down():
+            self.output("You can lay this phase down now: /lay")
+
+    def _cmd_draw(self, source: str = "") -> None:
+        """Draw a card. Plain /draw takes stock, /draw d takes the discard."""
+        hand = self._require_hand()
+        if hand is None:
+            return
+        try:
+            card = hand.draw(from_discard=source.lower().startswith("d"))
+        except RuntimeError as e:
+            self.output(str(e))
+            return
+        self.output(f"drew {card}")
+        self._cmd_hand()
+
+    def _cmd_discard(self, index: str) -> None:
+        """Discard by position. Usage: /discard 4"""
+        hand = self._require_hand()
+        if hand is None:
+            return
+        try:
+            card = hand.hand[int(index)]
+        except (ValueError, IndexError):
+            self.output(f"Pick a position between 0 and {len(hand.hand) - 1}.")
+            return
+        try:
+            hand.discard_card(card)
+        except RuntimeError as e:
+            self.output(str(e))
+            return
+        self.output(f"discarded {card}")
+        if hand.state is HandState.FAILED:
+            self.ctx.settle(hand)
+        else:
+            self._cmd_hand()
+
+    def _cmd_lay(self) -> None:
+        """Lay the phase down, if your hand satisfies it."""
+        hand = self._require_hand()
+        if hand is None:
+            return
+        try:
+            layout = hand.lay_down()
+        except RuntimeError as e:
+            self.output(str(e))
+            return
+        for i, group in enumerate(layout, 1):
+            self.output(render_group(i, group))
+        self.ctx.settle(hand)
+
+    def _cmd_auto(self) -> None:
+        """Play the current hand out with the built-in greedy player."""
+        hand = self._require_hand()
+        if hand is None:
+            return
+        config, spec = hand.config, hand.spec
+        while hand.state is HandState.IN_PROGRESS:
+            if hand.can_lay_down():
+                hand.lay_down()
+                break
+            if not hand.stock:
+                hand.mark_failed("stock_empty")
+                break
+            hand.draw()
+            if hand.can_lay_down():
+                hand.lay_down()
+                break
+            hand.discard_card(choose_discard(hand.hand, spec, config))
+        if hand.layout:
+            for i, group in enumerate(hand.layout, 1):
+                self.output(render_group(i, group))
+        self.ctx.settle(hand)
+
+
+class Phase10Context(CommonContext):
+    game = "Phase 10"
+    items_handling = 0b111  # full remote
+    command_processor = Phase10CommandProcessor
+
+    def __init__(self, server_address: str | None = None, password: str | None = None) -> None:
+        super().__init__(server_address, password)
+        self.session = Phase10Session()
+        self.rng = random.Random()
+        self.pending_locations: list[int] = []
+        self.goal_sent = False
+
+    async def server_auth(self, password_requested: bool = False) -> None:
+        if password_requested and not self.password:
+            await super().server_auth(password_requested)
+        await self.get_username()
+        await self.send_connect(game=self.game)
+
+    def on_package(self, cmd: str, args: dict[str, Any]) -> None:
+        if cmd == "Connected":
+            self.session = Phase10Session.from_slot_data(args.get("slot_data", {}))
+            self.goal_sent = False
+            self.sync_items()
+            logger.info("Connected. /phases to see what you can play, /play <n> to start.")
+        elif cmd == "ReceivedItems":
+            self.sync_items()
+
+    def sync_items(self) -> None:
+        """Re-tally received items.
+
+        Archipelago resends the full list, so this is a wholesale replace rather
+        than an increment -- which also makes it safe to call on reconnect.
+        """
+        names = [
+            self.item_names.lookup_in_game(item.item, self.game)
+            for item in self.items_received
+        ]
+        before = self.session.unlocked_phases
+        self.session.set_items(names)
+        for phase in sorted(self.session.unlocked_phases - before):
+            logger.info(f"Phase {phase} unlocked: {phase_description(phase)}")
+
+    def settle(self, hand) -> None:
+        """Finish a hand and queue whatever checks it earned."""
+        new = self.session.finish_hand(hand)
+        if hand.state is HandState.FAILED:
+            logger.info("Hand failed -- out of draws.")
+        else:
+            logger.info(f"Phase {hand.phase} cleared in {hand.draws_used} draws.")
+        if new:
+            self.pending_locations.extend(new)
+
+    async def phase10_loop(self) -> None:
+        while not self.exit_event.is_set():
+            if self.pending_locations and self.server and not self.server.socket.closed:
+                queued, self.pending_locations = self.pending_locations, []
+                await self.check_locations(queued)
+            if self.session.goal_met and not self.goal_sent and self.server:
+                await self.send_msgs(
+                    [{"cmd": "StatusUpdate", "status": ClientStatus.CLIENT_GOAL}]
+                )
+                self.finished_game = True
+                self.goal_sent = True
+                logger.info("Goal complete.")
+            await asyncio.sleep(0.1)
+
+    def make_gui(self):
+        ui = super().make_gui()
+        ui.base_title = "Archipelago Phase 10 Client"
+        return ui
+
+
+async def main(args) -> None:
+    from CommonClient import gui_enabled
+
+    ctx = Phase10Context(args.connect, args.password)
+    ctx.auth = args.name
+    ctx.server_task = asyncio.create_task(server_loop(ctx), name="server loop")
+    ctx.client_loop = asyncio.create_task(ctx.phase10_loop(), name="phase10 loop")
+
+    if gui_enabled:
+        ctx.run_gui()
+    ctx.run_cli()
+
+    await ctx.exit_event.wait()
+    await ctx.shutdown()

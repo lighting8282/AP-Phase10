@@ -98,7 +98,7 @@ class PhaseHand:
             card = self.discard.pop()
         else:
             if not self.stock:
-                self._fail("stock_empty")
+                self.mark_failed("stock_empty")
                 raise RuntimeError("stock is empty")
             card = self.stock.pop(0)
         self.hand.append(card)
@@ -115,7 +115,7 @@ class PhaseHand:
         self.discard.append(card)
         self.drew_this_turn = False
         if self.draws_left == 0 and self.state is HandState.IN_PROGRESS:
-            self._fail("out_of_draws")
+            self.mark_failed("out_of_draws")
 
     def lay_down(self) -> Layout:
         layout = self.solution()
@@ -135,7 +135,9 @@ class PhaseHand:
         return layout
 
     # -- bookkeeping -------------------------------------------------------
-    def _fail(self, reason: str) -> None:
+    def mark_failed(self, reason: str) -> None:
+        """End the hand as a loss. Public because a driver that runs the turn
+        loop itself (the client, the autoplayer) has to be able to call it."""
         self.state = HandState.FAILED
         self._emit("hand_failed", reason=reason, score=hand_score(self.hand))
 

@@ -4,24 +4,11 @@ from typing import TYPE_CHECKING
 
 from BaseClasses import Item, ItemClassification
 
+from .data import FILLERS, ITEM_NAME_TO_ID, PHASE_UNLOCK, TRAPS
 from .rules import MIN_EXTRA_DRAWS, MIN_WILD_CARDS
 
 if TYPE_CHECKING:
     from .world import Phase10World
-
-PHASE_UNLOCK = "Phase {} Unlocked"
-
-ITEM_NAME_TO_ID = {
-    **{PHASE_UNLOCK.format(p): p for p in range(1, 11)},
-    "Wild Card": 20,
-    "Extra Draw": 21,
-    "Hand Size Upgrade": 22,
-    "Phase Lock": 30,
-    "Lean Deal": 31,
-    "Wild Theft": 32,
-    "Mulligan": 40,
-    "Score Reduction": 41,
-}
 
 DEFAULT_ITEM_CLASSIFICATIONS = {
     **{PHASE_UNLOCK.format(p): ItemClassification.progression for p in range(1, 11)},
@@ -35,8 +22,6 @@ DEFAULT_ITEM_CLASSIFICATIONS = {
     "Score Reduction": ItemClassification.filler,
 }
 
-TRAPS = ["Phase Lock", "Lean Deal", "Wild Theft"]
-FILLERS = ["Mulligan", "Score Reduction"]
 
 
 class Phase10Item(Item):
