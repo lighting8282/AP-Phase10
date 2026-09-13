@@ -1,27 +1,83 @@
-# phase10_ap
+# Phase 10 for Archipelago
 
-Headless Phase 10 engine for Archipelago. No UI, no AP imports yet — the engine
-is pure so rules can be tested and tuned before any client exists.
+A solo Phase 10 implementation that ships *inside* its own apworld — Python game
+and Archipelago world in one package, no mod loader, no IPC. Structured after
+`Archipelago/worlds/apquest/`, which is the reference for that pattern.
 
-Scaffolded to match `Archipelago/worlds/apquest/`, which is the reference for a
-game that ships *inside* an apworld (Python game + CommonClient in one process,
-no mod loader, no IPC).
+The engine has no Archipelago dependency, so the rules can be tested and tuned
+on their own.
 
 ## Layout
 
-    phase10/cards.py             card model, deck construction, scoring
-    phase10/phases.py            phase specs + the solver
-    phase10/engine.py            solo hand: deal, draw, discard, lay down
-    phase10/autoplay.py          greedy autoplayer (for difficulty measurement)
-    phase10/play_in_console.py   headless runner and difficulty sweeps
-    tests/test_phases.py         18 tests, no dependencies
+    phase10/                     the apworld package
+      world.py options.py items.py locations.py regions.py rules.py
+      test/                      37 world tests, run inside an AP checkout
+      game/                      the engine, no Archipelago dependency
+        cards.py                 card model, deck construction, scoring
+        phases.py                phase specs + the solver
+        engine.py                solo hand: deal, draw, discard, lay down
+        autoplay.py              greedy autoplayer (difficulty measurement)
+        play_in_console.py       headless runner and difficulty sweeps
+    tests/test_phases.py         18 engine tests, no dependencies
+    tests/yaml/Phase10.yaml      generation smoke-test YAML
 
 ## Run
 
+Engine only, no Archipelago needed:
+
     python tests/test_phases.py
-    python -m phase10.play_in_console --phase 6
-    python -m phase10.play_in_console --sweep --trials 200 --max-draws 8
-    python -m phase10.play_in_console --draws --trials 200
+    cd phase10 && python -m game.play_in_console --phase 6
+    cd phase10 && python -m game.play_in_console --sweep --trials 200 --max-draws 8
+    cd phase10 && python -m game.play_in_console --draws --trials 200
+
+The engine imports as a top-level `game` package rather than through
+`phase10/__init__.py`, which pulls in Archipelago. That is what keeps it
+testable on its own.
+
+## Apworld
+
+Targets Archipelago 0.6.8 and its `rule_builder` rule DSL. Needs an Archipelago
+**source** checkout; the packaged release on A: is frozen and has no usable
+interpreter. Link the package in once (PowerShell):
+
+    New-Item -ItemType Junction -Path <AP checkout>\worlds\phase10 -Target <this repo>\phase10
+
+Generation needs four of AP's dependencies: `pathspec schema colorama jinja2`.
+Then, from the Archipelago root:
+
+    python -m unittest discover -s worlds/phase10/test -t . -p "test_*.py"
+
+**Items.** Ten phase unlocks, Wild Card, Extra Draw, Hand Size Upgrade, plus
+filler and traps. The deck starts with no wilds at all and a small draw budget;
+items build both back up.
+
+Only as many Wild Cards and Extra Draws as logic can actually demand are
+classified `progression` — the surplus is `useful`. Without that split the pool
+runs about 80% progression, which fill cannot place into a location set this
+small.
+
+**Locations.** Each phase is worth up to four checks (cleared / went out / no
+wilds / under par), plus ten cumulative "Hands Won" milestones. 50 at default
+options.
+
+**Rules.** Unlocking a phase only seats you at the table; the measured
+difficulty gates *clearing* it. That also keeps every unlock immediately worth
+something.
+
+### Two fill failures worth remembering
+
+Both were caught by generating, not by reading the code.
+
+1. **Empty sphere zero.** Gating every location behind a phase unlock meant a
+   fresh seed had nothing reachable, so fill had nowhere to place its first
+   item. Fixed by the Hands Won milestones, which gate on nothing, plus
+   precollected starting phases drawn from the easy set.
+2. **Progression density.** 32 of 40 items were progression. Fixed by
+   classifying surplus power items as `useful` and widening the pool to 50.
+
+AP's own `test_empty_state_can_reach_something` and `test_fill` cover both. The
+option combinations that stress them are pinned in
+`phase10/test/test_capacity.py`.
 
 ## Solo model
 
@@ -72,11 +128,16 @@ Success rate, hand 10, `max_draws` 8:
 
 ### Logic requirements implied by the data
 
-Baseline `max_draws` 8, stock wilds:
+These are what `rules.py` actually implements. Clearing a phase costs:
 
-- phases 1, 2, 4 — no requirement
-- phases 3, 5, 6, 8 — 1 Extra Draw *or* 2 Wild Cards
-- phases 7, 9, 10 — 2 Extra Draws *or* 4 Wild Cards
+- phases 1, 2, 4 (easy) — nothing beyond the unlock
+- phases 3, 5, 6, 8 (medium) — 2 Wild Cards *or* 2 Extra Draws
+- phases 7, 9, 10 (hard) — 4 Wild Cards *or* 4 Extra Draws
+
+Each check tier then adds its own cost on top: Went Out wants 3 Extra Draws,
+No Wilds wants 5, Under Par wants 4 Wild Cards. Those maxima are what set
+`MIN_WILD_CARDS` and `MIN_EXTRA_DRAWS`, the counts above which copies stop
+being progression.
 
 ## Open design questions
 
@@ -90,7 +151,14 @@ Baseline `max_draws` 8, stock wilds:
   Mixing COLOR with SET/RUN raises `NotImplementedError` rather than silently
   answering wrong — needs joint rank+color search if Masters phases get added.
 
+
 ## Not built yet
 
-AP world (items/locations/rules/regions/options), client, UI, going-out bonus
-checks, multi-hand game loop with scoring.
+The client — the game has no Archipelago connection yet. `fill_slot_data` sends
+the knobs, but nothing consumes them, nothing reports a check when a phase is
+cleared, and there is no multi-hand game loop with scoring or UI.
+
+## Naming
+
+Game rules are not copyrightable, but "Phase 10" and the card art belong to
+Mattel. Shipping this publicly means giving it its own name and art.
