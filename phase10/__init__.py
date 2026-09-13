@@ -1,1 +1,1 @@
-"""Headless Phase 10 engine for Archipelago."""
+from .world import Phase10World as Phase10World

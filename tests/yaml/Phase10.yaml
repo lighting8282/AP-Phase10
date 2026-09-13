@@ -1,0 +1,15 @@
+name: P10Tester
+game: Phase 10
+description: Phase 10 apworld generation smoke test
+
+Phase 10:
+  progression_balancing: 0
+  accessibility: full
+  goal: all_phases
+  starting_draws: 4
+  extra_draw_items: 12
+  wild_card_items: 8
+  hand_size_upgrades: 2
+  checks_per_phase: 4
+  include_skips: false
+  trap_chance: 10

@@ -1,15 +1,20 @@
 """Tests for the phase solver. Runnable via pytest or directly."""
 
 import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+# Import the engine as a top-level "game" package rather than through
+# phase10/__init__.py, which pulls in Archipelago and is only importable from
+# inside an AP checkout. The engine itself has no AP dependency and must stay
+# testable on its own.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "phase10"))
 
 import random
 import time
 
-from phase10.cards import (
+from game.cards import (
     Color, Kind, Card, SKIP, WILD, build_deck, number_card, shuffled_deck, hand_score,
 )
-from phase10.phases import (
+from game.phases import (
     PHASES, SET, RUN, COLOR, solve_phase, can_complete, phase_card_count, phase_description,
 )
 
