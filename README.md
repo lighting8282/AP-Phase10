@@ -1,4 +1,4 @@
-# Phase 10 for Archipelago
+# AP_Phase10
 
 A solo Phase 10 implementation that ships *inside* its own apworld — Python game
 and Archipelago world in one package, no mod loader, no IPC. Structured after
@@ -267,7 +267,7 @@ Short grinds keep the two closer together.
 
 ## UI
 
-`client/game_manager.py` adds a Phase 10 tab to the client window, alongside the
+`client/game_manager.py` adds a game tab to the client window, alongside the
 usual Archipelago log and hints tabs.
 
 - the hand as colour-coded cards — click one to discard it
@@ -335,5 +335,15 @@ slot_data and the server tracks checks, not points.
 
 ## Naming
 
-Game rules are not copyrightable, but "Phase 10" and the card art belong to
-Mattel. Shipping this publicly means giving it its own name and art.
+The world is registered as `AP_Phase10`, defined once in `data.py` as
+`GAME_NAME` and read from there by the world, items, locations, client,
+launcher and UI tab. `archipelago.json` and the docs filename carry their own
+copies because they are not Python — a generation run is what catches those
+drifting.
+
+Game rules are not copyrightable, so the engine is original work, and the card
+art is generated rather than borrowed. The **name** is the part still shared
+with Mattel's product: `AP_Phase10` prefixes the mark rather than replacing it,
+so it does not create legal distance. That was a deliberate choice for an
+identifier matching the repo, not a claim that the trademark question is
+settled.

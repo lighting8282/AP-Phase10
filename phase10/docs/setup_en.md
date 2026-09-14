@@ -1,22 +1,22 @@
-# Phase 10 Setup Guide
+# AP_Phase10 Setup Guide
 
 ## Required Software
 
 - Archipelago 0.6.8 or newer.
-- The Phase 10 apworld, placed in your Archipelago `custom_worlds` folder.
+- The AP_Phase10 apworld, placed in your Archipelago `custom_worlds` folder.
 
 No separate game download is needed -- the game ships inside the apworld and
 runs in Python.
 
 ## Generating a game
 
-1. Create a YAML for Phase 10 (the options page or the template will produce
+1. Create a YAML for AP_Phase10 (the options page or the template will produce
    one).
 2. Generate and host as normal.
 
 ## Joining
 
-Launch the Phase 10 client from the Archipelago Launcher and connect with your
+Launch the AP_Phase10 client from the Archipelago Launcher and connect with your
 slot name.
 
 ## Options worth knowing

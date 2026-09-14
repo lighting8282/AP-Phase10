@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from BaseClasses import Item, ItemClassification
 
-from .data import FILLERS, ITEM_NAME_TO_ID, PHASE_UNLOCK, SKIP_CARD, TRAPS
+from .data import FILLERS, GAME_NAME, ITEM_NAME_TO_ID, PHASE_UNLOCK, SKIP_CARD, TRAPS
 from .rules import MIN_EXTRA_DRAWS, MIN_WILD_CARDS
 
 if TYPE_CHECKING:
@@ -26,7 +26,7 @@ DEFAULT_ITEM_CLASSIFICATIONS = {
 
 
 class Phase10Item(Item):
-    game = "Phase 10"
+    game = GAME_NAME
 
 
 def get_random_filler_item_name(world: Phase10World) -> str:

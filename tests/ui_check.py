@@ -23,7 +23,7 @@ OUT = sys.argv[1] if len(sys.argv) > 1 else "phase10_ui.png"
 
 from worlds.phase10.client.context import Phase10Context
 from worlds.phase10.client.session import Phase10Session
-from worlds.phase10.data import EXTRA_DRAW, PHASE_UNLOCK, SKIP_CARD, WILD_CARD
+from worlds.phase10.data import EXTRA_DRAW, GAME_NAME, PHASE_UNLOCK, SKIP_CARD, WILD_CARD
 
 failures: list[str] = []
 
@@ -90,7 +90,7 @@ async def main():
 
         view.refresh(force=True)
         try:
-            ctx.ui.screens.current = "Phase 10"
+            ctx.ui.screens.current = GAME_NAME
         except Exception as e:
             print("  tab switch failed:", e)
         Clock.schedule_once(lambda _d: Window.screenshot(name=OUT), 0.8)

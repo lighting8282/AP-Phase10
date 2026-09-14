@@ -1,8 +1,8 @@
-# Phase 10
+# AP_Phase10
 
 ## What is this game?
 
-Phase 10 is a rummy-style card game built around ten escalating objectives --
+An original implementation of a rummy-style card game built around ten escalating objectives --
 sets, runs, and colour collections -- normally played in a fixed order against
 other players.
 

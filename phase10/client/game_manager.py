@@ -27,6 +27,7 @@ from kivy.uix.image import Image
 from kivy.uix.label import Label
 from kivy.uix.layout import Layout
 
+from ..data import GAME_NAME
 from ..game.cards import Color, card_filename
 from ..game.engine import HandState
 from ..game.phases import PHASES, phase_description
@@ -267,13 +268,13 @@ class Phase10View(BoxLayout):
 
 
 class Phase10Manager(GameManager):
-    base_title = "Archipelago Phase 10 Client"
+    base_title = f"Archipelago {GAME_NAME} Client"
     ctx: "Phase10Context"
 
     def build(self) -> Layout:
         container = super().build()
         self.game_view = Phase10View(self)
-        self.add_client_tab("Phase 10", self.game_view)
+        self.add_client_tab(GAME_NAME, self.game_view)
         # Polling beats threading a redraw call through every mutation site;
         # the signature check makes an unchanged frame nearly free.
         Clock.schedule_interval(lambda _dt: self.game_view.refresh(), 1 / 4)

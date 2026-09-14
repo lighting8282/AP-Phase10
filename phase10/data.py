@@ -9,6 +9,12 @@ seed was half played.
 
 from __future__ import annotations
 
+#: The Archipelago game identifier. Everything that must agree on it --
+#: world, items, locations, client, launcher, UI tab -- reads it from here.
+#: archipelago.json and the docs filename carry their own copies because
+#: they are not Python; the generation test catches it if those drift.
+GAME_NAME = "AP_Phase10"
+
 PHASE_UNLOCK = "Phase {} Unlocked"
 PHASE_CLEAR_EVENT = "Phase {} Clear"
 

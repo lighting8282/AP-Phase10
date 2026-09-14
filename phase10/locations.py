@@ -6,6 +6,7 @@ from BaseClasses import Location
 
 from . import items
 from .data import (
+    GAME_NAME,
     HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS,
     milestone_location_name, phase_location_name,
 )
@@ -14,7 +15,7 @@ if TYPE_CHECKING:
     from .world import Phase10World
 
 class Phase10Location(Location):
-    game = "Phase 10"
+    game = GAME_NAME
 
 
 def create_all_locations(world: Phase10World) -> None:

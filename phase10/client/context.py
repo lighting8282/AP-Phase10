@@ -1,4 +1,4 @@
-"""Archipelago client for Phase 10.
+"""Archipelago client for AP_Phase10.
 
 The game is played through commands in the client console rather than a bespoke
 GUI -- a card game reads fine as text, and it keeps everything in one process
@@ -22,6 +22,7 @@ from CommonClient import (
 )
 from NetUtils import ClientStatus
 
+from ..data import GAME_NAME
 from ..game.autoplay import play_out
 from ..game.engine import HandState
 from ..game.phases import PHASES, phase_description
@@ -249,7 +250,7 @@ class Phase10CommandProcessor(ClientCommandProcessor):
             self.output(line)
 
 class Phase10Context(CommonContext):
-    game = "Phase 10"
+    game = GAME_NAME
     items_handling = 0b111  # full remote
     command_processor = Phase10CommandProcessor
 

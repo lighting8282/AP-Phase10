@@ -5,6 +5,7 @@ from worlds.AutoWorld import World
 
 from . import items, locations, regions, rules, web_world
 from . import options as phase10_options
+from .data import GAME_NAME
 
 
 class Phase10World(World):
@@ -15,7 +16,7 @@ class Phase10World(World):
     phases you may attempt, and how many wild cards and draws you get.
     """
 
-    game = "Phase 10"
+    game = GAME_NAME
     web = web_world.Phase10WebWorld()
 
     options_dataclass = phase10_options.Phase10Options
