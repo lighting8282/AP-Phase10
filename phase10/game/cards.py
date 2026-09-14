@@ -77,6 +77,21 @@ def number_card(rank: int, color: Color) -> Card:
     return Card(Kind.NUMBER, rank, color)
 
 
+def card_filename(card: Card) -> str:
+    """Filename of this card's rendered face.
+
+    Lives beside the model rather than in the client so that the renderer
+    (tools/generate_cards.py, which loads this module directly) and the UI
+    that displays the result agree by construction. The deck holds 108 cards
+    but only 50 faces -- duplicates map to the same name.
+    """
+    if card.kind is Kind.WILD:
+        return "wild.png"
+    if card.kind is Kind.SKIP:
+        return "skip.png"
+    return f"{card.color.value}_{card.rank:02d}.png"
+
+
 def build_deck(wilds: int = STOCK_WILDS, skips: int = STOCK_SKIPS) -> list[Card]:
     """Build a deck. `wilds` and `skips` are driven by AP item counts."""
     if not 0 <= wilds <= STOCK_WILDS:
