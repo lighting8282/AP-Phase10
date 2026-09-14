@@ -1,0 +1,18 @@
+{
+  "name": "ap-phase10",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser client for Phase 10 for Archipelago",
+  "homepage": "https://lighting8282.github.io/AP-Phase10/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lighting8282/AP-Phase10.git"
+  },
+  "type": "module",
+  "scripts": {
+    "test": "node docs/test/crosscheck.mjs && node docs/test/crosscheck_engine.mjs && node docs/test/game_test.mjs",
+    "test:solver": "node docs/test/crosscheck.mjs",
+    "test:engine": "node docs/test/crosscheck_engine.mjs",
+    "test:game": "node docs/test/game_test.mjs"
+  }
+}
