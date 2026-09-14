@@ -302,6 +302,32 @@ It needs `kivy==2.3.1` and kivymd (AP pins a git commit) in the venv. Note that
 `kvui` must be imported before anything from `kivy` — it asserts on that for
 frozen-build compatibility, so do not let an import sorter reorder those lines.
 
+## Persistence
+
+The scorecard lives in Archipelago's Data Storage under
+`phase10_game_<team>_<slot>`, so it follows the slot rather than the machine:
+reconnect anywhere and the rounds, score and phase history come back.
+
+Saved on every settled round; restored on connect before anything is written
+back. That ordering matters — saving before the restore lands would overwrite a
+real scorecard with the empty one just built from slot_data, so the context
+tracks `needed / requested / done` and refuses to save until the restore has
+resolved.
+
+**Checked locations are deliberately not stored.** The server is the authority
+on those; a second copy could only ever disagree with it. What is stored is the
+part the server has no idea about — rounds, score, spent traps, an active Phase
+Lock.
+
+The payload comes back over the network, so nothing in it is trusted. A
+malformed, truncated or foreign-version payload is discarded whole and the game
+starts fresh rather than half-loading; `test_persistence.py` covers wrong types,
+bad versions, missing fields, unknown hand states and out-of-range values.
+
+Verified live: played to 530 points over 12 rounds, disconnected, reconnected
+with a fresh context, got 12 rounds and 530 points back, and carried on to round
+15 without restarting the numbering.
+
 ## Not built yet
 
 Score is local only — it resets on reconnect, since the session is rebuilt from

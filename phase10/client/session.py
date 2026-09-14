@@ -31,7 +31,7 @@ from ..data import (
 )
 from ..game.cards import STOCK_WILDS
 from ..game.engine import GameConfig, HandState, PhaseHand
-from ..game.game import Phase10Game, RoundResult
+from ..game.game import SAVE_VERSION, Phase10Game, RoundResult
 
 #: Traps are one-shot. Received counts only ever grow, so pending effects are
 #: tracked as (received - consumed) rather than by mutating the counts.
@@ -180,6 +180,45 @@ class Phase10Session:
         ]
         self.checked_locations.update(new)
         return new
+
+    # -- persistence -------------------------------------------------------
+    def to_payload(self) -> dict:
+        """Everything the server does not already know.
+
+        Checked locations are deliberately left out: the server is the
+        authority on those, and writing our own copy back would only create
+        something that could disagree with it.
+        """
+        return {
+            "version": SAVE_VERSION,
+            "game": self.game.to_payload(),
+            "consumed_traps": {k: int(v) for k, v in self.consumed_traps.items() if v},
+            "locked_phase": self.locked_phase,
+        }
+
+    def load_payload(self, payload: object) -> bool:
+        """Restore from a saved payload. Returns whether it took.
+
+        Treated as untrusted input -- it arrives over the network and a partial
+        restore would be worse than none.
+        """
+        if not isinstance(payload, dict) or payload.get("version") != SAVE_VERSION:
+            return False
+        if not self.game.load_payload(payload.get("game")):
+            return False
+
+        traps = payload.get("consumed_traps")
+        if isinstance(traps, dict):
+            try:
+                self.consumed_traps = Counter(
+                    {str(k): int(v) for k, v in traps.items()}
+                )
+            except (TypeError, ValueError):
+                self.consumed_traps = Counter()
+
+        locked = payload.get("locked_phase")
+        self.locked_phase = locked if isinstance(locked, int) and 1 <= locked <= 10 else None
+        return True
 
     # -- goal --------------------------------------------------------------
     @property

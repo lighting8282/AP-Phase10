@@ -23,6 +23,11 @@ from .cards import hand_score
 from .engine import GameConfig, HandState, PhaseHand
 
 
+#: Bumped when the saved shape changes. A payload from a different version is
+#: discarded rather than guessed at.
+SAVE_VERSION = 1
+
+
 @dataclass(frozen=True)
 class RoundResult:
     number: int
@@ -110,6 +115,57 @@ class Phase10Game:
         self.rounds.append(result)
         self.hand = None
         return result
+
+    # -- persistence -------------------------------------------------------
+    def to_payload(self) -> dict:
+        return {
+            "version": SAVE_VERSION,
+            "rounds": [
+                {
+                    "number": r.number,
+                    "phase": r.phase,
+                    "state": r.state.value,
+                    "score": r.score,
+                    "draws_used": r.draws_used,
+                    "wilds_used": r.wilds_used,
+                    "skips_played": r.skips_played,
+                }
+                for r in self.rounds
+            ],
+        }
+
+    def load_payload(self, payload: object) -> bool:
+        """Restore rounds from a saved payload. Returns whether it took.
+
+        The payload comes back off the network, so nothing in it is trusted:
+        anything malformed, truncated or from another save version is discarded
+        and the game simply starts fresh rather than half-loading.
+        """
+        if not isinstance(payload, dict) or payload.get("version") != SAVE_VERSION:
+            return False
+        raw_rounds = payload.get("rounds")
+        if not isinstance(raw_rounds, list):
+            return False
+
+        restored: list[RoundResult] = []
+        try:
+            for raw in raw_rounds:
+                restored.append(
+                    RoundResult(
+                        number=int(raw["number"]),
+                        phase=int(raw["phase"]),
+                        state=HandState(raw["state"]),
+                        score=int(raw["score"]),
+                        draws_used=int(raw["draws_used"]),
+                        wilds_used=int(raw["wilds_used"]),
+                        skips_played=int(raw["skips_played"]),
+                    )
+                )
+        except (KeyError, TypeError, ValueError):
+            return False
+
+        self.rounds = restored
+        return True
 
     def scorecard(self, limit: int = 10) -> list[str]:
         """Recent rounds plus the running totals, ready to print."""

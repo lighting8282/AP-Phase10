@@ -259,6 +259,16 @@ class Phase10Context(CommonContext):
         self.rng = random.Random()
         self.pending_locations: list[int] = []
         self.goal_sent = False
+        # "needed" -> ask, "requested" -> waiting, "done" -> safe to save.
+        # Saving before the restore lands would overwrite a real scorecard
+        # with the empty one we just built from slot_data.
+        self.restore_state = "needed"
+        self.save_pending = False
+
+    @property
+    def save_key(self) -> str:
+        """Data Storage key for this slot's scorecard."""
+        return f"phase10_game_{self.team}_{self.slot}"
 
     async def server_auth(self, password_requested: bool = False) -> None:
         if password_requested and not self.password:
@@ -272,10 +282,14 @@ class Phase10Context(CommonContext):
                 args.get("slot_data", {}), self.rng
             )
             self.goal_sent = False
+            self.restore_state = "needed"
+            self.save_pending = False
             self.sync_items()
             logger.info("Connected. /phases to see what you can play, /play <n> to start.")
         elif cmd == "ReceivedItems":
             self.sync_items()
+        elif cmd == "Retrieved":
+            self.restore_from(args.get("keys", {}))
 
     def sync_items(self) -> None:
         """Re-tally received items.
@@ -292,6 +306,20 @@ class Phase10Context(CommonContext):
         for phase in sorted(self.session.unlocked_phases - before):
             logger.info(f"Phase {phase} unlocked: {phase_description(phase)}")
 
+    def restore_from(self, keys: dict[str, Any]) -> None:
+        """Load a scorecard out of Data Storage, if there is one."""
+        if self.save_key not in keys:
+            return
+        payload = keys[self.save_key]
+        if self.session.load_payload(payload):
+            game = self.session.game
+            logger.info(
+                f"Restored {len(game.rounds)} round(s), {game.total_score} points."
+            )
+        elif payload is not None:
+            logger.info("Stored scorecard could not be read; starting a fresh one.")
+        self.restore_state = "done"
+
     def settle(self, hand, quiet: bool = False) -> None:
         """Finish a hand and queue whatever checks it earned."""
         new = self.session.finish_hand(hand)
@@ -300,9 +328,28 @@ class Phase10Context(CommonContext):
             logger.info(str(result))
         if new:
             self.pending_locations.extend(new)
+        self.save_pending = True
 
     async def phase10_loop(self) -> None:
         while not self.exit_event.is_set():
+            connected = self.server and not self.server.socket.closed
+
+            if connected and self.restore_state == "needed":
+                self.restore_state = "requested"
+                await self.send_msgs([{"cmd": "Get", "keys": [self.save_key]}])
+
+            if connected and self.save_pending and self.restore_state == "done":
+                self.save_pending = False
+                await self.send_msgs([{
+                    "cmd": "Set",
+                    "key": self.save_key,
+                    "default": {},
+                    "want_reply": False,
+                    "operations": [
+                        {"operation": "replace", "value": self.session.to_payload()}
+                    ],
+                }])
+
             if self.pending_locations and self.server and not self.server.socket.closed:
                 queued, self.pending_locations = self.pending_locations, []
                 await self.check_locations(queued)
