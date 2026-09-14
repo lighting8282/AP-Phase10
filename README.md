@@ -18,7 +18,7 @@ on their own.
         engine.py                solo hand: deal, draw, discard, lay down
         autoplay.py              greedy autoplayer (difficulty measurement)
         play_in_console.py       headless runner and difficulty sweeps
-    tests/test_phases.py         18 engine tests, no dependencies
+    tests/test_phases.py         engine tests, no dependencies
     tests/yaml/Phase10.yaml      generation smoke-test YAML
 
 ## Run
@@ -265,11 +265,47 @@ the deck it started with, and items earned along the way only apply once it
 finishes. Verified live — a 30-round grind ran all 30 at the starting config.
 Short grinds keep the two closer together.
 
+## UI
+
+`client/game_manager.py` adds a Phase 10 tab to the client window, alongside the
+usual Archipelago log and hints tabs.
+
+- the hand as colour-coded cards — click one to discard it
+- round, running score, wins, phases cleared
+- the current phase and its objective, draws left, stock, discard top, skips held
+- Draw / Take discard / Lay down / Dig / Auto / Score
+- a phase row: blue is unlocked, green is cleared, grey is locked out
+- when a Skip reveals the top of the pile, the three cards appear as buttons
+
+Two things worth knowing about how it is put together.
+
+**Every control routes through the command processor.** A button runs exactly
+what typing the command runs, so the two cannot drift — which is the same reason
+`/auto` and `/grind` share one autoplayer.
+
+**The view redraws only when a signature of the visible state changes.** A card
+game is idle between clicks; tearing down a dozen widgets four times a second to
+redraw an unchanged hand is waste.
+
+Kivy is imported lazily inside `make_gui`, so it stays off the import path for
+the headless tests and for anyone running without a display.
+
+### Checking it
+
+Kivy needs a real window, so the UI is not unit tested. `tests/ui_check.py`
+launches it with a seeded session, dispatches real button events to prove the
+bindings work, screenshots the result and exits:
+
+    <AP checkout>/.venv/Scripts/python.exe tests/ui_check.py out.png
+
+It needs `kivy==2.3.1` and kivymd (AP pins a git commit) in the venv. Note that
+`kvui` must be imported before anything from `kivy` — it asserts on that for
+frozen-build compatibility, so do not let an import sorter reorder those lines.
+
 ## Not built yet
 
-Any visual presentation beyond text. Score is local only — it resets on
-reconnect, since the session is rebuilt from slot_data and the server tracks
-checks, not points.
+Score is local only — it resets on reconnect, since the session is rebuilt from
+slot_data and the server tracks checks, not points.
 
 ## Naming
 

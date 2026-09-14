@@ -316,9 +316,11 @@ class Phase10Context(CommonContext):
             await asyncio.sleep(0.1)
 
     def make_gui(self):
-        ui = super().make_gui()
-        ui.base_title = "Archipelago Phase 10 Client"
-        return ui
+        # Imported here, not at module scope: kivy must stay off the import
+        # path for the headless tests and for anyone running without a display.
+        from .game_manager import Phase10Manager
+
+        return Phase10Manager
 
 
 async def main(args) -> None:
