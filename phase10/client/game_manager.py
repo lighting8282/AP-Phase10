@@ -11,6 +11,7 @@ a second to redraw the same hand is pure waste.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 # kvui MUST be imported before anything from kivy -- it asserts on that for
@@ -18,13 +19,15 @@ from typing import TYPE_CHECKING
 from kvui import GameManager
 
 from kivy.clock import Clock
+from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.gridlayout import GridLayout
+from kivy.uix.image import Image
 from kivy.uix.label import Label
 from kivy.uix.layout import Layout
 
-from ..game.cards import Color
+from ..game.cards import Color, card_filename
 from ..game.engine import HandState
 from ..game.phases import PHASES, phase_description
 
@@ -50,7 +53,36 @@ def card_color(card) -> tuple[float, float, float, float]:
     return CARD_COLORS[card.color]
 
 
-class CardButton(Button):
+CARD_ASSETS = Path(__file__).parent / "assets" / "cards"
+
+
+def card_image(card) -> str | None:
+    """Path to this card's rendered face, or None if it has not been generated.
+
+    Faces come from tools/generate_cards.py. They are ordinary repo files, so
+    normally they are simply present -- but a checkout that has not run the
+    generator should still get a usable client rather than a stack trace.
+    """
+    path = CARD_ASSETS / card_filename(card)
+    return str(path) if path.is_file() else None
+
+
+class CardFace(ButtonBehavior, Image):
+    """A rendered card that behaves like a button.
+
+    ButtonBehavior supplies on_release, so call sites bind to this exactly as
+    they did to the old Button. fit_mode="contain" keeps the 2:3 card shape
+    inside whatever cell the layout hands it, rather than stretching it.
+    """
+
+    def __init__(self, card, source: str, **kwargs) -> None:
+        super().__init__(source=source, fit_mode="contain", **kwargs)
+        self.card = card
+
+
+class CardChip(Button):
+    """Fallback face: the coloured text button used before the art existed."""
+
     def __init__(self, card, **kwargs) -> None:
         super().__init__(
             text=str(card),
@@ -60,6 +92,23 @@ class CardButton(Button):
             bold=True,
             **kwargs,
         )
+        self.card = card
+
+
+def make_card(card, **kwargs):
+    """A clickable card widget -- the rendered face when it exists."""
+    source = card_image(card)
+    if source is not None:
+        return CardFace(card, source, **kwargs)
+    return CardChip(card, **kwargs)
+
+
+# Row height for a card. The faces are 2:3, and fit_mode="contain" scales a
+# card to whichever of the cell's dimensions binds first -- so the row height
+# is what actually decides how big a card looks.
+CARD_ROW_HEIGHT = 96
+CARD_WIDTH = CARD_ROW_HEIGHT * 2 // 3   # the faces are rendered 2:3
+HAND_COLS = 8
 
 
 class Phase10View(BoxLayout):
@@ -173,23 +222,33 @@ class Phase10View(BoxLayout):
     def _render_hand(self, hand) -> None:
         self.hand_grid.clear_widgets()
         if hand is None:
+            self.hand_grid.height = CARD_ROW_HEIGHT
             return
         for index, card in enumerate(hand.hand):
-            button = CardButton(card)
+            button = make_card(card)
             button.bind(on_release=lambda _w, i=index: self.run(f"/discard {i}"))
             self.hand_grid.add_widget(button)
+
+        # A GridLayout splits its height evenly across however many rows it
+        # ends up with, so a fixed height shrinks every card as the hand grows.
+        # Size to the content instead and the cards stay legible.
+        rows = max(1, -(-len(hand.hand) // HAND_COLS))
+        self.hand_grid.height = rows * CARD_ROW_HEIGHT + (rows - 1) * self.hand_grid.spacing[1]
 
     def _render_dig(self, hand) -> None:
         self.dig_row.clear_widgets()
         if hand is None or not hand.dig_pending:
             self.dig_row.height = 0
             return
-        self.dig_row.height = 44
+        self.dig_row.height = CARD_ROW_HEIGHT
         self.dig_row.add_widget(Label(text="Keep one:", size_hint_x=None, width=90))
         for index, card in enumerate(hand.dig_options):
-            button = CardButton(card)
+            button = make_card(card, size_hint_x=None, width=CARD_WIDTH)
             button.bind(on_release=lambda _w, i=index: self.run(f"/take {i}"))
             self.dig_row.add_widget(button)
+        # Only three cards are revealed. Without a trailing spacer a BoxLayout
+        # would spread them across the whole row; this keeps them together.
+        self.dig_row.add_widget(BoxLayout())
 
     def _render_phases(self, session) -> None:
         self.phase_grid.clear_widgets()
