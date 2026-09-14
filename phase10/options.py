@@ -94,15 +94,22 @@ class ChecksPerPhase(Range):
     default = 4
 
 
-class IncludeSkips(Toggle):
+class SkipCardItems(Range):
     """
-    Put Skip cards in the deck.
+    How many Skip Card items go in the pool.
 
-    Solo play has no opponent to skip, so a Skip is simply fifteen points of
-    dead weight clogging your hand. Off by default. Turn it on only if you want
-    the deck to match the physical one.
+    Each one puts a Skip in your hand at the start of every hand, dealt on top
+    of your hand size so it costs no room. Play it to look at the top three of
+    the draw pile and keep one, free -- the Skip becomes that turn's discard.
+
+    Skips are granted, never shuffled into the deck. Measured in the deck they
+    turn up about a third of a hand and are a straight loss; held, the first one
+    is worth roughly twelve points of success rate on the hardest phases.
     """
-    display_name = "Include Skips"
+    display_name = "Skip Card Items"
+    range_start = 0
+    range_end = 4
+    default = 4
 
 
 class TrapChance(Range):
@@ -124,14 +131,15 @@ class Phase10Options(PerGameCommonOptions):
     wild_card_items: WildCardItems
     hand_size_upgrades: HandSizeUpgrades
     checks_per_phase: ChecksPerPhase
-    include_skips: IncludeSkips
+    skip_card_items: SkipCardItems
     trap_chance: TrapChance
 
 
 option_groups = [
     OptionGroup("Goal", [Goal, ChecksPerPhase, StartingPhases]),
-    OptionGroup("Difficulty", [StartingDraws, ExtraDrawItems, WildCardItems, HandSizeUpgrades]),
-    OptionGroup("Deck", [IncludeSkips, TrapChance]),
+    OptionGroup("Difficulty", [StartingDraws, ExtraDrawItems, WildCardItems,
+                               HandSizeUpgrades, SkipCardItems]),
+    OptionGroup("Deck", [TrapChance]),
 ]
 
 option_presets = {
@@ -143,7 +151,7 @@ option_presets = {
         "wild_card_items": 8,
         "hand_size_upgrades": 0,
         "checks_per_phase": 4,
-        "include_skips": False,
+        "skip_card_items": 0,
         "trap_chance": 20,
     },
     "short": {
@@ -154,7 +162,7 @@ option_presets = {
         "wild_card_items": 8,
         "hand_size_upgrades": 2,
         "checks_per_phase": 2,
-        "include_skips": False,
+        "skip_card_items": 4,
         "trap_chance": 0,
     },
 }

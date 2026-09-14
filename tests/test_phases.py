@@ -165,6 +165,64 @@ def test_all_phases_have_sane_specs():
         assert phase_description(p)
 
 
+def test_granted_skips_are_dealt_on_top_of_the_hand():
+    from game.engine import GameConfig, PhaseHand
+    cfg = GameConfig(hand_size=10, wilds_in_deck=8, starting_skips=2, max_draws=8)
+    h = PhaseHand(1, cfg, random.Random(3))
+    assert len(h.hand) == 12, "granted skips must not eat hand room"
+    assert h.skips_in_hand == 2
+    assert sum(1 for c in h.stock if c.is_skip) == 0, "skips must not be in the deck"
+
+
+def test_playing_a_skip_reveals_the_top_of_the_stock():
+    from game.engine import GameConfig, PhaseHand, SKIP_DIG_DEPTH
+    cfg = GameConfig(hand_size=10, starting_skips=1, max_draws=8)
+    h = PhaseHand(1, cfg, random.Random(3))
+    expected = list(h.stock[:SKIP_DIG_DEPTH])
+    options = h.play_skip()
+    assert options == expected
+    assert h.skips_in_hand == 0, "the skip leaves your hand"
+    assert h.discard_top.is_skip, "the skip becomes the discard"
+    assert h.dig_pending
+
+
+def test_taking_a_dug_card_buries_the_rest_and_costs_no_draw():
+    from game.engine import GameConfig, PhaseHand
+    cfg = GameConfig(hand_size=10, starting_skips=1, max_draws=8)
+    h = PhaseHand(1, cfg, random.Random(3))
+    before_hand, before_stock = len(h.hand), len(h.stock)
+    options = h.play_skip()
+    kept = h.take_dug(1)
+    assert kept in h.hand
+    assert h.draws_used == 0, "a dig must not spend a draw"
+    assert len(h.hand) == before_hand, "skip out, card in"
+    assert h.stock[-2:] == [options[0], options[2]], "rejects go to the bottom"
+    assert len(h.stock) == before_stock - 1
+    assert not h.dig_pending
+
+
+def test_digging_without_a_skip_is_refused():
+    from game.engine import GameConfig, PhaseHand
+    h = PhaseHand(1, GameConfig(starting_skips=0), random.Random(3))
+    try:
+        h.play_skip()
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("expected a refusal with no Skip in hand")
+
+
+def test_taking_without_a_dig_is_refused():
+    from game.engine import GameConfig, PhaseHand
+    h = PhaseHand(1, GameConfig(starting_skips=1), random.Random(3))
+    try:
+        h.take_dug(0)
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("expected a refusal with nothing revealed")
+
+
 def test_solver_is_fast_on_random_hands():
     rng = random.Random(1234)
     start = time.perf_counter()

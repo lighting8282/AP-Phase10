@@ -11,5 +11,5 @@ Phase 10:
   wild_card_items: 8
   hand_size_upgrades: 2
   checks_per_phase: 4
-  include_skips: false
+  skip_card_items: 4
   trap_chance: 10

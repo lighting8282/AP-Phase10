@@ -6,14 +6,14 @@ import unittest
 from ..client.session import LEAN_DEAL_PENALTY, Phase10Session
 from ..data import (
     BASE_HAND_SIZE, EXTRA_DRAW, HAND_SIZE_UPGRADE, LEAN_DEAL, LOCATION_NAME_TO_ID,
-    PHASE_LOCK, PHASE_UNLOCK, WILD_CARD, WILD_THEFT,
+    MAX_SKIPS, PHASE_LOCK, PHASE_UNLOCK, SKIP_CARD, WILD_CARD, WILD_THEFT,
 )
 from ..game.cards import STOCK_WILDS
 from ..game.engine import HandState
 
 
 def session(**slot) -> Phase10Session:
-    base = {"goal": 0, "starting_draws": 4, "checks_per_phase": 4, "include_skips": False}
+    base = {"goal": 0, "starting_draws": 4, "checks_per_phase": 4}
     base.update(slot)
     return Phase10Session.from_slot_data(base)
 
@@ -34,6 +34,8 @@ class TestConfigDerivation(unittest.TestCase):
         self.assertEqual(c.hand_size, BASE_HAND_SIZE)
         self.assertEqual(c.wilds_in_deck, 0)
         self.assertEqual(c.max_draws, 4)
+        self.assertEqual(c.starting_skips, 0)
+        # Skips are granted into hand, never shuffled into the draw pile.
         self.assertEqual(c.skips_in_deck, 0)
 
     def test_items_feed_straight_into_the_knobs(self) -> None:
@@ -49,8 +51,16 @@ class TestConfigDerivation(unittest.TestCase):
         s.set_items([WILD_CARD] * 20)
         self.assertEqual(s.config.wilds_in_deck, STOCK_WILDS)
 
-    def test_skips_follow_the_option(self) -> None:
-        self.assertEqual(session(include_skips=True).config.skips_in_deck, 4)
+    def test_skip_cards_are_granted_into_hand(self) -> None:
+        s = session()
+        s.set_items([SKIP_CARD] * 3)
+        self.assertEqual(s.config.starting_skips, 3)
+        self.assertEqual(s.config.skips_in_deck, 0)
+
+    def test_skip_cards_are_capped(self) -> None:
+        s = session()
+        s.set_items([SKIP_CARD] * 9)
+        self.assertEqual(s.config.starting_skips, MAX_SKIPS)
 
 
 class TestTraps(unittest.TestCase):

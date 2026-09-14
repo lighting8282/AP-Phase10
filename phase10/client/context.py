@@ -66,7 +66,7 @@ class Phase10CommandProcessor(ClientCommandProcessor):
         c = s.config
         self.output(
             f"hand size {c.hand_size} | wilds in deck {c.wilds_in_deck} "
-            f"| draws per hand {c.max_draws} | skips {c.skips_in_deck}"
+            f"| draws per hand {c.max_draws} | skips per hand {c.starting_skips}"
         )
         self.output(
             f"phases unlocked {len(s.unlocked_phases)}/10 "
@@ -103,6 +103,8 @@ class Phase10CommandProcessor(ClientCommandProcessor):
             f"discard top {hand.discard_top} | draws left {hand.draws_left} "
             f"| stock {len(hand.stock)}"
         )
+        if hand.skips_in_hand:
+            self.output(f"{hand.skips_in_hand} Skip(s) in hand -- /skip digs for free")
         if hand.can_lay_down():
             self.output("You can lay this phase down now: /lay")
 
@@ -135,6 +137,37 @@ class Phase10CommandProcessor(ClientCommandProcessor):
             self.output(str(e))
             return
         self.output(f"discarded {card}")
+        if hand.state is HandState.FAILED:
+            self.ctx.settle(hand)
+        else:
+            self._cmd_hand()
+
+    def _cmd_skip(self) -> None:
+        """Spend a Skip to look at the top of the draw pile. Then /take <i>."""
+        hand = self._require_hand()
+        if hand is None:
+            return
+        try:
+            options = hand.play_skip()
+        except RuntimeError as e:
+            self.output(str(e))
+            return
+        shown = "  ".join(f"[{i}]{c}" for i, c in enumerate(options))
+        self.output(f"top of the pile: {shown}")
+        self.output("Keep one with /take <i>; the rest go to the bottom.")
+
+    def _cmd_take(self, index: str) -> None:
+        """Keep one of the cards a Skip revealed. Usage: /take 1"""
+        hand = self.ctx.session.hand
+        if hand is None or not hand.dig_pending:
+            self.output("Nothing revealed. Play a Skip first with /skip.")
+            return
+        try:
+            card = hand.take_dug(int(index))
+        except (ValueError, IndexError) as e:
+            self.output(str(e) if isinstance(e, IndexError) else "Give a number.")
+            return
+        self.output(f"kept {card}")
         if hand.state is HandState.FAILED:
             self.ctx.settle(hand)
         else:

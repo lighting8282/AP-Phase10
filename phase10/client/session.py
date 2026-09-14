@@ -19,9 +19,10 @@ from ..data import (
     HANDS_WON_MILESTONES,
     LEAN_DEAL,
     LOCATION_NAME_TO_ID,
+    MAX_SKIPS,
     PHASE_LOCK,
     PHASE_UNLOCK,
-    STOCK_SKIPS,
+    SKIP_CARD,
     TIERS,
     WILD_CARD,
     WILD_THEFT,
@@ -43,7 +44,6 @@ class Phase10Session:
     goal: int = 0
     starting_draws: int = 4
     checks_per_phase: int = 4
-    include_skips: bool = False
 
     items: Counter = field(default_factory=Counter)
     consumed_traps: Counter = field(default_factory=Counter)
@@ -59,7 +59,6 @@ class Phase10Session:
             goal=int(slot_data.get("goal", 0)),
             starting_draws=int(slot_data.get("starting_draws", 4)),
             checks_per_phase=int(slot_data.get("checks_per_phase", 4)),
-            include_skips=bool(slot_data.get("include_skips", False)),
         )
 
     # -- items -------------------------------------------------------------
@@ -91,8 +90,8 @@ class Phase10Session:
         return GameConfig(
             hand_size=max(4, hand_size),
             wilds_in_deck=max(0, min(wilds, STOCK_WILDS)),
-            skips_in_deck=STOCK_SKIPS if self.include_skips else 0,
             max_draws=max(1, draws),
+            starting_skips=min(self.items[SKIP_CARD], MAX_SKIPS),
         )
 
     # -- playing -----------------------------------------------------------

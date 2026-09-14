@@ -47,9 +47,9 @@ Then, from the Archipelago root:
 
     python -m unittest discover -s worlds/phase10/test -t . -p "test_*.py"
 
-**Items.** Ten phase unlocks, Wild Card, Extra Draw, Hand Size Upgrade, plus
-filler and traps. The deck starts with no wilds at all and a small draw budget;
-items build both back up.
+**Items.** Ten phase unlocks, Wild Card, Extra Draw, Hand Size Upgrade, Skip
+Card, plus filler and traps. The deck starts with no wilds at all and a small
+draw budget; items build both back up.
 
 Only as many Wild Cards and Extra Draws as logic can actually demand are
 classified `progression` — the surplus is `useful`. Without that split the pool
@@ -141,10 +141,6 @@ being progression.
 
 ## Open design questions
 
-- **Skips have no solo meaning.** With no opponent to skip, a Skip is 15 points
-  of dead weight, which makes "Skip Card" a trap rather than a reward. Either
-  cut it as an item or give Skips a solo use (e.g. play one to burn stock and
-  dig). Currently they are dead weight, faithful to the card.
 - **All-wild groups.** Official rules forbid completing a phase entirely with
   wilds, but printings vary. Exposed as `min_naturals_per_group`, default 1.
 - **COLOR groups only solve as a phase's sole group** (fine for the stock ten).
@@ -164,6 +160,8 @@ rendering layer to maintain.
     /hand       your cards, the discard top, draws left
     /draw [d]   draw from stock, or from the discard with `d`
     /discard <i>  discard by position
+    /skip       spend a Skip to see the top three of the pile
+    /take <i>   keep one of the revealed cards
     /lay        lay the phase down
     /auto       play the current hand out with the greedy player
 
@@ -202,10 +200,45 @@ interactive prompt that EOFs when there is no stdin. Setting
 `ModuleUpdate.update_ran = True` before importing `Generate` skips the check
 entirely; the venv also has `setuptools<81`, which fixes it properly.
 
+## Skips
+
+A Skip has no opponent to deny in solo play, so it digs instead. Play one to see
+the top three of the draw pile and keep a card; the Skip becomes that turn's
+discard, and the dig costs no draw. That sells **selection**, which is the
+resource a solo player actually lacks — Extra Draw already sells volume.
+
+Getting there took three measured attempts, and the first two were wrong.
+
+| design | result |
+|---|---|
+| dig costs a draw, Skips shuffled into the deck | −1% to −7% on every phase |
+| dig is free, Skips still in the deck | −4% to +2%, mostly still negative |
+| dig is free, Skips **granted into hand** | +7 to +12 points per Skip |
+
+The first two failed for the same reason, which only showed up when instrumented:
+**a Skip shuffled into a 108-card deck is played 0.34 times per hand.** Two
+thirds of hands never see one, so it cannot repay the density it costs every
+other draw no matter how strong each use is — deepening the dig from 3 cards to
+8 moved Phase 6 only from 53% to 56%. The lever was access, not power.
+
+So Skip Cards are granted, never shuffled in: each item puts a Skip in your hand
+at the start of every hand, dealt on top of your hand size so holding one costs
+no room to build the phase in.
+
+Success rate at 8 draws with stock wilds:
+
+| phase | none | 1 Skip | 2 Skips | 4 Skips |
+|---|---|---|---|---|
+| 6 — run of 9 | 59% | 71% | 83% | 96% |
+| 7 — 2 sets of 4 | 31% | 43% | 61% | 87% |
+| 10 — set of 5 + set of 3 | 33% | 45% | 64% | 87% |
+
+Skip Card is classified `useful`, not `progression`, so no access rule depends
+on it and the fill balance is unchanged.
+
 ## Not built yet
 
 A multi-hand game loop with scoring, and any visual presentation beyond text.
-Skips still have no solo purpose (see the open questions above).
 
 ## Naming
 

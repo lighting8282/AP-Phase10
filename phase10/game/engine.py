@@ -5,6 +5,11 @@ pile: you get a bounded number of draws to lay your phase down. That removes
 the need for opponent AI entirely, and makes every AP item that adds wilds or
 draws directly, measurably valuable.
 
+Skips have no opponent to skip, so they dig instead: play one to see the top
+of the stock and keep a card of your choice. That trades the game's only dead
+weight for selection, which is the resource a solo player actually lacks --
+Extra Draw already sells volume.
+
 The engine is pure -- no I/O, no UI, no Archipelago imports. A client drives it
 turn by turn and reads `events` to decide which locations to check.
 """
@@ -16,10 +21,14 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from enum import Enum
 
-from .cards import WILD, Card, Color, hand_score, number_card, shuffled_deck
+from .cards import SKIP, WILD, Card, Color, hand_score, number_card, shuffled_deck
 from .phases import (
     PHASES, GroupKind, GroupSpec, Layout, PhaseSpec, phase_card_count, solve_phase,
 )
+
+
+#: How deep into the stock a played Skip lets you look.
+SKIP_DIG_DEPTH = 3
 
 
 class HandState(Enum):
@@ -35,8 +44,14 @@ class GameConfig:
 
     hand_size: int = 10           # "Hand Size +1" items
     wilds_in_deck: int = 8        # "Wild Card" items
-    skips_in_deck: int = 4        # "Skip Card" items
     max_draws: int = 20           # "Extra Draw" items
+    starting_skips: int = 0       # "Skip Card" items
+
+    #: Skips shuffled into the draw pile, for fidelity to the physical deck.
+    #: Measured as a straight loss -- they turn up 0.34 times per hand, too
+    #: rarely to repay the density they cost every other draw -- so Archipelago
+    #: grants Skips via `starting_skips` instead and leaves this at zero.
+    skips_in_deck: int = 0
     min_naturals_per_group: int = 1
     allow_discard_draw: bool = True
 
@@ -59,6 +74,9 @@ class PhaseHand:
 
         deck = shuffled_deck(rng, config.wilds_in_deck, config.skips_in_deck)
         self.hand: list[Card] = deck[: config.hand_size]
+        # Granted Skips are dealt on top of the hand rather than out of it, so
+        # holding them costs no room to build the phase in.
+        self.hand += [SKIP] * config.starting_skips
         rest = deck[config.hand_size:]
         self.discard: list[Card] = [rest[0]]
         self.stock: list[Card] = rest[1:]
@@ -69,6 +87,8 @@ class PhaseHand:
         self.events: list[HandEvent] = []
         self.drew_this_turn = False
         self.used_wilds_in_layout = 0
+        self.skips_played = 0
+        self.dig_options: list[Card] | None = None
 
     # -- queries -----------------------------------------------------------
     @property
@@ -78,6 +98,14 @@ class PhaseHand:
     @property
     def discard_top(self) -> Card | None:
         return self.discard[-1] if self.discard else None
+
+    @property
+    def dig_pending(self) -> bool:
+        return self.dig_options is not None
+
+    @property
+    def skips_in_hand(self) -> int:
+        return sum(1 for c in self.hand if c.is_skip)
 
     def solution(self) -> Layout | None:
         return solve_phase(self.hand, self.spec,
@@ -114,7 +142,66 @@ class PhaseHand:
         self.hand.remove(card)
         self.discard.append(card)
         self.drew_this_turn = False
-        if self.draws_left == 0 and self.state is HandState.IN_PROGRESS:
+        self._fail_if_out_of_road()
+
+    def play_skip(self) -> list[Card]:
+        """Spend a Skip to look at the top of the stock.
+
+        The Skip becomes this turn's discard, so no separate discard follows --
+        that is what keeps hand size stable and lets the Skip shed itself. The
+        dig costs no draw: a Skip denies a turn in the real game, so here it
+        grants one that does not count. Resolve the reveal with `take_dug`.
+        """
+        if self.state is not HandState.IN_PROGRESS:
+            raise RuntimeError(f"hand is {self.state.value}")
+        if self.dig_options is not None:
+            raise RuntimeError("finish the current dig first")
+        if self.drew_this_turn:
+            raise RuntimeError("already drew this turn; discard first")
+        skip = next((c for c in self.hand if c.is_skip), None)
+        if skip is None:
+            raise RuntimeError("no Skip in hand")
+        if not self.stock:
+            raise RuntimeError("stock is empty")
+
+        self.hand.remove(skip)
+        self.discard.append(skip)
+        depth = min(SKIP_DIG_DEPTH, len(self.stock))
+        self.dig_options = self.stock[:depth]
+        del self.stock[:depth]
+        return list(self.dig_options)
+
+    def take_dug(self, index: int) -> Card:
+        """Keep one revealed card; the rest go to the bottom of the stock."""
+        if self.dig_options is None:
+            raise RuntimeError("no dig in progress")
+        if not 0 <= index < len(self.dig_options):
+            raise IndexError(f"pick 0..{len(self.dig_options) - 1}")
+
+        chosen = self.dig_options.pop(index)
+        self.hand.append(chosen)
+        self.stock.extend(self.dig_options)
+        self.dig_options = None
+
+        # A dig deliberately does NOT spend a draw. Charging for it made Skips
+        # a net loss in simulation (-1% to -7% across every phase): you burn a
+        # draw finding the Skip and another using it, and a choice of three
+        # does not pay for two turns. Free, the cycle costs only the draw that
+        # turned up the Skip, which a choice of three clearly beats.
+        self.skips_played += 1
+        self.drew_this_turn = False
+        self._emit("skip_dug", card=str(chosen))
+        self._fail_if_out_of_road()
+        return chosen
+
+    def _fail_if_out_of_road(self) -> None:
+        # A budget that just ran out is only a loss if the phase is not already
+        # satisfiable -- otherwise the player is entitled to lay it down.
+        if (
+            self.state is HandState.IN_PROGRESS
+            and self.draws_left == 0
+            and not self.can_lay_down()
+        ):
             self.mark_failed("out_of_draws")
 
     def lay_down(self) -> Layout:

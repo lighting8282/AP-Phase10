@@ -4,9 +4,10 @@ Not meant to be a strong player -- meant to be a *consistent* one, so that
 simulated success rates are a usable proxy for phase difficulty when tuning
 Archipelago logic rules.
 
-Policy: draw the discard top only when it strictly reduces `cards_short`;
-otherwise draw stock. Discard whichever card leaves `cards_short` lowest,
-breaking ties by dumping the highest point value.
+Policy: if holding a Skip, dig with it -- a choice of three beats a blind draw,
+and the Skip is dead weight otherwise. Failing that, draw the discard top only
+when it strictly reduces `cards_short`, else draw stock. Discard whichever card
+leaves `cards_short` lowest, breaking ties by dumping the highest point value.
 """
 
 from __future__ import annotations
@@ -33,6 +34,14 @@ def choose_discard(hand: list[Card], spec: PhaseSpec, cfg: GameConfig) -> Card:
     return best
 
 
+def choose_dig(options: list[Card], hand: list[Card], spec: PhaseSpec, cfg: GameConfig) -> int:
+    """Pick the revealed card that leaves the hand closest to the phase."""
+    return min(
+        range(len(options)),
+        key=lambda i: (_short(hand + [options[i]], spec, cfg), -options[i].points),
+    )
+
+
 def play_hand(phase: int, cfg: GameConfig, rng: random.Random) -> PhaseHand:
     h = PhaseHand(phase, cfg, rng)
     spec = h.spec
@@ -44,6 +53,15 @@ def play_hand(phase: int, cfg: GameConfig, rng: random.Random) -> PhaseHand:
         if not h.stock:
             h.mark_failed("stock_empty")
             break
+
+        # A Skip in hand is strictly better spent than held: it buys a choice
+        # of three for the same one draw, and sheds itself as the discard.
+        if h.skips_in_hand and h.stock:
+            options = h.play_skip()
+            h.take_dug(choose_dig(options, h.hand, spec, cfg))
+            if h.can_lay_down():
+                h.lay_down()
+            continue
 
         base = _short(h.hand, spec, cfg)
         top = h.discard_top

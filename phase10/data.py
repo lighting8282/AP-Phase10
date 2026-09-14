@@ -15,6 +15,7 @@ PHASE_CLEAR_EVENT = "Phase {} Clear"
 WILD_CARD = "Wild Card"
 EXTRA_DRAW = "Extra Draw"
 HAND_SIZE_UPGRADE = "Hand Size Upgrade"
+SKIP_CARD = "Skip Card"
 
 PHASE_LOCK = "Phase Lock"
 LEAN_DEAL = "Lean Deal"
@@ -28,6 +29,7 @@ ITEM_NAME_TO_ID = {
     WILD_CARD: 20,
     EXTRA_DRAW: 21,
     HAND_SIZE_UPGRADE: 22,
+    SKIP_CARD: 23,
     PHASE_LOCK: 30,
     LEAN_DEAL: 31,
     WILD_THEFT: 32,
@@ -67,4 +69,7 @@ LOCATION_NAME_TO_ID = {
 
 #: Baseline deck and deal, before any Archipelago item is applied.
 BASE_HAND_SIZE = 10
-STOCK_SKIPS = 4
+
+#: Skips are granted into hand, never shuffled in, so this caps the item count
+#: rather than describing the deck.
+MAX_SKIPS = 4

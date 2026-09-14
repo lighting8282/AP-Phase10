@@ -44,5 +44,5 @@ class Phase10World(World):
         # The client builds its GameConfig from these; the engine's knobs map
         # one-to-one onto the option names.
         return self.options.as_dict(
-            "goal", "starting_draws", "checks_per_phase", "include_skips",
+            "goal", "starting_draws", "checks_per_phase",
         )

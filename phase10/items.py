@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from BaseClasses import Item, ItemClassification
 
-from .data import FILLERS, ITEM_NAME_TO_ID, PHASE_UNLOCK, TRAPS
+from .data import FILLERS, ITEM_NAME_TO_ID, PHASE_UNLOCK, SKIP_CARD, TRAPS
 from .rules import MIN_EXTRA_DRAWS, MIN_WILD_CARDS
 
 if TYPE_CHECKING:
@@ -15,6 +15,7 @@ DEFAULT_ITEM_CLASSIFICATIONS = {
     "Wild Card": ItemClassification.progression,
     "Extra Draw": ItemClassification.progression,
     "Hand Size Upgrade": ItemClassification.useful,
+    SKIP_CARD: ItemClassification.useful,
     "Phase Lock": ItemClassification.trap,
     "Lean Deal": ItemClassification.trap,
     "Wild Theft": ItemClassification.trap,
@@ -71,11 +72,13 @@ def build_power_item_counts(world: Phase10World, capacity: int) -> dict[str, int
         "Wild Card": int(world.options.wild_card_items),
         "Extra Draw": int(world.options.extra_draw_items),
         "Hand Size Upgrade": int(world.options.hand_size_upgrades),
+        SKIP_CARD: int(world.options.skip_card_items),
     }
-    floors = {"Wild Card": MIN_WILD_CARDS, "Extra Draw": MIN_EXTRA_DRAWS, "Hand Size Upgrade": 0}
+    floors = {"Wild Card": MIN_WILD_CARDS, "Extra Draw": MIN_EXTRA_DRAWS,
+              "Hand Size Upgrade": 0, SKIP_CARD: 0}
 
     # Trim in this order until the pool fits, never below the logic floors.
-    for name in ("Hand Size Upgrade", "Extra Draw", "Wild Card"):
+    for name in (SKIP_CARD, "Hand Size Upgrade", "Extra Draw", "Wild Card"):
         while unlocks + sum(counts.values()) > capacity and counts[name] > floors[name]:
             counts[name] -= 1
     return counts
@@ -111,7 +114,7 @@ def create_all_items(world: Phase10World) -> None:
     ]
 
     floors = {"Wild Card": MIN_WILD_CARDS, "Extra Draw": MIN_EXTRA_DRAWS,
-              "Hand Size Upgrade": 0}
+              "Hand Size Upgrade": 0, SKIP_CARD: 0}
     for name, count in build_power_item_counts(world, capacity).items():
         required = min(count, floors[name])
         itempool += [world.create_item(name) for _ in range(required)]

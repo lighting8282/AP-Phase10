@@ -69,10 +69,12 @@ def main(argv=None) -> int:
     ap.add_argument("--hand-size", type=int, default=10)
     ap.add_argument("--wilds", type=int, default=8)
     ap.add_argument("--max-draws", type=int, default=20)
+    ap.add_argument("--skips", type=int, default=4)
     ap.add_argument("--seed", type=int, default=0)
     a = ap.parse_args(argv)
 
-    cfg = GameConfig(hand_size=a.hand_size, wilds_in_deck=a.wilds, max_draws=a.max_draws)
+    cfg = GameConfig(hand_size=a.hand_size, wilds_in_deck=a.wilds,
+                     skips_in_deck=a.skips, max_draws=a.max_draws)
     if a.sweep:
         sweep_wilds(a.trials, cfg)
     elif a.draws:
