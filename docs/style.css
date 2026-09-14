@@ -1,0 +1,90 @@
+:root {
+  --bg: #0b1220;
+  --panel: #131c2e;
+  --ink: #e8edf7;
+  --muted: #9fb0cc;
+  --line: #2a3855;
+  --accent: #3f6fd0;
+  --cleared: #2e8b57;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0 0 3rem;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 0.75rem 1rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+
+h1 { margin: 0 0 0.5rem; font-size: 1.1rem; letter-spacing: 0.02em; }
+h2 { margin: 1.4rem 0 0.5rem; font-size: 0.95rem; }
+h2 small { color: var(--muted); font-weight: normal; }
+
+main { padding: 0 1rem; max-width: 60rem; margin: 0 auto; }
+
+input, button {
+  font: inherit;
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: #0f1728;
+  color: var(--ink);
+}
+
+button { cursor: pointer; background: #22304d; }
+button:hover:not(:disabled) { background: #2c3e63; }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+#status { color: var(--muted); margin-left: 0.5rem; }
+#status.live { color: #6ee7a8; }
+#status.error { color: #ff9a9a; }
+
+#summary { font-size: 1.05rem; margin-top: 1rem; }
+#objective { margin-top: 0.3rem; }
+#stats { color: var(--muted); margin-top: 0.3rem; }
+
+.cards { display: flex; flex-wrap: wrap; gap: 0.5rem; min-height: 8.5rem; }
+
+.card {
+  padding: 0;
+  border: none;
+  background: none;
+  line-height: 0;
+  border-radius: 8px;
+}
+.card img { width: 76px; height: 114px; border-radius: 8px; display: block; }
+.card:hover img { outline: 2px solid var(--accent); }
+
+#actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
+
+#phases { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+#phases button { min-width: 3rem; }
+#phases button.open { background: var(--accent); }
+#phases button.cleared { background: var(--cleared); }
+
+pre {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin: 0;
+  max-height: 14rem;
+  overflow: auto;
+  color: var(--muted);
+  white-space: pre-wrap;
+}
+
+@media (max-width: 480px) {
+  .card img { width: 58px; height: 87px; }
+}

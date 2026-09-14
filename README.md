@@ -328,6 +328,60 @@ Verified live: played to 530 points over 12 rounds, disconnected, reconnected
 with a fresh context, got 12 rounds and 530 points back, and carried on to round
 15 without restarting the numbering.
 
+## Browser version
+
+`docs/` is the web root, laid out for GitHub Pages ("Deploy from a branch:
+main, /docs"). Open `docs/index.html` over HTTP and it is the whole game: the
+rules run in the browser, `archipelago.js` talks to the server.
+
+    docs/index.html          the page
+    docs/style.css
+    docs/src/ui.js           DOM layer, holds no game state of its own
+    docs/src/client.js       Archipelago wiring, no DOM
+    docs/src/session.js      items to config, hand to location IDs
+    docs/src/{cards,phases,engine,game}.js   the rules, ported from Python
+    docs/assets/cards/       the same 51 faces the Kivy client uses
+    docs/node_modules/       archipelago.js, vendored
+
+`archipelago.js` is vendored rather than pulled from a CDN, the way ap-rummy
+does it: Pages serves it with no build step and the game gains no runtime
+dependency on anyone else's uptime. It has no dependencies of its own, so the
+vendored tree is one package.
+
+The card faces exist twice, under `phase10/` and under `docs/`, because the
+apworld ships as a zip of `phase10/` and Pages cannot reach above `docs/`. One
+run of `tools/generate_cards.py` writes both rather than leaving the second to
+be remembered.
+
+### Verified against a live server
+
+Served `docs/`, drove the page in a real browser, clicked through a hand with
+the actual buttons: phase cleared, **four checks acknowledged, missing 50 to
+46**, and the item that check awarded came back and appeared in the log.
+Reloading and reconnecting restored the scorecard.
+
+Then the Python client was pointed at the same slot and **read the scorecard
+the browser had written** -- same Data Storage key, same payload -- so a game
+started in one continues in the other.
+
+### One bug that only a browser could have found
+
+`login(url, slot, game, { password: password || undefined })` hangs for the
+full ten-second timeout and reports the server as unresponsive. archipelago.js
+spreads those options over its defaults, so an explicit `undefined` overwrites
+the default empty string. `|| undefined` is precisely the idiom to reach for
+there and precisely the wrong one; omit the key instead. Node never saw it,
+because the node check passed no options at all.
+
+### Not wired up yet
+
+Pages itself is not enabled -- that is a repository setting, not a commit:
+Settings, Pages, Deploy from a branch, `main`, `/docs`.
+
+There is no autoplay in the browser. `/auto` and `/grind` exist only in the
+Kivy client, because porting the autoplayer without a differential test would
+be exactly the drift the rest of this is careful to avoid.
+
 ## Not built yet
 
 Score is local only — it resets on reconnect, since the session is rebuilt from

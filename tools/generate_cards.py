@@ -272,12 +272,20 @@ def verify_palette() -> list[str]:
 
 # ---------------------------------------------------------------------------
 
+#: The apworld ships as a zip of phase10/, so its assets must live inside it;
+#: GitHub Pages serves docs/ and cannot reach above it. Both copies are
+#: genuinely required, so one run writes both rather than leaving the second
+#: to be remembered.
+DEFAULT_OUTPUTS = ("phase10/client/assets/cards", "docs/assets/cards")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    ap.add_argument("--out", default="phase10/client/assets/cards", help="output directory")
+    ap.add_argument("--out", action="append", default=None,
+                    help="output directory; repeatable. Defaults to every DEFAULT_OUTPUT.")
     ap.add_argument("--width", type=int, default=200)
     ap.add_argument("--height", type=int, default=300)
     ap.add_argument("--scale", type=float, default=1.0, help="multiply both dimensions")
@@ -300,23 +308,28 @@ def main() -> int:
 
     w = int(args.width * args.scale)
     h = int(args.height * args.scale)
-    out = Path(args.out)
-    if not out.is_absolute():
-        out = PROJECT_ROOT / out
-    out.mkdir(parents=True, exist_ok=True)
 
-    written = 0
+    targets = []
+    for raw in (args.out or DEFAULT_OUTPUTS):
+        out = Path(raw)
+        targets.append(out if out.is_absolute() else PROJECT_ROOT / out)
+
+    faces = {}
     for rank in range(MIN_RANK, MAX_RANK + 1):
         for color in Color:
             card = Card(Kind.NUMBER, rank, color)
-            render_number(rank, color, w, h, args.font).save(out / card_filename(card))
-            written += 1
-    render_wild(w, h, args.font).save(out / "wild.png")
-    render_skip(w, h, args.font).save(out / "skip.png")
-    render_back(w, h, args.font).save(out / "back.png")
-    written += 3
+            faces[card_filename(card)] = render_number(rank, color, w, h, args.font)
+    faces["wild.png"] = render_wild(w, h, args.font)
+    faces["skip.png"] = render_skip(w, h, args.font)
+    faces["back.png"] = render_back(w, h, args.font)
 
-    print(f"wrote {written} faces at {w}x{h} to {out}")
+    # Rendered once, written everywhere: two copies that drift are worse than
+    # one copy in the wrong place.
+    for out in targets:
+        out.mkdir(parents=True, exist_ok=True)
+        for name, image in faces.items():
+            image.save(out / name)
+        print(f"wrote {len(faces)} faces at {w}x{h} to {out.relative_to(PROJECT_ROOT)}")
     return 0
 
 
