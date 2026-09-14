@@ -373,10 +373,18 @@ the default empty string. `|| undefined` is precisely the idiom to reach for
 there and precisely the wrong one; omit the key instead. Node never saw it,
 because the node check passed no options at all.
 
-### Not wired up yet
+### Serving it on Pages
 
-Pages itself is not enabled -- that is a repository setting, not a commit:
-Settings, Pages, Deploy from a branch, `main`, `/docs`.
+Two settings, both easy to get wrong:
+
+**The source path must be `/docs`, not `/`.** Settings, Pages, Deploy from a
+branch, `main`, `/docs`. Pointed at the root it serves a repo with no
+`index.html` and every URL 404s.
+
+**`docs/.nojekyll` must exist.** Pages runs Jekyll by default, and Jekyll's
+default excludes contain `node_modules` -- so the vendored `archipelago.js`
+would simply not be published and the client would fail to import it. The empty
+`.nojekyll` file turns Jekyll off and serves the directory verbatim.
 
 There is no autoplay in the browser. `/auto` and `/grind` exist only in the
 Kivy client, because porting the autoplayer without a differential test would
