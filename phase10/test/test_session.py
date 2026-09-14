@@ -15,13 +15,13 @@ from ..game.engine import HandState
 def session(**slot) -> Phase10Session:
     base = {"goal": 0, "starting_draws": 4, "checks_per_phase": 4}
     base.update(slot)
-    return Phase10Session.from_slot_data(base)
+    return Phase10Session.from_slot_data(base, random.Random(0))
 
 
 def played(s: Phase10Session, phase: int, *, state: HandState, wilds: int, draws: int):
     """A finished hand with a forced outcome, so awards can be tested directly."""
     s.items[PHASE_UNLOCK.format(phase)] = 1
-    hand = s.start_hand(phase, random.Random(0))
+    hand = s.start_hand(phase)
     hand.state = state
     hand.used_wilds_in_layout = wilds
     hand.draws_used = draws
@@ -68,14 +68,16 @@ class TestTraps(unittest.TestCase):
         s = session()
         s.set_items([LEAN_DEAL, PHASE_UNLOCK.format(1)])
         self.assertEqual(s.config.hand_size, BASE_HAND_SIZE - LEAN_DEAL_PENALTY)
-        s.start_hand(1, random.Random(0))
+        s.start_hand(1)
+        s.game.hand = None  # abandon it; only the trap consumption matters here
         self.assertEqual(s.config.hand_size, BASE_HAND_SIZE)
 
     def test_wild_theft_applies_once_then_is_spent(self) -> None:
         s = session()
         s.set_items([WILD_CARD] * 4 + [WILD_THEFT, PHASE_UNLOCK.format(1)])
         self.assertEqual(s.config.wilds_in_deck, 3)
-        s.start_hand(1, random.Random(0))
+        s.start_hand(1)
+        s.game.hand = None  # abandon it; only the trap consumption matters here
         self.assertEqual(s.config.wilds_in_deck, 4)
 
     def test_phase_lock_pins_you_after_a_failed_hand(self) -> None:

@@ -30,7 +30,7 @@ class FakeContext:
         self.rng = random.Random(11)
         self.settled: list = []
 
-    def settle(self, hand) -> None:
+    def settle(self, hand, quiet: bool = False) -> None:
         self.settled.append(hand)
         self.session.finish_hand(hand)
 
@@ -46,7 +46,7 @@ class RecordingProcessor(Phase10CommandProcessor):
 
 def make(skips: int = 2, phase: int = 1):
     session = Phase10Session.from_slot_data(
-        {"goal": 0, "starting_draws": 6, "checks_per_phase": 4}
+        {"goal": 0, "starting_draws": 6, "checks_per_phase": 4}, random.Random(11)
     )
     session.set_items([PHASE_UNLOCK.format(phase)] + [SKIP_CARD] * skips)
     ctx = FakeContext(session)
@@ -101,6 +101,48 @@ class TestPlayCommands(unittest.TestCase):
         cp("/auto")
         self.assertEqual(len(ctx.settled), 1)
         self.assertIsNot(ctx.settled[0].state, HandState.IN_PROGRESS)
+
+    def test_grind_plays_many_rounds(self) -> None:
+        ctx, cp = make(skips=1)
+        cp("/grind 1 6")
+        self.assertEqual(len(ctx.session.game.rounds), 6)
+        self.assertTrue(any("Played 6 round(s)" in line for line in cp.lines))
+
+    def test_grind_is_capped(self) -> None:
+        ctx, cp = make()
+        cp("/grind 1 500")
+        self.assertLessEqual(len(ctx.session.game.rounds), 50)
+
+    def test_grind_refuses_mid_round(self) -> None:
+        ctx, cp = make()
+        cp("/play 1")
+        cp("/grind 1 3")
+        self.assertTrue(any("Finish the current round first" in line for line in cp.lines))
+
+    def test_grind_stops_on_a_locked_phase(self) -> None:
+        ctx, cp = make()
+        cp("/grind 7 3")
+        self.assertEqual(len(ctx.session.game.rounds), 0)
+        self.assertTrue(any("not unlocked" in line for line in cp.lines))
+
+    def test_score_reports_the_running_total(self) -> None:
+        ctx, cp = make()
+        cp("/grind 1 3")
+        cp.lines.clear()
+        cp("/score")
+        self.assertTrue(any("3 rounds" in line and "points total" in line for line in cp.lines))
+
+    def test_score_is_empty_before_play(self) -> None:
+        ctx, cp = make()
+        cp("/score")
+        self.assertTrue(any("No rounds played yet" in line for line in cp.lines))
+
+    def test_status_shows_round_and_score(self) -> None:
+        ctx, cp = make()
+        cp("/grind 1 2")
+        cp.lines.clear()
+        cp("/status")
+        self.assertTrue(any("round 3" in line and "points" in line for line in cp.lines))
 
     def test_locked_phase_is_refused(self) -> None:
         ctx, cp = make(phase=1)

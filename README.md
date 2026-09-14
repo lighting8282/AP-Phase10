@@ -164,6 +164,8 @@ rendering layer to maintain.
     /take <i>   keep one of the revealed cards
     /lay        lay the phase down
     /auto       play the current hand out with the greedy player
+    /grind <n> [k]  autoplay k rounds of phase n
+    /score      the scorecard: recent rounds and the running total
 
 `client/session.py` holds the whole bridge and stays pure — no sockets, no
 async — so the parts worth testing can be tested directly: how received items
@@ -236,9 +238,38 @@ Success rate at 8 draws with stock wilds:
 Skip Card is classified `useful`, not `progression`, so no access rule depends
 on it and the fill balance is unchanged.
 
+## Game and scoring
+
+A `PhaseHand` is one attempt at one phase and knows nothing about what came
+before it. `game/game.py` wraps a sequence of them into a game with a round
+count, a history and a running score.
+
+Scoring follows the printed rules — you score the cards still in hand when the
+hand ends, and lower is better. Going out is worth zero, a phase laid down with
+junk left over costs whatever that junk is worth, and a failed hand costs the
+lot. Cards 1–9 are 5, 10–12 are 10, a Skip is 15, a Wild is 25.
+
+Config is passed per round rather than held, because items keep arriving: the
+deck you play round nine with is not the one you played round one with.
+
+The session keeps no separate tallies — `hands_won` and `cleared_phases` are
+properties reading off the scorecard, so the two cannot drift.
+
+`/grind <phase> [rounds]` autoplays up to 50 rounds through the same policy the
+difficulty measurements were taken with. The Hands Won milestones run to thirty
+and clicking through that by hand is not a game.
+
+**One limitation.** Commands are synchronous while sending is async, so a long
+grind blocks the loop that drains checks: every round in one grind plays with
+the deck it started with, and items earned along the way only apply once it
+finishes. Verified live — a 30-round grind ran all 30 at the starting config.
+Short grinds keep the two closer together.
+
 ## Not built yet
 
-A multi-hand game loop with scoring, and any visual presentation beyond text.
+Any visual presentation beyond text. Score is local only — it resets on
+reconnect, since the session is rebuilt from slot_data and the server tracks
+checks, not points.
 
 ## Naming
 

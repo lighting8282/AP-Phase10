@@ -22,7 +22,7 @@ from CommonClient import (
 )
 from NetUtils import ClientStatus
 
-from ..game.autoplay import choose_discard
+from ..game.autoplay import play_out
 from ..game.engine import HandState
 from ..game.phases import PHASES, phase_description
 from .session import Phase10Session
@@ -72,6 +72,10 @@ class Phase10CommandProcessor(ClientCommandProcessor):
             f"phases unlocked {len(s.unlocked_phases)}/10 "
             f"| cleared {len(s.cleared_phases)}/10 | hands won {s.hands_won}"
         )
+        self.output(
+            f"round {s.game.round_number} | {s.hands_won} won | "
+            f"{s.total_score} points (lower is better)"
+        )
         if s.locked_phase:
             self.output(f"Phase Lock: you must replay Phase {s.locked_phase}.")
 
@@ -85,7 +89,7 @@ class Phase10CommandProcessor(ClientCommandProcessor):
             self.output("Give a phase number from 1 to 10.")
             return
         try:
-            self.ctx.session.start_hand(number, self.ctx.rng)
+            self.ctx.session.start_hand(number)
         except ValueError as e:
             self.output(str(e))
             return
@@ -192,24 +196,57 @@ class Phase10CommandProcessor(ClientCommandProcessor):
         hand = self._require_hand()
         if hand is None:
             return
-        config, spec = hand.config, hand.spec
-        while hand.state is HandState.IN_PROGRESS:
-            if hand.can_lay_down():
-                hand.lay_down()
-                break
-            if not hand.stock:
-                hand.mark_failed("stock_empty")
-                break
-            hand.draw()
-            if hand.can_lay_down():
-                hand.lay_down()
-                break
-            hand.discard_card(choose_discard(hand.hand, spec, config))
+        play_out(hand)
         if hand.layout:
             for i, group in enumerate(hand.layout, 1):
                 self.output(render_group(i, group))
         self.ctx.settle(hand)
 
+    def _cmd_grind(self, phase: str, count: str = "5") -> None:
+        """Autoplay several rounds of a phase. Usage: /grind 2 10
+
+        The Hands Won milestones run to thirty; clicking through that by hand
+        is not a game.
+
+        Commands are synchronous while sending is not, so a long grind blocks
+        the loop that drains checks -- every round in one grind plays with the
+        deck you started it with, and items earned along the way only apply
+        afterwards. Short grinds keep the two closer together.
+        """
+        try:
+            number, rounds = int(phase), int(count)
+        except ValueError:
+            self.output("Usage: /grind <phase> [rounds]")
+            return
+        if number not in PHASES:
+            self.output("Give a phase number from 1 to 10.")
+            return
+        rounds = max(1, min(rounds, 50))
+
+        session = self.ctx.session
+        if session.hand is not None:
+            self.output("Finish the current round first.")
+            return
+
+        won = 0
+        for _ in range(rounds):
+            refusal = session.can_play(number)
+            if refusal:
+                self.output(refusal)
+                break
+            hand = session.start_hand(number)
+            play_out(hand)
+            self.ctx.settle(hand, quiet=True)
+            if session.last_result and session.last_result.cleared:
+                won += 1
+
+        self.output(f"Played {min(rounds, session.game.round_number - 1)} round(s), won {won}.")
+        self._cmd_score()
+
+    def _cmd_score(self) -> None:
+        """Show the scorecard: recent rounds and the running total."""
+        for line in self.ctx.session.game.scorecard():
+            self.output(line)
 
 class Phase10Context(CommonContext):
     game = "Phase 10"
@@ -231,7 +268,9 @@ class Phase10Context(CommonContext):
 
     def on_package(self, cmd: str, args: dict[str, Any]) -> None:
         if cmd == "Connected":
-            self.session = Phase10Session.from_slot_data(args.get("slot_data", {}))
+            self.session = Phase10Session.from_slot_data(
+                args.get("slot_data", {}), self.rng
+            )
             self.goal_sent = False
             self.sync_items()
             logger.info("Connected. /phases to see what you can play, /play <n> to start.")
@@ -253,13 +292,12 @@ class Phase10Context(CommonContext):
         for phase in sorted(self.session.unlocked_phases - before):
             logger.info(f"Phase {phase} unlocked: {phase_description(phase)}")
 
-    def settle(self, hand) -> None:
+    def settle(self, hand, quiet: bool = False) -> None:
         """Finish a hand and queue whatever checks it earned."""
         new = self.session.finish_hand(hand)
-        if hand.state is HandState.FAILED:
-            logger.info("Hand failed -- out of draws.")
-        else:
-            logger.info(f"Phase {hand.phase} cleared in {hand.draws_used} draws.")
+        result = self.session.last_result
+        if not quiet and result is not None:
+            logger.info(str(result))
         if new:
             self.pending_locations.extend(new)
 

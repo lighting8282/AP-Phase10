@@ -31,6 +31,7 @@ from ..data import (
 )
 from ..game.cards import STOCK_WILDS
 from ..game.engine import GameConfig, HandState, PhaseHand
+from ..game.game import Phase10Game, RoundResult
 
 #: Traps are one-shot. Received counts only ever grow, so pending effects are
 #: tracked as (received - consumed) rather than by mutating the counts.
@@ -47,19 +48,37 @@ class Phase10Session:
 
     items: Counter = field(default_factory=Counter)
     consumed_traps: Counter = field(default_factory=Counter)
-    hands_won: int = 0
-    cleared_phases: set[int] = field(default_factory=set)
     checked_locations: set[int] = field(default_factory=set)
     locked_phase: int | None = None
-    hand: PhaseHand | None = None
+    last_result: RoundResult | None = None
+    game: Phase10Game = field(default_factory=Phase10Game)
 
     @classmethod
-    def from_slot_data(cls, slot_data: Mapping[str, Any]) -> Phase10Session:
+    def from_slot_data(cls, slot_data: Mapping[str, Any], rng=None) -> Phase10Session:
         return cls(
             goal=int(slot_data.get("goal", 0)),
             starting_draws=int(slot_data.get("starting_draws", 4)),
             checks_per_phase=int(slot_data.get("checks_per_phase", 4)),
+            game=Phase10Game(rng),
         )
+
+    # The game owns the running state; the session keeps one source of truth
+    # rather than a second tally that could drift from the scorecard.
+    @property
+    def hand(self) -> PhaseHand | None:
+        return self.game.hand
+
+    @property
+    def hands_won(self) -> int:
+        return self.game.rounds_won
+
+    @property
+    def cleared_phases(self) -> set[int]:
+        return self.game.cleared_phases
+
+    @property
+    def total_score(self) -> int:
+        return self.game.total_score
 
     # -- items -------------------------------------------------------------
     def set_items(self, item_names: list[str]) -> None:
@@ -103,7 +122,7 @@ class Phase10Session:
             return f"A Phase Lock trap is forcing you to replay Phase {self.locked_phase}."
         return None
 
-    def start_hand(self, phase: int, rng) -> PhaseHand:
+    def start_hand(self, phase: int) -> PhaseHand:
         refusal = self.can_play(phase)
         if refusal:
             raise ValueError(refusal)
@@ -114,8 +133,7 @@ class Phase10Session:
             if self.pending(trap):
                 self.consumed_traps[trap] += 1
 
-        self.hand = PhaseHand(phase, config, rng)
-        return self.hand
+        return self.game.start_round(phase, config)
 
     def earned_tiers(self, hand: PhaseHand) -> list[str]:
         """Which check tiers a finished hand is worth."""
@@ -137,14 +155,14 @@ class Phase10Session:
 
     def finish_hand(self, hand: PhaseHand) -> list[int]:
         """Settle a finished hand. Returns newly checked location IDs."""
-        names: list[str] = []
-        cleared = hand.state in (HandState.PHASE_LAID, HandState.WENT_OUT)
+        tiers = self.earned_tiers(hand)
+        result = self.game.finish_round(hand)
+        self.last_result = result
 
-        if cleared:
-            self.cleared_phases.add(hand.phase)
-            self.hands_won += 1
+        names: list[str] = []
+        if result.cleared:
             self.locked_phase = None
-            names += [phase_location_name(hand.phase, tier) for tier in self.earned_tiers(hand)]
+            names += [phase_location_name(result.phase, tier) for tier in tiers]
             names += [
                 milestone_location_name(n)
                 for n in HANDS_WON_MILESTONES
@@ -153,7 +171,7 @@ class Phase10Session:
         elif self.pending(PHASE_LOCK):
             # A failed hand under a Phase Lock pins you to this phase.
             self.consumed_traps[PHASE_LOCK] += 1
-            self.locked_phase = hand.phase
+            self.locked_phase = result.phase
 
         new = [
             LOCATION_NAME_TO_ID[name]
@@ -161,7 +179,6 @@ class Phase10Session:
             if LOCATION_NAME_TO_ID[name] not in self.checked_locations
         ]
         self.checked_locations.update(new)
-        self.hand = None
         return new
 
     # -- goal --------------------------------------------------------------

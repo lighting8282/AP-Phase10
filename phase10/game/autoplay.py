@@ -42,9 +42,14 @@ def choose_dig(options: list[Card], hand: list[Card], spec: PhaseSpec, cfg: Game
     )
 
 
-def play_hand(phase: int, cfg: GameConfig, rng: random.Random) -> PhaseHand:
-    h = PhaseHand(phase, cfg, rng)
-    spec = h.spec
+def play_out(h: PhaseHand) -> PhaseHand:
+    """Play an already-dealt hand to its conclusion.
+
+    Split out from `play_hand` so the client's /auto and /grind drive the same
+    policy the difficulty measurements were taken with -- two copies of this
+    loop drifted apart once already.
+    """
+    cfg, spec = h.config, h.spec
 
     while h.state is HandState.IN_PROGRESS:
         if h.can_lay_down():
@@ -55,8 +60,8 @@ def play_hand(phase: int, cfg: GameConfig, rng: random.Random) -> PhaseHand:
             break
 
         # A Skip in hand is strictly better spent than held: it buys a choice
-        # of three for the same one draw, and sheds itself as the discard.
-        if h.skips_in_hand and h.stock:
+        # of three for no draw at all, and sheds itself as the discard.
+        if h.skips_in_hand:
             options = h.play_skip()
             h.take_dug(choose_dig(options, h.hand, spec, cfg))
             if h.can_lay_down():
@@ -67,8 +72,7 @@ def play_hand(phase: int, cfg: GameConfig, rng: random.Random) -> PhaseHand:
         top = h.discard_top
         take_discard = False
         if top is not None and cfg.allow_discard_draw:
-            probe = h.hand + [top]
-            take_discard = _short(probe, spec, cfg) < base
+            take_discard = _short(h.hand + [top], spec, cfg) < base
 
         h.draw(from_discard=take_discard)
 
@@ -78,6 +82,10 @@ def play_hand(phase: int, cfg: GameConfig, rng: random.Random) -> PhaseHand:
         h.discard_card(choose_discard(h.hand, spec, cfg))
 
     return h
+
+
+def play_hand(phase: int, cfg: GameConfig, rng: random.Random) -> PhaseHand:
+    return play_out(PhaseHand(phase, cfg, rng))
 
 
 def success_rate(phase: int, cfg: GameConfig, trials: int, seed: int = 0) -> float:
