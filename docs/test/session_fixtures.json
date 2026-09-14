@@ -1,0 +1,1417 @@
+{
+ "config": [
+  {
+   "starting_draws": 2,
+   "items": [],
+   "config": {
+    "handSize": 10,
+    "wildsInDeck": 0,
+    "maxDraws": 2,
+    "startingSkips": 0
+   }
+  },
+  {
+   "starting_draws": 2,
+   "items": [
+    "Wild Card",
+    "Wild Card",
+    "Wild Card"
+   ],
+   "config": {
+    "handSize": 10,
+    "wildsInDeck": 3,
+    "maxDraws": 2,
+    "startingSkips": 0
+   }
+  },
+  {
+   "starting_draws": 2,
+   "items": [
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card"
+   ],
+   "config": {
+    "handSize": 10,
+    "wildsInDeck": 8,
+    "maxDraws": 2,
+    "startingSkips": 0
+   }
+  },
+  {
+   "starting_draws": 2,
+   "items": [
+    "Extra Draw",
+    "Extra Draw",
+    "Extra Draw",
+    "Extra Draw",
+    "Extra Draw"
+   ],
+   "config": {
+    "handSize": 10,
+    "wildsInDeck": 0,
+    "maxDraws": 7,
+    "startingSkips": 0
+   }
+  },
+  {
+   "starting_draws": 2,
+   "items": [
+    "Hand Size Upgrade",
+    "Hand Size Upgrade"
+   ],
+   "config": {
+    "handSize": 12,
+    "wildsInDeck": 0,
+    "maxDraws": 2,
+    "startingSkips": 0
+   }
+  },
+  {
+   "starting_draws": 2,
+   "items": [
+    "Skip Card",
+    "Skip Card",
+    "Skip Card",
+    "Skip Card",
+    "Skip Card",
+    "Skip Card",
+    "Skip Card",
+    "Skip Card",
+    "Skip Card"
+   ],
+   "config": {
+    "handSize": 10,
+    "wildsInDeck": 0,
+    "maxDraws": 2,
+    "startingSkips": 4
+   }
+  },
+  {
+   "starting_draws": 2,
+   "items": [
+    "Lean Deal"
+   ],
+   "config": {
+    "handSize": 8,
+    "wildsInDeck": 0,
+    "maxDraws": 2,
+    "startingSkips": 0
+   }
+  },
+  {
+   "starting_draws": 2,
+   "items": [
+    "Wild Theft",
+    "Wild Card",
+    "Wild Card"
+   ],
+   "config": {
+    "handSize": 10,
+    "wildsInDeck": 1,
+    "maxDraws": 2,
+    "startingSkips": 0
+   }
+  },
+  {
+   "starting_draws": 2,
+   "items": [
+    "Lean Deal",
+    "Wild Theft",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Extra Draw",
+    "Extra Draw",
+    "Skip Card"
+   ],
+   "config": {
+    "handSize": 8,
+    "wildsInDeck": 3,
+    "maxDraws": 4,
+    "startingSkips": 1
+   }
+  },
+  {
+   "starting_draws": 4,
+   "items": [],
+   "config": {
+    "handSize": 10,
+    "wildsInDeck": 0,
+    "maxDraws": 4,
+    "startingSkips": 0
+   }
+  },
+  {
+   "starting_draws": 4,
+   "items": [
+    "Wild Card",
+    "Wild Card",
+    "Wild Card"
+   ],
+   "config": {
+    "handSize": 10,
+    "wildsInDeck": 3,
+    "maxDraws": 4,
+    "startingSkips": 0
+   }
+  },
+  {
+   "starting_draws": 4,
+   "items": [
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card"
+   ],
+   "config": {
+    "handSize": 10,
+    "wildsInDeck": 8,
+    "maxDraws": 4,
+    "startingSkips": 0
+   }
+  },
+  {
+   "starting_draws": 4,
+   "items": [
+    "Extra Draw",
+    "Extra Draw",
+    "Extra Draw",
+    "Extra Draw",
+    "Extra Draw"
+   ],
+   "config": {
+    "handSize": 10,
+    "wildsInDeck": 0,
+    "maxDraws": 9,
+    "startingSkips": 0
+   }
+  },
+  {
+   "starting_draws": 4,
+   "items": [
+    "Hand Size Upgrade",
+    "Hand Size Upgrade"
+   ],
+   "config": {
+    "handSize": 12,
+    "wildsInDeck": 0,
+    "maxDraws": 4,
+    "startingSkips": 0
+   }
+  },
+  {
+   "starting_draws": 4,
+   "items": [
+    "Skip Card",
+    "Skip Card",
+    "Skip Card",
+    "Skip Card",
+    "Skip Card",
+    "Skip Card",
+    "Skip Card",
+    "Skip Card",
+    "Skip Card"
+   ],
+   "config": {
+    "handSize": 10,
+    "wildsInDeck": 0,
+    "maxDraws": 4,
+    "startingSkips": 4
+   }
+  },
+  {
+   "starting_draws": 4,
+   "items": [
+    "Lean Deal"
+   ],
+   "config": {
+    "handSize": 8,
+    "wildsInDeck": 0,
+    "maxDraws": 4,
+    "startingSkips": 0
+   }
+  },
+  {
+   "starting_draws": 4,
+   "items": [
+    "Wild Theft",
+    "Wild Card",
+    "Wild Card"
+   ],
+   "config": {
+    "handSize": 10,
+    "wildsInDeck": 1,
+    "maxDraws": 4,
+    "startingSkips": 0
+   }
+  },
+  {
+   "starting_draws": 4,
+   "items": [
+    "Lean Deal",
+    "Wild Theft",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Extra Draw",
+    "Extra Draw",
+    "Skip Card"
+   ],
+   "config": {
+    "handSize": 8,
+    "wildsInDeck": 3,
+    "maxDraws": 6,
+    "startingSkips": 1
+   }
+  },
+  {
+   "starting_draws": 9,
+   "items": [],
+   "config": {
+    "handSize": 10,
+    "wildsInDeck": 0,
+    "maxDraws": 9,
+    "startingSkips": 0
+   }
+  },
+  {
+   "starting_draws": 9,
+   "items": [
+    "Wild Card",
+    "Wild Card",
+    "Wild Card"
+   ],
+   "config": {
+    "handSize": 10,
+    "wildsInDeck": 3,
+    "maxDraws": 9,
+    "startingSkips": 0
+   }
+  },
+  {
+   "starting_draws": 9,
+   "items": [
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card"
+   ],
+   "config": {
+    "handSize": 10,
+    "wildsInDeck": 8,
+    "maxDraws": 9,
+    "startingSkips": 0
+   }
+  },
+  {
+   "starting_draws": 9,
+   "items": [
+    "Extra Draw",
+    "Extra Draw",
+    "Extra Draw",
+    "Extra Draw",
+    "Extra Draw"
+   ],
+   "config": {
+    "handSize": 10,
+    "wildsInDeck": 0,
+    "maxDraws": 14,
+    "startingSkips": 0
+   }
+  },
+  {
+   "starting_draws": 9,
+   "items": [
+    "Hand Size Upgrade",
+    "Hand Size Upgrade"
+   ],
+   "config": {
+    "handSize": 12,
+    "wildsInDeck": 0,
+    "maxDraws": 9,
+    "startingSkips": 0
+   }
+  },
+  {
+   "starting_draws": 9,
+   "items": [
+    "Skip Card",
+    "Skip Card",
+    "Skip Card",
+    "Skip Card",
+    "Skip Card",
+    "Skip Card",
+    "Skip Card",
+    "Skip Card",
+    "Skip Card"
+   ],
+   "config": {
+    "handSize": 10,
+    "wildsInDeck": 0,
+    "maxDraws": 9,
+    "startingSkips": 4
+   }
+  },
+  {
+   "starting_draws": 9,
+   "items": [
+    "Lean Deal"
+   ],
+   "config": {
+    "handSize": 8,
+    "wildsInDeck": 0,
+    "maxDraws": 9,
+    "startingSkips": 0
+   }
+  },
+  {
+   "starting_draws": 9,
+   "items": [
+    "Wild Theft",
+    "Wild Card",
+    "Wild Card"
+   ],
+   "config": {
+    "handSize": 10,
+    "wildsInDeck": 1,
+    "maxDraws": 9,
+    "startingSkips": 0
+   }
+  },
+  {
+   "starting_draws": 9,
+   "items": [
+    "Lean Deal",
+    "Wild Theft",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Wild Card",
+    "Extra Draw",
+    "Extra Draw",
+    "Skip Card"
+   ],
+   "config": {
+    "handSize": 8,
+    "wildsInDeck": 3,
+    "maxDraws": 11,
+    "startingSkips": 1
+   }
+  }
+ ],
+ "tiers": [
+  {
+   "checks_per_phase": 2,
+   "state": "phase_laid",
+   "wilds": 0,
+   "draws": 0,
+   "budget": 8,
+   "tiers": [
+    "Cleared"
+   ]
+  },
+  {
+   "checks_per_phase": 2,
+   "state": "phase_laid",
+   "wilds": 0,
+   "draws": 4,
+   "budget": 8,
+   "tiers": [
+    "Cleared"
+   ]
+  },
+  {
+   "checks_per_phase": 2,
+   "state": "phase_laid",
+   "wilds": 0,
+   "draws": 8,
+   "budget": 8,
+   "tiers": [
+    "Cleared"
+   ]
+  },
+  {
+   "checks_per_phase": 2,
+   "state": "phase_laid",
+   "wilds": 0,
+   "draws": 1,
+   "budget": 1,
+   "tiers": [
+    "Cleared"
+   ]
+  },
+  {
+   "checks_per_phase": 2,
+   "state": "phase_laid",
+   "wilds": 2,
+   "draws": 0,
+   "budget": 8,
+   "tiers": [
+    "Cleared"
+   ]
+  },
+  {
+   "checks_per_phase": 2,
+   "state": "phase_laid",
+   "wilds": 2,
+   "draws": 4,
+   "budget": 8,
+   "tiers": [
+    "Cleared"
+   ]
+  },
+  {
+   "checks_per_phase": 2,
+   "state": "phase_laid",
+   "wilds": 2,
+   "draws": 8,
+   "budget": 8,
+   "tiers": [
+    "Cleared"
+   ]
+  },
+  {
+   "checks_per_phase": 2,
+   "state": "phase_laid",
+   "wilds": 2,
+   "draws": 1,
+   "budget": 1,
+   "tiers": [
+    "Cleared"
+   ]
+  },
+  {
+   "checks_per_phase": 2,
+   "state": "went_out",
+   "wilds": 0,
+   "draws": 0,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Went Out"
+   ]
+  },
+  {
+   "checks_per_phase": 2,
+   "state": "went_out",
+   "wilds": 0,
+   "draws": 4,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Went Out"
+   ]
+  },
+  {
+   "checks_per_phase": 2,
+   "state": "went_out",
+   "wilds": 0,
+   "draws": 8,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Went Out"
+   ]
+  },
+  {
+   "checks_per_phase": 2,
+   "state": "went_out",
+   "wilds": 0,
+   "draws": 1,
+   "budget": 1,
+   "tiers": [
+    "Cleared",
+    "Went Out"
+   ]
+  },
+  {
+   "checks_per_phase": 2,
+   "state": "went_out",
+   "wilds": 2,
+   "draws": 0,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Went Out"
+   ]
+  },
+  {
+   "checks_per_phase": 2,
+   "state": "went_out",
+   "wilds": 2,
+   "draws": 4,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Went Out"
+   ]
+  },
+  {
+   "checks_per_phase": 2,
+   "state": "went_out",
+   "wilds": 2,
+   "draws": 8,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Went Out"
+   ]
+  },
+  {
+   "checks_per_phase": 2,
+   "state": "went_out",
+   "wilds": 2,
+   "draws": 1,
+   "budget": 1,
+   "tiers": [
+    "Cleared",
+    "Went Out"
+   ]
+  },
+  {
+   "checks_per_phase": 2,
+   "state": "failed",
+   "wilds": 0,
+   "draws": 0,
+   "budget": 8,
+   "tiers": []
+  },
+  {
+   "checks_per_phase": 2,
+   "state": "failed",
+   "wilds": 0,
+   "draws": 4,
+   "budget": 8,
+   "tiers": []
+  },
+  {
+   "checks_per_phase": 2,
+   "state": "failed",
+   "wilds": 0,
+   "draws": 8,
+   "budget": 8,
+   "tiers": []
+  },
+  {
+   "checks_per_phase": 2,
+   "state": "failed",
+   "wilds": 0,
+   "draws": 1,
+   "budget": 1,
+   "tiers": []
+  },
+  {
+   "checks_per_phase": 2,
+   "state": "failed",
+   "wilds": 2,
+   "draws": 0,
+   "budget": 8,
+   "tiers": []
+  },
+  {
+   "checks_per_phase": 2,
+   "state": "failed",
+   "wilds": 2,
+   "draws": 4,
+   "budget": 8,
+   "tiers": []
+  },
+  {
+   "checks_per_phase": 2,
+   "state": "failed",
+   "wilds": 2,
+   "draws": 8,
+   "budget": 8,
+   "tiers": []
+  },
+  {
+   "checks_per_phase": 2,
+   "state": "failed",
+   "wilds": 2,
+   "draws": 1,
+   "budget": 1,
+   "tiers": []
+  },
+  {
+   "checks_per_phase": 3,
+   "state": "phase_laid",
+   "wilds": 0,
+   "draws": 0,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "No Wilds"
+   ]
+  },
+  {
+   "checks_per_phase": 3,
+   "state": "phase_laid",
+   "wilds": 0,
+   "draws": 4,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "No Wilds"
+   ]
+  },
+  {
+   "checks_per_phase": 3,
+   "state": "phase_laid",
+   "wilds": 0,
+   "draws": 8,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "No Wilds"
+   ]
+  },
+  {
+   "checks_per_phase": 3,
+   "state": "phase_laid",
+   "wilds": 0,
+   "draws": 1,
+   "budget": 1,
+   "tiers": [
+    "Cleared",
+    "No Wilds"
+   ]
+  },
+  {
+   "checks_per_phase": 3,
+   "state": "phase_laid",
+   "wilds": 2,
+   "draws": 0,
+   "budget": 8,
+   "tiers": [
+    "Cleared"
+   ]
+  },
+  {
+   "checks_per_phase": 3,
+   "state": "phase_laid",
+   "wilds": 2,
+   "draws": 4,
+   "budget": 8,
+   "tiers": [
+    "Cleared"
+   ]
+  },
+  {
+   "checks_per_phase": 3,
+   "state": "phase_laid",
+   "wilds": 2,
+   "draws": 8,
+   "budget": 8,
+   "tiers": [
+    "Cleared"
+   ]
+  },
+  {
+   "checks_per_phase": 3,
+   "state": "phase_laid",
+   "wilds": 2,
+   "draws": 1,
+   "budget": 1,
+   "tiers": [
+    "Cleared"
+   ]
+  },
+  {
+   "checks_per_phase": 3,
+   "state": "went_out",
+   "wilds": 0,
+   "draws": 0,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Went Out",
+    "No Wilds"
+   ]
+  },
+  {
+   "checks_per_phase": 3,
+   "state": "went_out",
+   "wilds": 0,
+   "draws": 4,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Went Out",
+    "No Wilds"
+   ]
+  },
+  {
+   "checks_per_phase": 3,
+   "state": "went_out",
+   "wilds": 0,
+   "draws": 8,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Went Out",
+    "No Wilds"
+   ]
+  },
+  {
+   "checks_per_phase": 3,
+   "state": "went_out",
+   "wilds": 0,
+   "draws": 1,
+   "budget": 1,
+   "tiers": [
+    "Cleared",
+    "Went Out",
+    "No Wilds"
+   ]
+  },
+  {
+   "checks_per_phase": 3,
+   "state": "went_out",
+   "wilds": 2,
+   "draws": 0,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Went Out"
+   ]
+  },
+  {
+   "checks_per_phase": 3,
+   "state": "went_out",
+   "wilds": 2,
+   "draws": 4,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Went Out"
+   ]
+  },
+  {
+   "checks_per_phase": 3,
+   "state": "went_out",
+   "wilds": 2,
+   "draws": 8,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Went Out"
+   ]
+  },
+  {
+   "checks_per_phase": 3,
+   "state": "went_out",
+   "wilds": 2,
+   "draws": 1,
+   "budget": 1,
+   "tiers": [
+    "Cleared",
+    "Went Out"
+   ]
+  },
+  {
+   "checks_per_phase": 3,
+   "state": "failed",
+   "wilds": 0,
+   "draws": 0,
+   "budget": 8,
+   "tiers": []
+  },
+  {
+   "checks_per_phase": 3,
+   "state": "failed",
+   "wilds": 0,
+   "draws": 4,
+   "budget": 8,
+   "tiers": []
+  },
+  {
+   "checks_per_phase": 3,
+   "state": "failed",
+   "wilds": 0,
+   "draws": 8,
+   "budget": 8,
+   "tiers": []
+  },
+  {
+   "checks_per_phase": 3,
+   "state": "failed",
+   "wilds": 0,
+   "draws": 1,
+   "budget": 1,
+   "tiers": []
+  },
+  {
+   "checks_per_phase": 3,
+   "state": "failed",
+   "wilds": 2,
+   "draws": 0,
+   "budget": 8,
+   "tiers": []
+  },
+  {
+   "checks_per_phase": 3,
+   "state": "failed",
+   "wilds": 2,
+   "draws": 4,
+   "budget": 8,
+   "tiers": []
+  },
+  {
+   "checks_per_phase": 3,
+   "state": "failed",
+   "wilds": 2,
+   "draws": 8,
+   "budget": 8,
+   "tiers": []
+  },
+  {
+   "checks_per_phase": 3,
+   "state": "failed",
+   "wilds": 2,
+   "draws": 1,
+   "budget": 1,
+   "tiers": []
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "phase_laid",
+   "wilds": 0,
+   "draws": 0,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "No Wilds",
+    "Under Par"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "phase_laid",
+   "wilds": 0,
+   "draws": 4,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "No Wilds",
+    "Under Par"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "phase_laid",
+   "wilds": 0,
+   "draws": 8,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "No Wilds"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "phase_laid",
+   "wilds": 0,
+   "draws": 1,
+   "budget": 1,
+   "tiers": [
+    "Cleared",
+    "No Wilds",
+    "Under Par"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "phase_laid",
+   "wilds": 2,
+   "draws": 0,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Under Par"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "phase_laid",
+   "wilds": 2,
+   "draws": 4,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Under Par"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "phase_laid",
+   "wilds": 2,
+   "draws": 8,
+   "budget": 8,
+   "tiers": [
+    "Cleared"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "phase_laid",
+   "wilds": 2,
+   "draws": 1,
+   "budget": 1,
+   "tiers": [
+    "Cleared",
+    "Under Par"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "went_out",
+   "wilds": 0,
+   "draws": 0,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Went Out",
+    "No Wilds",
+    "Under Par"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "went_out",
+   "wilds": 0,
+   "draws": 4,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Went Out",
+    "No Wilds",
+    "Under Par"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "went_out",
+   "wilds": 0,
+   "draws": 8,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Went Out",
+    "No Wilds"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "went_out",
+   "wilds": 0,
+   "draws": 1,
+   "budget": 1,
+   "tiers": [
+    "Cleared",
+    "Went Out",
+    "No Wilds",
+    "Under Par"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "went_out",
+   "wilds": 2,
+   "draws": 0,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Went Out",
+    "Under Par"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "went_out",
+   "wilds": 2,
+   "draws": 4,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Went Out",
+    "Under Par"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "went_out",
+   "wilds": 2,
+   "draws": 8,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Went Out"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "went_out",
+   "wilds": 2,
+   "draws": 1,
+   "budget": 1,
+   "tiers": [
+    "Cleared",
+    "Went Out",
+    "Under Par"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "failed",
+   "wilds": 0,
+   "draws": 0,
+   "budget": 8,
+   "tiers": []
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "failed",
+   "wilds": 0,
+   "draws": 4,
+   "budget": 8,
+   "tiers": []
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "failed",
+   "wilds": 0,
+   "draws": 8,
+   "budget": 8,
+   "tiers": []
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "failed",
+   "wilds": 0,
+   "draws": 1,
+   "budget": 1,
+   "tiers": []
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "failed",
+   "wilds": 2,
+   "draws": 0,
+   "budget": 8,
+   "tiers": []
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "failed",
+   "wilds": 2,
+   "draws": 4,
+   "budget": 8,
+   "tiers": []
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "failed",
+   "wilds": 2,
+   "draws": 8,
+   "budget": 8,
+   "tiers": []
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "failed",
+   "wilds": 2,
+   "draws": 1,
+   "budget": 1,
+   "tiers": []
+  }
+ ],
+ "sequences": [
+  {
+   "goal": 0,
+   "steps": [
+    {
+     "phase": 1,
+     "state": "phase_laid",
+     "ids": [
+      110,
+      300
+     ],
+     "handsWon": 1,
+     "lockedPhase": null,
+     "goalMet": false
+    },
+    {
+     "phase": 2,
+     "state": "phase_laid",
+     "ids": [
+      120,
+      301
+     ],
+     "handsWon": 2,
+     "lockedPhase": null,
+     "goalMet": false
+    },
+    {
+     "phase": 3,
+     "state": "phase_laid",
+     "ids": [
+      130,
+      302
+     ],
+     "handsWon": 3,
+     "lockedPhase": null,
+     "goalMet": false
+    },
+    {
+     "phase": 4,
+     "state": "phase_laid",
+     "ids": [
+      140
+     ],
+     "handsWon": 4,
+     "lockedPhase": null,
+     "goalMet": false
+    },
+    {
+     "phase": 5,
+     "state": "phase_laid",
+     "ids": [
+      150,
+      303
+     ],
+     "handsWon": 5,
+     "lockedPhase": null,
+     "goalMet": false
+    },
+    {
+     "phase": 6,
+     "state": "phase_laid",
+     "ids": [
+      160
+     ],
+     "handsWon": 6,
+     "lockedPhase": null,
+     "goalMet": false
+    },
+    {
+     "phase": 7,
+     "state": "phase_laid",
+     "ids": [
+      170
+     ],
+     "handsWon": 7,
+     "lockedPhase": null,
+     "goalMet": false
+    },
+    {
+     "phase": 8,
+     "state": "phase_laid",
+     "ids": [
+      180,
+      304
+     ],
+     "handsWon": 8,
+     "lockedPhase": null,
+     "goalMet": false
+    },
+    {
+     "phase": 9,
+     "state": "phase_laid",
+     "ids": [
+      190
+     ],
+     "handsWon": 9,
+     "lockedPhase": null,
+     "goalMet": false
+    },
+    {
+     "phase": 10,
+     "state": "phase_laid",
+     "ids": [
+      200
+     ],
+     "handsWon": 10,
+     "lockedPhase": null,
+     "goalMet": true
+    }
+   ]
+  },
+  {
+   "goal": 1,
+   "steps": [
+    {
+     "phase": 1,
+     "state": "phase_laid",
+     "ids": [
+      110,
+      300
+     ],
+     "handsWon": 1,
+     "lockedPhase": null,
+     "goalMet": false
+    },
+    {
+     "phase": 10,
+     "state": "went_out",
+     "ids": [
+      200,
+      201,
+      301
+     ],
+     "handsWon": 2,
+     "lockedPhase": null,
+     "goalMet": true
+    }
+   ]
+  },
+  {
+   "goal": 0,
+   "steps": [
+    {
+     "phase": 2,
+     "state": "phase_laid",
+     "ids": [
+      120,
+      300
+     ],
+     "handsWon": 1,
+     "lockedPhase": null,
+     "goalMet": false
+    },
+    {
+     "phase": 2,
+     "state": "phase_laid",
+     "ids": [
+      301
+     ],
+     "handsWon": 2,
+     "lockedPhase": null,
+     "goalMet": false
+    },
+    {
+     "phase": 2,
+     "state": "phase_laid",
+     "ids": [
+      302
+     ],
+     "handsWon": 3,
+     "lockedPhase": null,
+     "goalMet": false
+    },
+    {
+     "phase": 2,
+     "state": "phase_laid",
+     "ids": [],
+     "handsWon": 4,
+     "lockedPhase": null,
+     "goalMet": false
+    },
+    {
+     "phase": 2,
+     "state": "phase_laid",
+     "ids": [
+      303
+     ],
+     "handsWon": 5,
+     "lockedPhase": null,
+     "goalMet": false
+    },
+    {
+     "phase": 2,
+     "state": "phase_laid",
+     "ids": [],
+     "handsWon": 6,
+     "lockedPhase": null,
+     "goalMet": false
+    }
+   ]
+  },
+  {
+   "goal": 0,
+   "steps": [
+    {
+     "phase": 4,
+     "state": "failed",
+     "ids": [],
+     "handsWon": 0,
+     "lockedPhase": 4,
+     "goalMet": false
+    },
+    {
+     "phase": 4,
+     "state": "phase_laid",
+     "ids": [
+      140,
+      300
+     ],
+     "handsWon": 1,
+     "lockedPhase": null,
+     "goalMet": false
+    },
+    {
+     "phase": 4,
+     "state": "went_out",
+     "ids": [
+      141,
+      301
+     ],
+     "handsWon": 2,
+     "lockedPhase": null,
+     "goalMet": false
+    }
+   ]
+  }
+ ]
+}

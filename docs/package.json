@@ -1,0 +1,10 @@
+{
+  "name": "ap-phase10-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Vendored browser dependencies, served by GitHub Pages from /docs",
+  "dependencies": {
+    "archipelago.js": "^2.1.0"
+  }
+}
