@@ -152,11 +152,60 @@ being progression.
   answering wrong — needs joint rank+color search if Masters phases get added.
 
 
+## Client
+
+Played through commands in the client console rather than a bespoke GUI. A card
+game reads fine as text, and it keeps everything in one process with no
+rendering layer to maintain.
+
+    /phases     every phase, what it needs, whether it is open
+    /status     the deck and draw budget your items have built
+    /play <n>   start a hand
+    /hand       your cards, the discard top, draws left
+    /draw [d]   draw from stock, or from the discard with `d`
+    /discard <i>  discard by position
+    /lay        lay the phase down
+    /auto       play the current hand out with the greedy player
+
+`client/session.py` holds the whole bridge and stays pure — no sockets, no
+async — so the parts worth testing can be tested directly: how received items
+become a `GameConfig`, and which location IDs a finished hand is worth.
+
+Traps do something now. Lean Deal costs two cards on the next deal, Wild Theft
+one wild, Phase Lock pins you to a phase until you clear it. Received counts
+only ever grow, so pending effects are tracked as received minus consumed.
+
+### Verified against a live server
+
+Generated a seed, hosted it, connected the real client, played 15 hands: the
+server acknowledged 9 checks and missing locations went 50 to 41.
+
+That round trip caught a bug nothing else did. Phase checks run 110–203, and
+the milestones originally started at 200 — so `Phase 10 - Cleared` and
+`Hands Won: 1` claimed the same address. The world builds and fills perfectly
+happily with two names on one ID; the assertion only fires when the datapackage
+is written during a real generation. `test_data.py` guards it now.
+
+## Environment
+
+Two things about this machine are worth knowing before touching AP again.
+
+**Use the venv at `<AP checkout>\.venv`.** The system Python has
+websockets 17.1, but AP 0.6.8 pins `websockets==13.1` (`<14`) and uses
+`socket.open` / `socket.closed` throughout — both removed in websockets 14. The
+server crashes on every client connection without the pin. This affects every
+world, not just this one.
+
+**`Generate.py` hangs with no output on this machine.** `ModuleUpdate.update()`
+wants `pkg_resources`, which setuptools 84 removed, then blocks on an
+interactive prompt that EOFs when there is no stdin. Setting
+`ModuleUpdate.update_ran = True` before importing `Generate` skips the check
+entirely; the venv also has `setuptools<81`, which fixes it properly.
+
 ## Not built yet
 
-The client — the game has no Archipelago connection yet. `fill_slot_data` sends
-the knobs, but nothing consumes them, nothing reports a check when a phase is
-cleared, and there is no multi-hand game loop with scoring or UI.
+A multi-hand game loop with scoring, and any visual presentation beyond text.
+Skips still have no solo purpose (see the open questions above).
 
 ## Naming
 

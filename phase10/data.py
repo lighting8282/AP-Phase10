@@ -57,8 +57,10 @@ LOCATION_NAME_TO_ID = {
         for phase in range(1, 11)
         for index, tier in enumerate(TIERS)
     },
+    # Phase checks occupy 110..203 (100 + phase * 10 + tier), so milestones
+    # start well clear of Phase 10 rather than colliding with it at 200.
     **{
-        milestone_location_name(n): 200 + index
+        milestone_location_name(n): 300 + index
         for index, n in enumerate(HANDS_WON_MILESTONES)
     },
 }
