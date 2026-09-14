@@ -11,7 +11,8 @@ a second to redraw the same hand is pure waste.
 
 from __future__ import annotations
 
-from pathlib import Path
+from importlib import resources
+from io import BytesIO
 from typing import TYPE_CHECKING
 
 # kvui MUST be imported before anything from kivy -- it asserts on that for
@@ -19,6 +20,7 @@ from typing import TYPE_CHECKING
 from kvui import GameManager
 
 from kivy.clock import Clock
+from kivy.core.image import Image as CoreImage
 from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
@@ -54,18 +56,23 @@ def card_color(card) -> tuple[float, float, float, float]:
     return CARD_COLORS[card.color]
 
 
-CARD_ASSETS = Path(__file__).parent / "assets" / "cards"
+def card_bytes(card) -> bytes | None:
+    """The rendered face for this card, or None if it was never generated.
 
-
-def card_image(card) -> str | None:
-    """Path to this card's rendered face, or None if it has not been generated.
-
-    Faces come from tools/generate_cards.py. They are ordinary repo files, so
-    normally they are simply present -- but a checkout that has not run the
-    generator should still get a usable client rather than a stack trace.
+    Read through importlib.resources rather than as a filesystem path. An
+    installed .apworld is a zip, so `Path(__file__).parent` points inside it
+    and every `is_file()` is False -- which turned the packaged client's art
+    off silently, falling back to text chips with nothing logged. Traversables
+    read the same either way.
     """
-    path = CARD_ASSETS / card_filename(card)
-    return str(path) if path.is_file() else None
+    name = card_filename(card)
+    try:
+        face = resources.files(__package__).joinpath("assets").joinpath("cards").joinpath(name)
+        if face.is_file():
+            return face.read_bytes()
+    except (FileNotFoundError, ModuleNotFoundError, OSError):
+        pass
+    return None
 
 
 class CardFace(ButtonBehavior, Image):
@@ -74,10 +81,14 @@ class CardFace(ButtonBehavior, Image):
     ButtonBehavior supplies on_release, so call sites bind to this exactly as
     they did to the old Button. fit_mode="contain" keeps the 2:3 card shape
     inside whatever cell the layout hands it, rather than stretching it.
+
+    The texture is built from bytes rather than set from a `source` path, so
+    the same code works whether the world is a folder or a zipped .apworld.
     """
 
-    def __init__(self, card, source: str, **kwargs) -> None:
-        super().__init__(source=source, fit_mode="contain", **kwargs)
+    def __init__(self, card, data: bytes, **kwargs) -> None:
+        super().__init__(fit_mode="contain", **kwargs)
+        self.texture = CoreImage(BytesIO(data), ext="png").texture
         self.card = card
 
 
@@ -98,9 +109,9 @@ class CardChip(Button):
 
 def make_card(card, **kwargs):
     """A clickable card widget -- the rendered face when it exists."""
-    source = card_image(card)
-    if source is not None:
-        return CardFace(card, source, **kwargs)
+    data = card_bytes(card)
+    if data is not None:
+        return CardFace(card, data, **kwargs)
     return CardChip(card, **kwargs)
 
 

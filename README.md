@@ -390,6 +390,45 @@ There is no autoplay in the browser. `/auto` and `/grind` exist only in the
 Kivy client, because porting the autoplayer without a differential test would
 be exactly the drift the rest of this is careful to avoid.
 
+## Packaging
+
+    python tools/build_apworld.py                          # dist/phase10.apworld
+    python tools/build_apworld.py --verify dist/phase10.apworld
+
+Drop the result in Archipelago's `custom_worlds/`. It ships the world, the
+docs and the 51 card faces, and omits `__pycache__` and the test tree, which
+is what the two reference apworlds on this machine do. Timestamps are fixed so
+two builds of the same source are byte-identical -- otherwise every build looks
+like a change and you cannot tell whether a shipped file differs from yours.
+
+`--verify` is not a formality. It checks the required modules are present, that
+nothing bytecode-shaped leaked in, that the card art is there, and that the
+manifest's `game` matches the docs filename -- a mismatch there 404s the
+WebHost page and nothing else notices.
+
+### Two things packaging broke that source never would
+
+Both were found by installing the package with the dev junction removed, not
+by reading it.
+
+**The manifest was incomplete.** Archipelago's container loader reads
+`compatible_version`, and without it raises `KeyError` -- which surfaces as
+"This might be the incorrect world version for this file", pointing nowhere
+near the cause, plus "will stop working with Archipelago 0.7.0". The build now
+injects `compatible_version` and `version`; the committed manifest stays a
+description of the world, the way `worlds/apquest/archipelago.json` is, since
+those fields describe the container and Archipelago generates them itself.
+
+**The card art silently vanished.** `Path(__file__).parent / "assets"` points
+*inside* the zip for an installed world, so every `is_file()` was False, every
+face fell back to a text chip, and nothing was logged -- the client just
+quietly looked like it did before the art existed. Faces are now read through
+`importlib.resources`, which reads a folder and a zip the same way, and the
+widget builds its texture from bytes rather than a `source` path.
+
+Verified from the installed package with no source junction: the world
+registers, a seed generates, and all 51 faces read back as real PNG bytes.
+
 ## Not built yet
 
 Score is local only — it resets on reconnect, since the session is rebuilt from
