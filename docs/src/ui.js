@@ -14,12 +14,79 @@ const el = (id) => document.getElementById(id);
 const app = new Phase10Client({
   onUpdate: () => render(),
   onLog: (line) => log(line),
+  onMessage: (text, nodes) => logMessage(text, nodes),
 });
 
-function log(line) {
+//: Rooms can be chatty and this feed never scrolls away on its own.
+const MAX_LOG_LINES = 300;
+
+function appendLine(node) {
   const box = el("log");
-  box.textContent += `${line}\n`;
-  box.scrollTop = box.scrollHeight;
+  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  box.append(node);
+  while (box.childElementCount > MAX_LOG_LINES) box.firstElementChild.remove();
+  // Only follow the feed if the reader was already at the bottom; yanking the
+  // scroll while somebody is reading back is worse than missing a line.
+  if (atBottom) box.scrollTop = box.scrollHeight;
+}
+
+function log(line) {
+  const div = document.createElement("div");
+  div.className = "line local";
+  div.textContent = line;
+  appendLine(div);
+}
+
+/**
+ * Render one room message from its nodes.
+ *
+ * The plain text is right there in `text`, but the nodes carry what a player
+ * actually scans for -- whether the item that moved was progression or a trap,
+ * and whether the player named was them.
+ */
+function logMessage(text, nodes) {
+  const line = document.createElement("div");
+  line.className = "line";
+
+  if (!nodes || !nodes.length) {
+    line.textContent = text;
+    appendLine(line);
+    return;
+  }
+
+  for (const node of nodes) {
+    const span = document.createElement("span");
+    span.textContent = node.text;
+    span.className = classForNode(node);
+    line.append(span);
+  }
+  appendLine(line);
+}
+
+function classForNode(node) {
+  switch (node.type) {
+    case "item": {
+      const item = node.item;
+      if (!item) return "n-useful";
+      if (item.progression) return "n-progression";
+      if (item.trap) return "n-trap";
+      if (item.useful) return "n-useful";
+      return "n-filler";
+    }
+    case "location":
+      return "n-location";
+    case "player": {
+      const self = app.client?.players?.self;
+      const isSelf = self && node.player && node.player.slot === self.slot;
+      return isSelf ? "n-player self" : "n-player";
+    }
+    case "entrance":
+      return "n-entrance";
+    case "color":
+      return `c-${node.color}`;
+    default:
+      return "";
+  }
 }
 
 function cardButton(card, onClick) {

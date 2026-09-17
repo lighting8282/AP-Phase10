@@ -16,6 +16,14 @@ import ModuleUpdate
 
 ModuleUpdate.update_ran = True
 
+# Note this alone is not sticky. ModuleUpdate.RequirementsSet.add runs
+# `update_ran &= _skip_update` every time a world registers a requirements
+# file, so any world discovered after this line flips it back, and the next
+# update() call blocks on a prompt that EOFs -- naming whichever world import
+# order happened to reach, which is what makes it look random. Run the suite
+# with SKIP_REQUIREMENTS_UPDATE=1 to pin it properly; that is read before
+# ModuleUpdate loads, which a test module cannot be.
+
 from ..client.context import Phase10CommandProcessor
 from ..client.session import Phase10Session
 from ..data import PHASE_UNLOCK, SKIP_CARD

@@ -88,3 +88,37 @@ pre {
 @media (max-width: 480px) {
   .card img { width: 58px; height: 87px; }
 }
+
+/* --- log feed -------------------------------------------------------- */
+.log {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  max-height: 16rem;
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.log .line { color: var(--muted); }
+.log .line.local { color: var(--ink); }
+
+/* Item classification, the way Archipelago colours its own logs: a player
+   scanning the feed cares far more about what kind of item moved than who
+   phrased the sentence. */
+.n-progression { color: #c79bff; font-weight: 600; }
+.n-useful      { color: #8ab4ff; }
+.n-trap        { color: #ff8f8f; }
+.n-filler      { color: #9fe0c0; }
+.n-location    { color: #7fd4a8; }
+.n-player      { color: #ffd479; }
+.n-player.self { color: #ffd479; font-weight: 700; text-decoration: underline; }
+.n-entrance    { color: #7fd4d4; }
+
+.c-red { color: #ff8f8f; }      .c-green { color: #8ade9b; }
+.c-yellow { color: #ffd479; }   .c-blue { color: #8ab4ff; }
+.c-magenta { color: #f39bdc; }  .c-cyan { color: #7fd4d4; }
+.c-white { color: var(--ink); } .c-black { color: #7c8aa6; }
+.c-bold { font-weight: 700; }   .c-underline { text-decoration: underline; }

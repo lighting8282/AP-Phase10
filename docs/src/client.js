@@ -16,11 +16,15 @@ import { Phase10Game, roundToString } from "./game.js";
 import { Phase10Session } from "./session.js";
 
 export class Phase10Client {
-  constructor({ onUpdate = () => {}, onLog = () => {} } = {}) {
+  constructor({ onUpdate = () => {}, onLog = () => {}, onMessage = () => {} } = {}) {
     this.client = new Client();
     this.session = new Phase10Session();
     this.onUpdate = onUpdate;
     this.onLog = onLog;
+    // Everything the room says: items sent and received, hints, joins,
+    // chat. Without it the browser client can see its own game and
+    // nothing of the multiworld it is part of.
+    this.onMessage = onMessage;
 
     this.connected = false;
     this.restoreState = "needed";
@@ -50,6 +54,7 @@ export class Phase10Client {
     this.connected = true;
 
     this.client.items.on("itemsReceived", () => this.syncItems());
+    this.client.messages.on("message", (text, nodes) => this.onMessage(text, nodes));
     this.client.socket.on("disconnected", () => {
       this.connected = false;
       this.onLog("Disconnected.");

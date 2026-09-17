@@ -46,7 +46,16 @@ interpreter. Link the package in once (PowerShell):
 Generation needs four of AP's dependencies: `pathspec schema colorama jinja2`.
 Then, from the Archipelago root:
 
-    python -m unittest discover -s worlds/phase10/test -t . -p "test_*.py"
+    SKIP_REQUIREMENTS_UPDATE=1 python -m unittest discover -s worlds/phase10/test -t . -p "test_*.py"
+
+That environment variable is not optional dressing.
+`ModuleUpdate.RequirementsSet.add` runs `update_ran &= _skip_update` every time
+a world registers a requirements file, so the flag Archipelago's own
+`test/__init__.py` sets gets undone by any world discovered afterwards. The next
+`update()` call then blocks on an input prompt that EOFs, naming whichever world
+import order happened to reach -- so it reads as a random failure in a different
+world each run. The variable is read before `ModuleUpdate` loads, which is why
+no test module can fix it from inside.
 
 **Items.** Ten phase unlocks, Wild Card, Extra Draw, Hand Size Upgrade, Skip
 Card, plus filler and traps. The deck starts with no wilds at all and a small
@@ -175,6 +184,32 @@ become a `GameConfig`, and which location IDs a finished hand is worth.
 Traps do something now. Lean Deal costs two cards on the next deal, Wild Theft
 one wild, Phase Lock pins you to a phase until you clear it. Received counts
 only ever grow, so pending effects are tracked as received minus consumed.
+
+### The log
+
+One feed, chronological, carrying both your own game events and everything the
+room says -- items sent and received, hints, joins, chat. The browser client was
+blind to the multiworld before this; the desktop client gets the same thing free
+from Archipelago's own log tab.
+
+Messages arrive as nodes rather than a flat string, and the nodes carry what a
+player actually scans for, so they are rendered rather than flattened:
+
+- **items by classification** -- progression, useful, trap, filler -- straight
+  from what `items.py` declares, so a Wild Card and a Phase Lock never look
+  alike
+- **your own name underlined**, to pick your own traffic out at a glance
+- locations, entrances, and the server's own colour directives
+
+The feed follows new lines only when you were already at the bottom -- yanking
+the scroll while somebody is reading back is worse than missing a line -- and
+caps at 300 lines, because a busy room never stops.
+
+Verified against the four-slot multiworld: a second client joined as another
+slot and sent checks, and the feed showed
+`QuestPal sent Phase 8 Unlocked to P10Default (Right Room Enemy Drop)` with the
+item purple for progression, the location green, and P10Default underlined as
+self -- immediately followed by this client's own `Phase 8 unlocked.`
 
 ### Verified against a live server
 
