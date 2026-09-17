@@ -13,3 +13,4 @@ AP_Phase10:
   checks_per_phase: 4
   skip_card_items: 4
   trap_chance: 10
+  death_link: true

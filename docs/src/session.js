@@ -26,6 +26,7 @@ export class Phase10Session {
     this.goal = opts.goal ?? 0;
     this.startingDraws = opts.startingDraws ?? 4;
     this.checksPerPhase = opts.checksPerPhase ?? 4;
+    this.deathLink = opts.deathLink ?? false;
 
     this.items = new Map();
     this.consumedTraps = new Map();
@@ -40,6 +41,7 @@ export class Phase10Session {
       goal: Number(slotData.goal ?? 0),
       startingDraws: Number(slotData.starting_draws ?? 4),
       checksPerPhase: Number(slotData.checks_per_phase ?? 4),
+      deathLink: Boolean(slotData.death_link ?? false),
       game: game ?? new Phase10Game(),
     });
   }
@@ -133,6 +135,21 @@ export class Phase10Session {
       }
     }
     return this.game.startRound(phase, config, opts);
+  }
+
+  /**
+   * Fail the hand in progress, if there is one.
+   *
+   * A card game has nothing to kill, so a DeathLink death is a lost hand.
+   * Between rounds there is nothing to lose and an incoming death passes
+   * harmlessly -- returning null says so, rather than inventing a penalty the
+   * player cannot see coming.
+   */
+  killHand() {
+    const hand = this.hand;
+    if (!hand || hand.state !== HAND_STATE.IN_PROGRESS) return null;
+    hand.markFailed("death_link");
+    return hand;
   }
 
   /** Which check tiers a finished hand is worth. */

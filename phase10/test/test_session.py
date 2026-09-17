@@ -162,3 +162,39 @@ class TestPlayability(unittest.TestCase):
         self.assertIsNotNone(s.can_play(4))
         s.set_items([PHASE_UNLOCK.format(4)])
         self.assertIsNone(s.can_play(4))
+
+
+class TestDeathLink(unittest.TestCase):
+    def test_off_by_default(self) -> None:
+        self.assertFalse(session().death_link)
+
+    def test_read_from_slot_data(self) -> None:
+        self.assertTrue(session(death_link=True).death_link)
+
+    def test_a_death_fails_the_hand_in_progress(self) -> None:
+        s = session(death_link=True)
+        s.items[PHASE_UNLOCK.format(1)] = 1
+        hand = s.start_hand(1)
+        killed = s.kill_hand()
+        self.assertIs(killed, hand)
+        self.assertIs(hand.state, HandState.FAILED)
+
+    def test_a_death_between_rounds_costs_nothing(self) -> None:
+        # Nothing to lose, so no invented penalty the player cannot see coming.
+        s = session(death_link=True)
+        self.assertIsNone(s.kill_hand())
+
+    def test_a_death_cannot_undo_a_cleared_phase(self) -> None:
+        s = session(death_link=True)
+        hand = played(s, 2, state=HandState.PHASE_LAID, wilds=0, draws=2)
+        self.assertIsNone(s.kill_hand(), "a finished hand must not be re-failed")
+        self.assertIs(hand.state, HandState.PHASE_LAID)
+
+    def test_a_killed_hand_still_settles_as_a_loss(self) -> None:
+        s = session(death_link=True)
+        s.items[PHASE_UNLOCK.format(1)] = 1
+        s.start_hand(1)
+        hand = s.kill_hand()
+        self.assertEqual(s.finish_hand(hand), [], "a lost hand awards nothing")
+        self.assertEqual(s.hands_won, 0)
+        self.assertEqual(len(s.game.rounds), 1, "it still counts as a round played")

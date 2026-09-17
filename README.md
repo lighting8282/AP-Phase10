@@ -24,6 +24,15 @@ on their own.
 
 ## Run
 
+To drive the browser client locally:
+
+    python tools/serve_docs.py        # http://127.0.0.1:8137, no-store
+
+Use this rather than `python -m http.server`, which sends no cache headers --
+browsers then heuristically cache ES modules, and you spend an afternoon
+testing the previous build. Local HTTP also still reaches `ws://` servers; the
+published HTTPS site can only reach `wss://`.
+
 Engine only, no Archipelago needed:
 
     python tests/test_phases.py
@@ -454,6 +463,25 @@ AP_Phase10 slots.
 Pointed at the single-slot set it must fail, and does:
 
     python tools/check_multiworld.py tests/yaml/solo
+
+## DeathLink
+
+Off by default; `death_link: true` in your YAML turns it on.
+
+A card game has nothing to kill, so a death is **a lost hand**: when someone
+else dies your hand in progress fails on the spot, and when a hand of yours
+runs out of draws everyone linked loses theirs. Between rounds you have nothing
+to lose and an incoming death passes harmlessly -- inventing a penalty a player
+cannot see coming would be worse than letting one through.
+
+Settling a hand that was killed by a death never sends one back, or two linked
+players would bounce deaths at each other forever.
+
+The semantics live in the session (`kill_hand` / `killHand`), not in either
+client, so the desktop and browser versions cannot disagree about what a death
+does. Verified live in both directions and across both clients: a third client
+sent a death and the browser lost its hand; the browser then lost a hand of its
+own and the Python client, holding one open, lost that.
 
 ## Packaging
 

@@ -17,3 +17,4 @@ AP_Phase10:
   starting_phases: 1
   skip_card_items: 0
   trap_chance: 40
+  death_link: true

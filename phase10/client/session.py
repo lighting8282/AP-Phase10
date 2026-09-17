@@ -45,6 +45,7 @@ class Phase10Session:
     goal: int = 0
     starting_draws: int = 4
     checks_per_phase: int = 4
+    death_link: bool = False
 
     items: Counter = field(default_factory=Counter)
     consumed_traps: Counter = field(default_factory=Counter)
@@ -59,6 +60,7 @@ class Phase10Session:
             goal=int(slot_data.get("goal", 0)),
             starting_draws=int(slot_data.get("starting_draws", 4)),
             checks_per_phase=int(slot_data.get("checks_per_phase", 4)),
+            death_link=bool(slot_data.get("death_link", False)),
             game=Phase10Game(rng),
         )
 
@@ -134,6 +136,20 @@ class Phase10Session:
                 self.consumed_traps[trap] += 1
 
         return self.game.start_round(phase, config)
+
+    def kill_hand(self) -> PhaseHand | None:
+        """Fail the hand in progress, if there is one.
+
+        A card game has nothing to kill, so a DeathLink death is a lost hand.
+        Between rounds there is nothing to lose and an incoming death passes
+        harmlessly -- returning None says so, rather than inventing a penalty
+        the player cannot see coming.
+        """
+        hand = self.hand
+        if hand is None or hand.state is not HandState.IN_PROGRESS:
+            return None
+        hand.mark_failed("death_link")
+        return hand
 
     def earned_tiers(self, hand: PhaseHand) -> list[str]:
         """Which check tiers a finished hand is worth."""

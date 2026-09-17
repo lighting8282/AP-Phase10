@@ -55,6 +55,21 @@ export class Phase10Client {
 
     this.client.items.on("itemsReceived", () => this.syncItems());
     this.client.messages.on("message", (text, nodes) => this.onMessage(text, nodes));
+
+    if (this.session.deathLink) {
+      this.client.deathLink.enableDeathLink();
+      this.client.deathLink.on("deathReceived", (source, _time, cause) => {
+        this.onLog(`DeathLink from ${source}${cause ? `: ${cause}` : ""}`);
+        const hand = this.session.killHand();
+        if (!hand) {
+          this.onLog("No hand in progress, so nothing to lose.");
+          return;
+        }
+        // sendDeath false: settling this must not bounce a death back at
+        // whoever killed us.
+        this.settle(hand, { sendDeath: false });
+      });
+    }
     this.client.socket.on("disconnected", () => {
       this.connected = false;
       this.onLog("Disconnected.");
@@ -126,7 +141,8 @@ export class Phase10Client {
   }
 
   /** Finish a hand: report its checks, save, and trip the goal if it is met. */
-  async settle(hand) {
+  async settle(hand, { sendDeath = true } = {}) {
+    const died = hand.state === "failed";
     const fresh = this.session.finishHand(hand);
     const result = this.session.lastResult;
     if (result) this.onLog(roundToString(result));
@@ -135,6 +151,13 @@ export class Phase10Client {
       this.client.check(...fresh);
     }
     await this.save();
+
+    if (died && sendDeath && this.session.deathLink && this.connected) {
+      this.client.deathLink.sendDeathLink(
+        this.client.players.self?.name ?? "A player",
+        "ran out of draws",
+      );
+    }
 
     if (this.session.goalMet && !this.goalSent && this.connected) {
       this.client.goal();

@@ -265,6 +265,8 @@ class Phase10Context(CommonContext):
         # with the empty one we just built from slot_data.
         self.restore_state = "needed"
         self.save_pending = False
+        self.death_link_pending = False
+        self.tags_pending = False
 
     @property
     def save_key(self) -> str:
@@ -285,6 +287,7 @@ class Phase10Context(CommonContext):
             self.goal_sent = False
             self.restore_state = "needed"
             self.save_pending = False
+            self.tags_pending = self.session.death_link
             self.sync_items()
             logger.info("Connected. /phases to see what you can play, /play <n> to start.")
         elif cmd == "ReceivedItems":
@@ -321,8 +324,19 @@ class Phase10Context(CommonContext):
             logger.info("Stored scorecard could not be read; starting a fresh one.")
         self.restore_state = "done"
 
-    def settle(self, hand, quiet: bool = False) -> None:
+    def on_deathlink(self, data: dict[str, Any]) -> None:
+        super().on_deathlink(data)
+        hand = self.session.kill_hand()
+        if hand is None:
+            logger.info("DeathLink: no hand in progress, so nothing to lose.")
+            return
+        # send_death=False: settling this hand must not bounce a death back at
+        # the player who killed us.
+        self.settle(hand, send_death=False)
+
+    def settle(self, hand, quiet: bool = False, send_death: bool = True) -> None:
         """Finish a hand and queue whatever checks it earned."""
+        died = hand.state is HandState.FAILED
         new = self.session.finish_hand(hand)
         result = self.session.last_result
         if not quiet and result is not None:
@@ -330,10 +344,20 @@ class Phase10Context(CommonContext):
         if new:
             self.pending_locations.extend(new)
         self.save_pending = True
+        if died and send_death and self.session.death_link:
+            self.death_link_pending = True
 
     async def phase10_loop(self) -> None:
         while not self.exit_event.is_set():
             connected = self.server and not self.server.socket.closed
+
+            if connected and self.tags_pending:
+                self.tags_pending = False
+                await self.update_death_link(self.session.death_link)
+
+            if connected and self.death_link_pending:
+                self.death_link_pending = False
+                await self.send_death(f"{self.player_names.get(self.slot, 'A player')} ran out of draws.")
 
             if connected and self.restore_state == "needed":
                 self.restore_state = "requested"

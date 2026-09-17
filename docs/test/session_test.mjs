@@ -122,6 +122,30 @@ fixtures.sequences.forEach((script, index) => {
   check("checked locations are not stored", "checked_locations" in before.toPayload(), false);
 }
 
+// -- death link ---------------------------------------------------------------
+{
+  check("death link off by default", session({}, []).deathLink, false);
+  check("death link read from slot data",
+    session({ death_link: true }, []).deathLink, true);
+
+  const s = session({ death_link: true }, [phaseUnlock(1)]);
+  check("a death between rounds costs nothing", s.killHand(), null);
+
+  const hand = s.startHand(1);
+  const killed = s.killHand();
+  check("a death fails the hand in progress", killed === hand, true);
+  check("the killed hand is failed", hand.state, "failed");
+  check("a killed hand awards nothing", s.finishHand(hand), []);
+  check("a killed hand is still a round played", s.game.rounds.length, 1);
+  check("a killed hand is not a win", s.handsWon, 0);
+
+  const done = session({ death_link: true }, [phaseUnlock(2)]);
+  const laid = done.startHand(2);
+  laid.state = "phase_laid";
+  check("a death cannot re-fail a finished hand", done.killHand(), null);
+  check("the finished hand keeps its state", laid.state, "phase_laid");
+}
+
 for (const line of failures) console.log(`  FAIL ${line}`);
 console.log(`\n${passed} passed, ${failures.length} failed`);
 process.exit(failures.length ? 1 : 0);

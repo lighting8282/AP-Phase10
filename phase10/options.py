@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from Options import Choice, OptionGroup, PerGameCommonOptions, Range, Toggle
+from Options import Choice, DeathLink, OptionGroup, PerGameCommonOptions, Range, Toggle
 
 
 class Goal(Choice):
@@ -112,6 +112,17 @@ class SkipCardItems(Range):
     default = 4
 
 
+class Phase10DeathLink(DeathLink):
+    """
+    Share deaths with the rest of the multiworld.
+
+    There is nothing to kill in a card game, so a death is a lost hand: when
+    someone else dies your current hand fails on the spot, and when a hand of
+    yours runs out of draws everyone linked loses theirs. Between rounds you
+    have nothing to lose, so an incoming death passes harmlessly.
+    """
+
+
 class TrapChance(Range):
     """
     Percentage chance that any given filler item is replaced by a trap.
@@ -133,13 +144,14 @@ class Phase10Options(PerGameCommonOptions):
     checks_per_phase: ChecksPerPhase
     skip_card_items: SkipCardItems
     trap_chance: TrapChance
+    death_link: Phase10DeathLink
 
 
 option_groups = [
     OptionGroup("Goal", [Goal, ChecksPerPhase, StartingPhases]),
     OptionGroup("Difficulty", [StartingDraws, ExtraDrawItems, WildCardItems,
                                HandSizeUpgrades, SkipCardItems]),
-    OptionGroup("Deck", [TrapChance]),
+    OptionGroup("Deck", [TrapChance, Phase10DeathLink]),
 ]
 
 option_presets = {
