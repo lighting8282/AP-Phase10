@@ -19,7 +19,8 @@ on their own.
         autoplay.py              greedy autoplayer (difficulty measurement)
         play_in_console.py       headless runner and difficulty sweeps
     tests/test_phases.py         engine tests, no dependencies
-    tests/yaml/Phase10.yaml      generation smoke-test YAML
+    tests/yaml/solo/             single-slot generation smoke test
+    tests/yaml/multi/            four-slot multiworld, two of them this game
 
 ## Run
 
@@ -389,6 +390,35 @@ would simply not be published and the client would fail to import it. The empty
 There is no autoplay in the browser. `/auto` and `/grind` exist only in the
 Kivy client, because porting the autoplayer without a differential test would
 be exactly the drift the rest of this is careful to avoid.
+
+## Multiworld
+
+    python tools/check_multiworld.py
+
+Every seed this project generated for a long time held one slot of one game,
+which is the single arrangement that cannot exercise what is most likely to
+break: fill putting this world's items into someone else's locations, and
+someone else's into this world's.
+
+`tests/yaml/multi/` is four slots -- APQuest, ChecksFinder, and **two
+AP_Phase10 slots with deliberately different options**. Same game twice is
+where item IDs, option-dependent location counts and progression balancing
+collide, and one of the two runs the tightest legal option set (two checks per
+phase, one starting phase, minimum items, `accessibility: minimal`), because
+that slot has the least room for fill to work in.
+
+The check asserts the seed really is mixed and that items crossed in both
+directions, not merely that generation exited zero. Generation succeeding is
+itself the beatability proof -- Archipelago validates completion and builds a
+playthrough before writing anything.
+
+Current result: 4 slots, 210 placements, 64 of this world's items placed
+elsewhere, 79 foreign items placed here, 37 crossing between the two
+AP_Phase10 slots.
+
+Pointed at the single-slot set it must fail, and does:
+
+    python tools/check_multiworld.py tests/yaml/solo
 
 ## Packaging
 

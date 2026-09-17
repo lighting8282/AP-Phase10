@@ -1,0 +1,11 @@
+name: QuestPal
+game: APQuest
+description: A second game, so items actually cross between worlds
+
+APQuest:
+  progression_balancing: 50
+  accessibility: full
+  hard_mode: true
+  hammer: true
+  extra_starting_chest: true
+  trap_chance: 20

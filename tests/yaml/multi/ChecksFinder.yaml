@@ -1,0 +1,7 @@
+name: FinderPal
+game: ChecksFinder
+description: A third slot, to give the fill somewhere else to put things
+
+ChecksFinder:
+  progression_balancing: 50
+  accessibility: full
