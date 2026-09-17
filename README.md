@@ -46,7 +46,8 @@ testable on its own.
 
 ## Apworld
 
-Targets Archipelago 0.6.8 and its `rule_builder` rule DSL. Needs an Archipelago
+Targets Archipelago **0.6.7**, the current stable release, and its
+`rule_builder` rule DSL. Needs an Archipelago
 **source** checkout; the packaged release on A: is frozen and has no usable
 interpreter. Link the package in once (PowerShell):
 
@@ -482,6 +483,30 @@ client, so the desktop and browser versions cannot disagree about what a death
 does. Verified live in both directions and across both clients: a third client
 sent a death and the browser lost its hand; the browser then lost a hand of its
 own and the Python client, holding one open, lost that.
+
+## A word on the version floor
+
+`minimum_ap_version` is `0.6.7`, and getting that wrong is easy in a way worth
+recording.
+
+Development here happens against a **source checkout of `main`**, which reports
+`__version__ = "0.6.8"` -- an unreleased, in-development number. Archipelago's
+latest *stable* release is 0.6.7. Declaring a floor of 0.6.8 therefore made the
+world uninstallable by everyone: the loader refuses it outright with
+
+    Did not load phase10.apworld as its minimum core version 0.6.8 is higher
+    than current core version 0.6.7
+
+and since nothing loads, no options template is generated either -- which is
+how the problem actually shows up, several steps from its cause.
+
+Nothing in this world needs 0.6.8. Verified by generating with the 0.6.7
+release build's own `ArchipelagoGenerate.exe`, and by running its Launcher's
+"Generate Template Options", which now produces `AP_Phase10.yaml` with all ten
+options.
+
+The lesson for next time: the floor is a claim about the oldest release that
+works, not about whatever your checkout happens to say.
 
 ## Packaging
 
