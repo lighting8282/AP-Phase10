@@ -72,14 +72,10 @@ class PhaseHand:
         self.config = config
         self.rng = rng
 
-        deck = shuffled_deck(rng, config.wilds_in_deck, config.skips_in_deck)
-        self.hand: list[Card] = deck[: config.hand_size]
-        # Granted Skips are dealt on top of the hand rather than out of it, so
-        # holding them costs no room to build the phase in.
-        self.hand += [SKIP] * config.starting_skips
-        rest = deck[config.hand_size:]
-        self.discard: list[Card] = [rest[0]]
-        self.stock: list[Card] = rest[1:]
+        self.hand: list[Card] = []
+        self.discard: list[Card] = []
+        self.stock: list[Card] = []
+        self._deal()
 
         self.draws_used = 0
         self.state = HandState.IN_PROGRESS
@@ -89,6 +85,39 @@ class PhaseHand:
         self.used_wilds_in_layout = 0
         self.skips_played = 0
         self.dig_options: list[Card] | None = None
+
+    def _deal(self) -> None:
+        """Shuffle and deal. Shared by the opening deal and a Mulligan, so the
+        two cannot drift into dealing subtly different tables."""
+        deck = shuffled_deck(self.rng, self.config.wilds_in_deck,
+                             self.config.skips_in_deck)
+        self.hand = deck[: self.config.hand_size]
+        # Granted Skips are dealt on top of the hand rather than out of it, so
+        # holding them costs no room to build the phase in.
+        self.hand += [SKIP] * self.config.starting_skips
+        rest = deck[self.config.hand_size:]
+        self.discard = [rest[0]]
+        self.stock = rest[1:]
+
+    def redeal(self) -> None:
+        """Throw the opening hand back and deal a fresh one -- a Mulligan.
+
+        Deliberately restricted to before the first draw. A reroll available at
+        any point is a far stronger item than a bad-opening insurance policy,
+        and it would invalidate the measured clear rates the access rules are
+        built on. Costs no draw: the point is to undo a dead deal, not to pay
+        for it out of the same budget that the deal already ruined.
+        """
+        if self.state is not HandState.IN_PROGRESS:
+            raise RuntimeError(f"hand is {self.state.value}")
+        if self.draws_used or self.drew_this_turn:
+            raise RuntimeError("a Mulligan only works before your first draw")
+        if self.dig_pending:
+            raise RuntimeError("finish the dig first")
+        if self.skips_played:
+            raise RuntimeError("a Mulligan only works before you play a Skip")
+        self._deal()
+        self._emit("redeal", hand=len(self.hand))
 
     # -- queries -----------------------------------------------------------
     @property

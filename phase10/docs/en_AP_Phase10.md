@@ -24,8 +24,17 @@ has only eight copies in the deck while any of eight copies can fill a run slot.
 
 ## What items and locations exist?
 
-Items: phase unlocks, Wild Card, Extra Draw, Hand Size Upgrade, plus filler and
-traps.
+Items: phase unlocks, Wild Card, Extra Draw, Hand Size Upgrade and Skip Card,
+plus filler and traps.
+
+The two fillers both do something. A **Mulligan** throws back a dead opening
+hand and deals you a fresh one -- usable only before your first draw, and it
+costs you no draw. A **Score Reduction** takes 25 points off your running total,
+which is what a Wild left in your hand costs you.
+
+Traps, when enabled: Phase Lock pins you to the phase you just lost until you
+clear it, Lean Deal costs you two cards on one hand, and Wild Theft takes a wild
+out of the deck for one hand.
 
 Locations: each phase is worth up to four checks -- clearing it, clearing it and
 going out in the same hand, clearing it without using a wild, and clearing it

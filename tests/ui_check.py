@@ -23,7 +23,9 @@ OUT = sys.argv[1] if len(sys.argv) > 1 else "phase10_ui.png"
 
 from worlds.phase10.client.context import Phase10Context
 from worlds.phase10.client.session import Phase10Session
-from worlds.phase10.data import EXTRA_DRAW, GAME_NAME, PHASE_UNLOCK, SKIP_CARD, WILD_CARD
+from worlds.phase10.data import (
+    EXTRA_DRAW, GAME_NAME, MULLIGAN, PHASE_UNLOCK, SKIP_CARD, WILD_CARD,
+)
 
 failures: list[str] = []
 
@@ -43,7 +45,7 @@ async def main():
     )
     ctx.session.set_items(
         [PHASE_UNLOCK.format(p) for p in (1, 2, 4, 6, 7)]
-        + [WILD_CARD] * 5 + [EXTRA_DRAW] * 3 + [SKIP_CARD] * 2
+        + [WILD_CARD] * 5 + [EXTRA_DRAW] * 3 + [SKIP_CARD] * 2 + [MULLIGAN]
     )
     ctx.run_gui()
 
@@ -63,6 +65,13 @@ async def main():
 
         hand = session.hand
         check(len(hand.hand) == 12, "hand shows 10 dealt cards plus 2 granted skips")
+
+        # Mulligan, while the deal is still untouched. It has to run before
+        # the draw below, which is exactly what makes it unavailable after.
+        dealt = [str(c) for c in hand.hand]
+        next(b for b in view.actions.children if b.text == "Mulligan").dispatch("on_release")
+        check([str(c) for c in hand.hand] != dealt, "Mulligan button redeals the hand")
+        check(session.mulligans_left == 0, "and the Mulligan is spent")
 
         # Draw, via the action button rather than the session.
         before = hand.draws_used

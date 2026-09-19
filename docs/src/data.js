@@ -19,8 +19,18 @@ export const PHASE_LOCK = "Phase Lock";
 export const LEAN_DEAL = "Lean Deal";
 export const WILD_THEFT = "Wild Theft";
 
+export const MULLIGAN = "Mulligan";
+export const SCORE_REDUCTION = "Score Reduction";
+
 export const TRAPS = [PHASE_LOCK, LEAN_DEAL, WILD_THEFT];
-export const FILLERS = ["Mulligan", "Score Reduction"];
+export const FILLERS = [MULLIGAN, SCORE_REDUCTION];
+
+/**
+ * Points a single Score Reduction takes off the running total. Twenty-five is
+ * the deck's own largest penalty -- what a Wild left in hand costs you -- so
+ * one of these is worth exactly the worst card you can be caught holding.
+ */
+export const SCORE_REDUCTION_VALUE = 25;
 
 export const ITEM_NAME_TO_ID = (() => {
   const table = {};
@@ -32,8 +42,8 @@ export const ITEM_NAME_TO_ID = (() => {
   table[PHASE_LOCK] = 30;
   table[LEAN_DEAL] = 31;
   table[WILD_THEFT] = 32;
-  table["Mulligan"] = 40;
-  table["Score Reduction"] = 41;
+  table[MULLIGAN] = 40;
+  table[SCORE_REDUCTION] = 41;
   return Object.freeze(table);
 })();
 

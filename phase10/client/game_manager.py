@@ -171,6 +171,7 @@ class Phase10View(BoxLayout):
             ("Take discard", "/draw d"),
             ("Lay down", "/lay"),
             ("Dig (Skip)", "/skip"),
+            ("Mulligan", "/mulligan"),
             ("Auto", "/auto"),
             ("Score", "/score"),
         ):
@@ -192,6 +193,7 @@ class Phase10View(BoxLayout):
             tuple(str(c) for c in hand.hand) if hand else (),
             str(hand.discard_top) if hand else None,
             hand.draws_left if hand else None,
+            s.mulligans_left,
             hand.state.value if hand else None,
             tuple(str(c) for c in (hand.dig_options or ())) if hand else (),
         )
@@ -210,6 +212,8 @@ class Phase10View(BoxLayout):
             f"score [b]{s.total_score}[/b] (lower is better)    "
             f"won {s.hands_won}    cleared {len(s.cleared_phases)}/10"
         )
+        if s.score_reduction:
+            self.header.text += f"    [color=88cc88]-{s.score_reduction} reduced[/color]"
 
         if hand is not None:
             self.objective.text = f"[b]Phase {hand.phase}[/b]: {phase_description(hand.phase)}"
@@ -217,6 +221,8 @@ class Phase10View(BoxLayout):
                 f"draws left [b]{hand.draws_left}[/b]    stock {len(hand.stock)}    "
                 f"discard {hand.discard_top}    skips in hand {hand.skips_in_hand}"
             )
+            if s.mulligans_left and s.can_mulligan() is None:
+                self.stats.text += f"    [color=88cc88]{s.mulligans_left} mulligan(s)[/color]"
         else:
             config = s.config
             self.objective.text = "No round in progress -- pick a phase below."

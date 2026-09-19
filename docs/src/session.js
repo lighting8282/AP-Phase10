@@ -12,7 +12,8 @@
 
 import {
   BASE_HAND_SIZE, EXTRA_DRAW, HANDS_WON_MILESTONES, HAND_SIZE_UPGRADE, LEAN_DEAL,
-  LOCATION_NAME_TO_ID, MAX_SKIPS, PHASE_LOCK, SKIP_CARD, TIERS, WILD_CARD,
+  LOCATION_NAME_TO_ID, MAX_SKIPS, MULLIGAN, PHASE_LOCK, SCORE_REDUCTION,
+  SCORE_REDUCTION_VALUE, SKIP_CARD, TIERS, WILD_CARD,
   WILD_THEFT, milestoneLocationName, phaseLocationName, phaseUnlock,
 } from "./data.js";
 import { STOCK_WILDS } from "./cards.js";
@@ -30,6 +31,7 @@ export class Phase10Session {
 
     this.items = new Map();
     this.consumedTraps = new Map();
+    this.mulligansUsed = 0;
     this.checkedLocations = new Set();
     this.lockedPhase = null;
     this.lastResult = null;
@@ -60,8 +62,18 @@ export class Phase10Session {
     return this.game.clearedPhases;
   }
 
+  /** Points Score Reduction items have taken off the running total. */
+  get scoreReduction() {
+    return this.count(SCORE_REDUCTION) * SCORE_REDUCTION_VALUE;
+  }
+
+  /**
+   * The score as the player is judged on it: raw, less reductions, floored at
+   * zero. The scorecard still shows what each round actually cost -- a
+   * reduction forgives points, it does not rewrite history.
+   */
   get totalScore() {
-    return this.game.totalScore;
+    return Math.max(0, this.game.totalScore - this.scoreReduction);
   }
 
   // -- items ---------------------------------------------------------------
@@ -121,6 +133,34 @@ export class Phase10Session {
       return `A Phase Lock trap is forcing you to replay Phase ${this.lockedPhase}.`;
     }
     return null;
+  }
+
+  // -- mulligans -----------------------------------------------------------
+  get mulligansLeft() {
+    return Math.max(0, this.count(MULLIGAN) - this.mulligansUsed);
+  }
+
+  /** Returns null if a Mulligan is usable right now, else why not. */
+  canMulligan() {
+    if (!this.mulligansLeft) return "No Mulligans left.";
+    const hand = this.hand;
+    if (!hand || hand.state !== HAND_STATE.IN_PROGRESS) return "No hand in progress.";
+    if (hand.drawsUsed || hand.drewThisTurn) {
+      return "A Mulligan only works before your first draw.";
+    }
+    if (hand.digPending) return "Finish the dig first.";
+    if (hand.skipsPlayed) return "A Mulligan only works before you play a Skip.";
+    return null;
+  }
+
+  /** Spend a Mulligan on the current hand and return it, redealt. */
+  useMulligan() {
+    const refusal = this.canMulligan();
+    if (refusal) throw new Error(refusal);
+    const hand = this.hand;
+    hand.redeal();
+    this.mulligansUsed += 1;
+    return hand;
   }
 
   startHand(phase, opts = {}) {
@@ -218,6 +258,7 @@ export class Phase10Session {
       version: SAVE_VERSION,
       game: this.game.toPayload(),
       consumed_traps: traps,
+      mulligans_used: this.mulligansUsed,
       locked_phase: this.lockedPhase,
     };
   }
@@ -239,6 +280,11 @@ export class Phase10Session {
         if (Number.isInteger(count) && count > 0) this.consumedTraps.set(name, count);
       }
     }
+
+    // Absent in saves written before Mulligans did anything, so a missing key
+    // restores as zero rather than refusing the whole payload.
+    const used = payload.mulligans_used;
+    this.mulligansUsed = Number.isInteger(used) && used >= 0 ? used : 0;
 
     const locked = payload.locked_phase;
     this.lockedPhase =

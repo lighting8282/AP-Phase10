@@ -237,7 +237,7 @@ is written during a real generation. `test_data.py` guards it now.
 Two things about this machine are worth knowing before touching AP again.
 
 **Use the venv at `<AP checkout>\.venv`.** The system Python has
-websockets 17.1, but AP 0.6.8 pins `websockets==13.1` (`<14`) and uses
+websockets 17.1, but AP pins `websockets==13.1` (`<14`) and uses
 `socket.open` / `socket.closed` throughout — both removed in websockets 14. The
 server crashes on every client connection without the pin. This affects every
 world, not just this one.
@@ -283,6 +283,38 @@ Success rate at 8 draws with stock wilds:
 
 Skip Card is classified `useful`, not `progression`, so no access rule depends
 on it and the fill balance is unchanged.
+
+## Fillers
+
+Both filler items were inert for a long time — named in the tables, classified,
+and read by nothing. At default settings that is roughly sixteen of the fifty
+items in the pool doing literally nothing, which is a lot of dead pool for
+whoever is playing the seed.
+
+**Mulligan** redeals the opening hand. The restriction is the whole design: it
+only works *before your first draw*, and it costs no draw.
+
+A reroll available at any moment is a far stronger item than bad-opening
+insurance — it would let a player fish for a layable hand all the way down the
+draw budget, and every clear rate in the table above is measured against a
+budget that cannot be rewound. Fixing it to the untouched deal keeps it what
+filler should be: it cuts the variance of a dead deal without raising the
+ceiling, so the access rules built on those measurements still hold.
+
+The engine and the session each enforce the restriction. The session's copy
+exists to explain a refusal in words; the engine's is what protects every other
+driver — the autoplayer, a fixture replay, a player poking at the console — and
+it has its own tests, because the session's guard otherwise shadows it and the
+engine's could be deleted with every test still green.
+
+**Score Reduction** takes 25 points off the running total, the same as a Wild
+left in your hand — the deck's own largest penalty. It is applied to the
+reported total, not to the rounds: the scorecard still shows what each hand
+actually cost, and the reduction is its own line. A reduction forgives points,
+it does not rewrite the history. The total is floored at zero.
+
+Nothing in logic depends on score, so this stays honest filler — it moves the
+number the player is judged on and nothing else.
 
 ## Game and scoring
 
@@ -549,8 +581,10 @@ registers, a seed generates, and all 51 faces read back as real PNG bytes.
 
 ## Not built yet
 
-Score is local only — it resets on reconnect, since the session is rebuilt from
-slot_data and the server tracks checks, not points.
+Nobody has actually played a full seed by hand — every difficulty number in
+this file comes from the greedy autoplayer. There is no browser autoplay, no
+hint display in the browser client, and `/grind` blocks the check-draining loop
+while it runs.
 
 ## Naming
 

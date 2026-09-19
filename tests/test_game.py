@@ -154,6 +154,92 @@ def test_scorecard_elides_old_rounds():
     assert any("10 earlier round(s)" in line for line in card)
 
 
+# -- Mulligan (engine level) --------------------------------------------------
+# The session carries its own copy of these guards so it can explain a refusal
+# in words. These test the engine's, which is what protects any other driver --
+# the autoplayer, a fixture replay, a player poking at the console.
+
+def fresh_hand(seed=3, **cfg):
+    return PhaseHand(1, GameConfig(max_draws=8, **cfg), random.Random(seed))
+
+
+def test_redeal_replaces_the_hand():
+    hand = fresh_hand()
+    before = [str(c) for c in hand.hand]
+    hand.redeal()
+    assert [str(c) for c in hand.hand] != before
+
+
+def test_redeal_conserves_the_deck():
+    hand = fresh_hand()
+    hand.redeal()
+    total = len(hand.hand) + len(hand.discard) + len(hand.stock)
+    assert total == 96 + hand.config.wilds_in_deck
+    assert len(hand.hand) == hand.config.hand_size
+    assert len(hand.discard) == 1
+
+
+def test_redeal_costs_no_draw():
+    hand = fresh_hand()
+    hand.redeal()
+    assert hand.draws_used == 0
+    assert hand.draws_left == 8
+
+
+def test_redeal_refused_after_a_draw():
+    hand = fresh_hand()
+    hand.draw()
+    try:
+        hand.redeal()
+    except RuntimeError:
+        return
+    raise AssertionError("redeal must be refused once the hand has been played")
+
+
+def test_redeal_refused_mid_turn():
+    """Drawn but not yet discarded still counts as touched."""
+    hand = fresh_hand()
+    hand.draw()
+    assert hand.drew_this_turn
+    try:
+        hand.redeal()
+    except RuntimeError:
+        return
+    raise AssertionError("redeal must be refused mid-turn")
+
+
+def test_redeal_refused_on_a_finished_hand():
+    hand = fresh_hand()
+    hand.mark_failed("test")
+    try:
+        hand.redeal()
+    except RuntimeError:
+        return
+    raise AssertionError("redeal must be refused on a finished hand")
+
+
+def test_redeal_refused_after_a_skip():
+    hand = fresh_hand(starting_skips=1)
+    hand.play_skip()
+    hand.take_dug(0)
+    try:
+        hand.redeal()
+    except RuntimeError:
+        return
+    raise AssertionError("redeal must be refused once a Skip has been played")
+
+
+def test_redeal_refused_with_a_dig_pending():
+    hand = fresh_hand(starting_skips=1)
+    hand.play_skip()
+    assert hand.dig_pending
+    try:
+        hand.redeal()
+    except RuntimeError:
+        return
+    raise AssertionError("redeal must be refused with a dig pending")
+
+
 if __name__ == "__main__":
     fns = [(k, v) for k, v in sorted(globals().items()) if k.startswith("test_")]
     failed = 0

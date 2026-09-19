@@ -6,9 +6,10 @@ import unittest
 from ..client.session import LEAN_DEAL_PENALTY, Phase10Session
 from ..data import (
     BASE_HAND_SIZE, EXTRA_DRAW, HAND_SIZE_UPGRADE, LEAN_DEAL, LOCATION_NAME_TO_ID,
-    MAX_SKIPS, PHASE_LOCK, PHASE_UNLOCK, SKIP_CARD, WILD_CARD, WILD_THEFT,
+    MAX_SKIPS, MULLIGAN, PHASE_LOCK, PHASE_UNLOCK, SCORE_REDUCTION,
+    SCORE_REDUCTION_VALUE, SKIP_CARD, WILD_CARD, WILD_THEFT,
 )
-from ..game.cards import STOCK_WILDS
+from ..game.cards import STOCK_WILDS, Color, number_card
 from ..game.engine import HandState
 
 
@@ -198,3 +199,122 @@ class TestDeathLink(unittest.TestCase):
         self.assertEqual(s.finish_hand(hand), [], "a lost hand awards nothing")
         self.assertEqual(s.hands_won, 0)
         self.assertEqual(len(s.game.rounds), 1, "it still counts as a round played")
+
+
+class TestMulligan(unittest.TestCase):
+    def opened(self, copies: int = 1) -> Phase10Session:
+        s = session()
+        s.set_items([MULLIGAN] * copies + [PHASE_UNLOCK.format(1)])
+        s.start_hand(1)
+        return s
+
+    def test_none_without_the_item(self) -> None:
+        s = session()
+        s.set_items([PHASE_UNLOCK.format(1)])
+        s.start_hand(1)
+        self.assertEqual(s.mulligans_left, 0)
+        self.assertEqual(s.can_mulligan(), "No Mulligans left.")
+
+    def test_redeals_the_hand(self) -> None:
+        s = self.opened()
+        before = [str(c) for c in s.hand.hand]
+        self.assertIsNone(s.can_mulligan())
+        s.use_mulligan()
+        self.assertNotEqual(before, [str(c) for c in s.hand.hand])
+
+    def test_costs_no_draw_and_leaves_a_full_table(self) -> None:
+        s = self.opened()
+        draws = s.hand.draws_left
+        s.use_mulligan()
+        hand = s.hand
+        self.assertEqual(hand.draws_left, draws)
+        self.assertEqual(len(hand.hand), s.config.hand_size)
+        self.assertEqual(len(hand.discard), 1)
+        # Deal, discard and stock still account for every card dealt.
+        self.assertEqual(
+            len(hand.hand) + len(hand.discard) + len(hand.stock),
+            96 + s.config.wilds_in_deck,
+        )
+
+    def test_is_spent_once_used(self) -> None:
+        s = self.opened(copies=2)
+        s.use_mulligan()
+        self.assertEqual(s.mulligans_left, 1)
+        s.use_mulligan()
+        self.assertEqual(s.mulligans_left, 0)
+        self.assertEqual(s.can_mulligan(), "No Mulligans left.")
+
+    def test_refused_after_the_first_draw(self) -> None:
+        """The whole point of the restriction: insurance, not a free reroll."""
+        s = self.opened()
+        s.hand.draw()
+        self.assertEqual(
+            s.can_mulligan(), "A Mulligan only works before your first draw."
+        )
+        with self.assertRaises(ValueError):
+            s.use_mulligan()
+        self.assertEqual(s.mulligans_left, 1)  # a refusal must not spend it
+
+    def test_refused_between_rounds(self) -> None:
+        s = session()
+        s.set_items([MULLIGAN])
+        self.assertEqual(s.can_mulligan(), "No hand in progress.")
+
+    def test_survives_a_reconnect(self) -> None:
+        s = self.opened(copies=2)
+        s.use_mulligan()
+        s.game.hand = None
+
+        fresh = session()
+        fresh.set_items([MULLIGAN] * 2)
+        self.assertTrue(fresh.load_payload(s.to_payload()))
+        self.assertEqual(fresh.mulligans_left, 1)
+
+    def test_old_saves_restore_with_none_spent(self) -> None:
+        """Payloads written before Mulligans did anything must still load."""
+        s = self.opened(copies=2)
+        payload = s.to_payload()
+        del payload["mulligans_used"]
+
+        fresh = session()
+        fresh.set_items([MULLIGAN] * 2)
+        self.assertTrue(fresh.load_payload(payload))
+        self.assertEqual(fresh.mulligans_left, 2)
+
+
+class TestScoreReduction(unittest.TestCase):
+    def scored(self, points: int, reductions: int = 0) -> Phase10Session:
+        """A session carrying one lost round worth exactly `points`.
+
+        Low number cards are five each, so the leftover hand is sized to the
+        score wanted. What is under test is the reduction arithmetic, not how a
+        hand comes to be worth points.
+        """
+        assert points % 5 == 0
+        s = session()
+        s.set_items([SCORE_REDUCTION] * reductions)
+        hand = played(s, 1, state=HandState.FAILED, wilds=0, draws=9)
+        hand.hand = [number_card(5, Color.RED) for _ in range(points // 5)]
+        s.finish_hand(hand)
+        assert s.game.total_score == points
+        return s
+
+    def test_no_reductions_leaves_the_score_alone(self) -> None:
+        s = self.scored(80)
+        self.assertEqual(s.score_reduction, 0)
+        self.assertEqual(s.total_score, 80)
+
+    def test_each_copy_takes_off_its_value(self) -> None:
+        s = self.scored(80, reductions=2)
+        self.assertEqual(s.score_reduction, 2 * SCORE_REDUCTION_VALUE)
+        self.assertEqual(s.total_score, 80 - 2 * SCORE_REDUCTION_VALUE)
+
+    def test_floored_at_zero(self) -> None:
+        s = self.scored(10, reductions=4)
+        self.assertEqual(s.total_score, 0)
+
+    def test_the_scorecard_still_shows_what_the_round_cost(self) -> None:
+        """A reduction forgives points; it does not rewrite the history."""
+        s = self.scored(80, reductions=1)
+        self.assertEqual(s.game.total_score, 80)
+        self.assertEqual(s.total_score, 55)

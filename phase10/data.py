@@ -27,8 +27,16 @@ PHASE_LOCK = "Phase Lock"
 LEAN_DEAL = "Lean Deal"
 WILD_THEFT = "Wild Theft"
 
+MULLIGAN = "Mulligan"
+SCORE_REDUCTION = "Score Reduction"
+
 TRAPS = [PHASE_LOCK, LEAN_DEAL, WILD_THEFT]
-FILLERS = ["Mulligan", "Score Reduction"]
+FILLERS = [MULLIGAN, SCORE_REDUCTION]
+
+#: Points a single Score Reduction takes off the running total. Twenty-five is
+#: the deck's own largest penalty -- what a Wild left in hand costs you -- so
+#: one of these is worth exactly the worst card you can be caught holding.
+SCORE_REDUCTION_VALUE = 25
 
 ITEM_NAME_TO_ID = {
     **{PHASE_UNLOCK.format(p): p for p in range(1, 11)},
@@ -39,8 +47,8 @@ ITEM_NAME_TO_ID = {
     PHASE_LOCK: 30,
     LEAN_DEAL: 31,
     WILD_THEFT: 32,
-    "Mulligan": 40,
-    "Score Reduction": 41,
+    MULLIGAN: 40,
+    SCORE_REDUCTION: 41,
 }
 
 #: Check tiers in unlock order; `checks_per_phase` takes a prefix of this list.

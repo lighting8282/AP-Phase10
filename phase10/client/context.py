@@ -77,6 +77,11 @@ class Phase10CommandProcessor(ClientCommandProcessor):
             f"round {s.game.round_number} | {s.hands_won} won | "
             f"{s.total_score} points (lower is better)"
         )
+        if s.mulligans_left or s.score_reduction:
+            self.output(
+                f"mulligans {s.mulligans_left} | "
+                f"score reduction -{s.score_reduction}"
+            )
         if s.locked_phase:
             self.output(f"Phase Lock: you must replay Phase {s.locked_phase}.")
 
@@ -178,6 +183,17 @@ class Phase10CommandProcessor(ClientCommandProcessor):
         else:
             self._cmd_hand()
 
+    def _cmd_mulligan(self) -> None:
+        """Throw back a dead opening hand and deal a fresh one."""
+        session = self.ctx.session
+        refusal = session.can_mulligan()
+        if refusal:
+            self.output(refusal)
+            return
+        session.use_mulligan()
+        self.output(f"Mulligan spent -- fresh hand. {session.mulligans_left} left.")
+        self._cmd_hand()
+
     def _cmd_lay(self) -> None:
         """Lay the phase down, if your hand satisfies it."""
         hand = self._require_hand()
@@ -246,8 +262,17 @@ class Phase10CommandProcessor(ClientCommandProcessor):
 
     def _cmd_score(self) -> None:
         """Show the scorecard: recent rounds and the running total."""
-        for line in self.ctx.session.game.scorecard():
+        session = self.ctx.session
+        for line in session.game.scorecard():
             self.output(line)
+        # The scorecard reports what each round actually cost; reductions are
+        # shown as their own line rather than folded into the rounds, so the
+        # history stays honest about what was played.
+        if session.score_reduction:
+            self.output(
+                f"  Score Reduction  -{session.score_reduction} "
+                f"-> {session.total_score} points"
+            )
 
 class Phase10Context(CommonContext):
     game = GAME_NAME

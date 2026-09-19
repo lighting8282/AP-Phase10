@@ -20,8 +20,11 @@ from ..data import (
     LEAN_DEAL,
     LOCATION_NAME_TO_ID,
     MAX_SKIPS,
+    MULLIGAN,
     PHASE_LOCK,
     PHASE_UNLOCK,
+    SCORE_REDUCTION,
+    SCORE_REDUCTION_VALUE,
     SKIP_CARD,
     TIERS,
     WILD_CARD,
@@ -49,6 +52,7 @@ class Phase10Session:
 
     items: Counter = field(default_factory=Counter)
     consumed_traps: Counter = field(default_factory=Counter)
+    mulligans_used: int = 0
     checked_locations: set[int] = field(default_factory=set)
     locked_phase: int | None = None
     last_result: RoundResult | None = None
@@ -79,8 +83,18 @@ class Phase10Session:
         return self.game.cleared_phases
 
     @property
+    def score_reduction(self) -> int:
+        """Points Score Reduction items have taken off the running total."""
+        return self.items[SCORE_REDUCTION] * SCORE_REDUCTION_VALUE
+
+    @property
     def total_score(self) -> int:
-        return self.game.total_score
+        """The score as the player is judged on it: raw, less reductions.
+
+        Floored at zero. The scorecard still shows what each round actually
+        cost -- a reduction forgives points, it does not rewrite history.
+        """
+        return max(0, self.game.total_score - self.score_reduction)
 
     # -- items -------------------------------------------------------------
     def set_items(self, item_names: list[str]) -> None:
@@ -123,6 +137,36 @@ class Phase10Session:
         if self.locked_phase is not None and phase != self.locked_phase:
             return f"A Phase Lock trap is forcing you to replay Phase {self.locked_phase}."
         return None
+
+    # -- mulligans ---------------------------------------------------------
+    @property
+    def mulligans_left(self) -> int:
+        return max(0, self.items[MULLIGAN] - self.mulligans_used)
+
+    def can_mulligan(self) -> str | None:
+        """Returns None if a Mulligan is usable right now, else why not."""
+        if not self.mulligans_left:
+            return "No Mulligans left."
+        hand = self.hand
+        if hand is None or hand.state is not HandState.IN_PROGRESS:
+            return "No hand in progress."
+        if hand.draws_used or hand.drew_this_turn:
+            return "A Mulligan only works before your first draw."
+        if hand.dig_pending:
+            return "Finish the dig first."
+        if hand.skips_played:
+            return "A Mulligan only works before you play a Skip."
+        return None
+
+    def use_mulligan(self) -> PhaseHand:
+        """Spend a Mulligan on the current hand and return it, redealt."""
+        refusal = self.can_mulligan()
+        if refusal:
+            raise ValueError(refusal)
+        hand = self.hand
+        hand.redeal()
+        self.mulligans_used += 1
+        return hand
 
     def start_hand(self, phase: int) -> PhaseHand:
         refusal = self.can_play(phase)
@@ -209,6 +253,7 @@ class Phase10Session:
             "version": SAVE_VERSION,
             "game": self.game.to_payload(),
             "consumed_traps": {k: int(v) for k, v in self.consumed_traps.items() if v},
+            "mulligans_used": self.mulligans_used,
             "locked_phase": self.locked_phase,
         }
 
@@ -231,6 +276,11 @@ class Phase10Session:
                 )
             except (TypeError, ValueError):
                 self.consumed_traps = Counter()
+
+        # Absent in saves written before Mulligans did anything, so a missing
+        # key restores as zero rather than refusing the whole payload.
+        used = payload.get("mulligans_used")
+        self.mulligans_used = used if isinstance(used, int) and used >= 0 else 0
 
         locked = payload.get("locked_phase")
         self.locked_phase = locked if isinstance(locked, int) and 1 <= locked <= 10 else None

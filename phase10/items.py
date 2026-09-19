@@ -4,7 +4,10 @@ from typing import TYPE_CHECKING
 
 from BaseClasses import Item, ItemClassification
 
-from .data import FILLERS, GAME_NAME, ITEM_NAME_TO_ID, PHASE_UNLOCK, SKIP_CARD, TRAPS
+from .data import (
+    FILLERS, GAME_NAME, ITEM_NAME_TO_ID, MULLIGAN, PHASE_UNLOCK,
+    SCORE_REDUCTION, SKIP_CARD, TRAPS,
+)
 from .rules import MIN_EXTRA_DRAWS, MIN_WILD_CARDS
 
 if TYPE_CHECKING:
@@ -19,8 +22,8 @@ DEFAULT_ITEM_CLASSIFICATIONS = {
     "Phase Lock": ItemClassification.trap,
     "Lean Deal": ItemClassification.trap,
     "Wild Theft": ItemClassification.trap,
-    "Mulligan": ItemClassification.filler,
-    "Score Reduction": ItemClassification.filler,
+    MULLIGAN: ItemClassification.filler,
+    SCORE_REDUCTION: ItemClassification.filler,
 }
 
 

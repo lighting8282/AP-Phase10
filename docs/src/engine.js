@@ -114,18 +114,11 @@ export class PhaseHand {
     this.spec = opts.spec ?? PHASES[phase];
     this.config = config;
 
-    const deck = opts.deck
-      ? opts.deck.map((c) => ({ ...c }))
-      : shuffledDeck(opts.random ?? Math.random, config.wildsInDeck, config.skipsInDeck);
-
-    this.hand = deck.slice(0, config.handSize);
-    // Granted Skips are dealt on top of the hand rather than out of it, so
-    // holding them costs no room to build the phase in.
-    for (let i = 0; i < config.startingSkips; i++) this.hand.push({ ...SKIP });
-
-    const rest = deck.slice(config.handSize);
-    this.discard = rest.length ? [rest[0]] : [];
-    this.stock = rest.slice(1);
+    // Kept so a Mulligan can shuffle again. A fixed `deck` is honoured for the
+    // opening deal only -- a redeal past it has nothing recorded to deal, so
+    // the trace exporter does not emit redeals into the differential fixtures.
+    this._random = opts.random ?? Math.random;
+    this._deal(opts.deck);
 
     this.drawsUsed = 0;
     this.state = HAND_STATE.IN_PROGRESS;
@@ -135,6 +128,45 @@ export class PhaseHand {
     this.usedWildsInLayout = 0;
     this.skipsPlayed = 0;
     this.digOptions = null;
+  }
+
+  /**
+   * Shuffle and deal. Shared by the opening deal and a Mulligan, so the two
+   * cannot drift into dealing subtly different tables.
+   */
+  _deal(fixedDeck = null) {
+    const deck = fixedDeck
+      ? fixedDeck.map((c) => ({ ...c }))
+      : shuffledDeck(this._random, this.config.wildsInDeck, this.config.skipsInDeck);
+
+    this.hand = deck.slice(0, this.config.handSize);
+    // Granted Skips are dealt on top of the hand rather than out of it, so
+    // holding them costs no room to build the phase in.
+    for (let i = 0; i < this.config.startingSkips; i++) this.hand.push({ ...SKIP });
+
+    const rest = deck.slice(this.config.handSize);
+    this.discard = rest.length ? [rest[0]] : [];
+    this.stock = rest.slice(1);
+  }
+
+  /**
+   * Throw the opening hand back and deal a fresh one -- a Mulligan.
+   *
+   * Deliberately restricted to before the first draw. A reroll available at
+   * any point is a far stronger item than a bad-opening insurance policy, and
+   * it would invalidate the measured clear rates the access rules are built
+   * on. Costs no draw: the point is to undo a dead deal, not to pay for it out
+   * of the same budget the deal already ruined.
+   */
+  redeal() {
+    if (this.state !== HAND_STATE.IN_PROGRESS) throw new Error(`hand is ${this.state}`);
+    if (this.drawsUsed || this.drewThisTurn) {
+      throw new Error("a Mulligan only works before your first draw");
+    }
+    if (this.digPending) throw new Error("finish the dig first");
+    if (this.skipsPlayed) throw new Error("a Mulligan only works before you play a Skip");
+    this._deal();
+    this._emit("redeal", { hand: this.hand.length });
   }
 
   // -- queries --------------------------------------------------------------

@@ -125,12 +125,18 @@ function withHand(fn) {
     return;
   }
   if (hand.state !== HAND_STATE.IN_PROGRESS) settle(hand);
-  else // Exposed deliberately: it is what the browser test harness drives, and it
-// lets a player inspect their own state from the console. Read-only in
-// practice -- every mutation still goes through the client.
-globalThis.phase10 = app;
+  render();
+}
 
-render();
+function mulligan() {
+  const refusal = app.session.canMulligan();
+  if (refusal) {
+    log(refusal);
+    return;
+  }
+  app.session.useMulligan();
+  log(`Mulligan spent -- fresh hand. ${app.session.mulligansLeft} left.`);
+  render();
 }
 
 const ACTIONS = {
@@ -138,6 +144,7 @@ const ACTIONS = {
   "draw-discard": () => withHand((hand) => hand.draw(true)),
   lay: () => withHand((hand) => hand.layDown()),
   skip: () => withHand((hand) => hand.playSkip()),
+  mulligan: () => mulligan(),
 };
 
 // -- rendering ---------------------------------------------------------------
@@ -147,7 +154,8 @@ function render() {
 
   el("summary").textContent =
     `Round ${s.game.roundNumber} - score ${s.totalScore} (lower is better) - ` +
-    `won ${s.handsWon} - cleared ${s.clearedPhases.size}/10`;
+    `won ${s.handsWon} - cleared ${s.clearedPhases.size}/10` +
+    (s.scoreReduction ? ` - ${s.scoreReduction} reduced` : "");
 
   if (hand) {
     el("objective").textContent = `Phase ${hand.phase}: ${phaseDescription(hand.phase)}`;
@@ -171,7 +179,18 @@ function render() {
   for (const button of document.querySelectorAll("#actions button")) {
     button.disabled = !hand || hand.state !== HAND_STATE.IN_PROGRESS;
   }
-  el("scorecard").textContent = s.game.scorecard().join("\n");
+  // Narrower than the rest: a Mulligan needs a copy in hand and an untouched
+  // deal, so it stays disabled even mid-hand.
+  const mull = el("mulligan-button");
+  mull.disabled = s.canMulligan() !== null;
+  mull.textContent = s.mulligansLeft ? `Mulligan (${s.mulligansLeft})` : "Mulligan";
+  // The scorecard reports what each round actually cost; reductions get their
+  // own line rather than being folded in, so the history stays honest.
+  const lines = s.game.scorecard();
+  if (s.scoreReduction) {
+    lines.push(`  Score Reduction  -${s.scoreReduction} -> ${s.totalScore} points`);
+  }
+  el("scorecard").textContent = lines.join("\n");
 }
 
 function renderHand(hand) {
