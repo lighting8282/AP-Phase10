@@ -4,7 +4,11 @@
 // client, and holds no game state of its own. Anything it needed to remember
 // would be a second copy of something the session already owns.
 
-import { cardFilename, isWild, points } from "./cards.js";
+import { SKIP, WILD, cardFilename, isWild, points } from "./cards.js";
+
+//: Faces used purely as icons in the stat panel.
+const SKIP_FACE = SKIP;
+const WILD_FACE = WILD;
 import { HAND_STATE } from "./engine.js";
 import { PHASE_COUNT, phaseDescription } from "./phases.js";
 import { Phase10Client } from "./client.js";
@@ -86,6 +90,81 @@ function classForNode(node) {
       return `c-${node.color}`;
     default:
       return "";
+  }
+}
+
+// -- the stat panel ----------------------------------------------------------
+// Counts you check every single turn. They live in their own column because
+// reading them should not mean finding them again in a paragraph.
+
+/** A stack of cards, for the stock. */
+const ICON_STOCK = `<svg viewBox="0 0 24 24" aria-hidden="true">
+  <rect x="3" y="6" width="12" height="16" rx="2"/>
+  <rect x="6.5" y="3.5" width="12" height="16" rx="2"/>
+</svg>`;
+
+/** A card with an arrow coming off it, for draws left. */
+const ICON_DRAW = `<svg viewBox="0 0 24 24" aria-hidden="true">
+  <rect x="2.5" y="4" width="11" height="16" rx="2"/>
+  <path d="M17 8v8m0 0l-3-3m3 3l3-3"/>
+</svg>`;
+
+function iconTile(icon, value, label, extra = "") {
+  const tile = document.createElement("div");
+  tile.className = `tile ${extra}`.trim();
+  const art = document.createElement("div");
+  art.className = "tile-icon";
+  art.innerHTML = icon;
+  const body = document.createElement("div");
+  body.className = "tile-body";
+  const v = document.createElement("span");
+  v.className = "tile-value";
+  v.textContent = String(value);
+  const l = document.createElement("span");
+  l.className = "tile-label";
+  l.textContent = label;
+  body.append(v, l);
+  tile.append(art, body);
+  return tile;
+}
+
+/** A tile whose icon is a real card face -- wilds, skips, the discard top. */
+function cardTile(card, value, label, extra = "") {
+  const art = card
+    ? `<img src="assets/cards/${cardFilename(card)}" alt="${describe(card)}">`
+    : `<img src="assets/cards/back.png" alt="">`;
+  const tile = iconTile(art, value, label, `card ${extra}`.trim());
+  if (card) tile.title = describe(card);
+  return tile;
+}
+
+function renderStats(session, hand) {
+  const box = el("stats");
+  box.replaceChildren();
+
+  if (hand) {
+    box.append(iconTile(ICON_DRAW, hand.drawsLeft, "draws left",
+      hand.drawsLeft === 0 ? "spent" : ""));
+    box.append(iconTile(ICON_STOCK, hand.stock.length, "in the stock"));
+    // The discard's icon is the card itself: what is on top is the whole
+    // point of looking, and a generic pile symbol would say nothing.
+    box.append(cardTile(hand.discardTop, hand.discardTop ? describe(hand.discardTop) : "empty",
+      "on the discard", "wide"));
+    box.append(cardTile(SKIP_FACE, hand.skipsInHand, "skips in hand"));
+    box.append(cardTile(WILD_FACE, hand.config.wildsInDeck, "wilds in the deck"));
+  } else {
+    const c = session.config;
+    box.append(iconTile(ICON_DRAW, c.maxDraws, "draws per hand"));
+    box.append(iconTile(ICON_STOCK, c.handSize, "cards dealt"));
+    box.append(cardTile(SKIP_FACE, c.startingSkips, "skips per hand"));
+    box.append(cardTile(WILD_FACE, c.wildsInDeck, "wilds in the deck"));
+  }
+
+  if (session.lockedPhase) {
+    const warn = document.createElement("div");
+    warn.className = "tile locked";
+    warn.textContent = `Phase Lock: replay ${session.lockedPhase}`;
+    box.append(warn);
   }
 }
 
@@ -194,18 +273,10 @@ function render() {
 
   if (hand) {
     el("objective").textContent = `Phase ${hand.phase}: ${phaseDescription(hand.phase)}`;
-    el("stats").textContent =
-      `draws left ${hand.drawsLeft} - stock ${hand.stock.length} - ` +
-      `discard ${hand.discardTop ? describe(hand.discardTop) : "none"} - ` +
-      `skips in hand ${hand.skipsInHand}`;
   } else {
-    const c = s.config;
     el("objective").textContent = "No round in progress -- pick a phase below.";
-    el("stats").textContent =
-      `deck: ${c.wildsInDeck} wilds - ${c.maxDraws} draws per hand - ` +
-      `hand size ${c.handSize} - ${c.startingSkips} skip(s) per hand` +
-      (s.lockedPhase ? ` - Phase Lock: replay ${s.lockedPhase}` : "");
   }
+  renderStats(s, hand);
 
   renderTable(s);
   renderOwnMelds(hand);

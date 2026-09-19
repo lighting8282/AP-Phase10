@@ -33,6 +33,35 @@ h2 small { color: var(--muted); font-weight: normal; }
 
 main { padding: 0 1rem; max-width: 60rem; margin: 0 auto; }
 
+/* --- three columns ---------------------------------------------------- */
+/* The middle column is everything you touch. The record of the game sits
+   left, the counts you check every turn sit right, and neither pushes the
+   cards off the screen. */
+main.board {
+  max-width: 96rem;
+  display: grid;
+  gap: 0 1.25rem;
+  grid-template-columns: 21rem minmax(0, 1fr) 13.5rem;
+  grid-template-areas: "left center right";
+  align-items: start;
+}
+#left { grid-area: left; }
+#center { grid-area: center; min-width: 0; }
+#right { grid-area: right; }
+
+/* Below three columns' worth of room, stack -- and put the play area first,
+   because that is what you came for. */
+@media (max-width: 1080px) {
+  main.board {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "center" "right" "left";
+  }
+  #right #stats { display: flex; flex-wrap: wrap; }
+  #right .tile { flex: 1 1 9rem; }
+}
+
+#left h2:first-child, #right h2:first-child, #center > div:first-child { margin-top: 1rem; }
+
 input, button {
   font: inherit;
   padding: 0.35rem 0.6rem;
@@ -186,4 +215,59 @@ button.meld::after {
   padding: 0 0.15rem;
   color: var(--accent);
   font-weight: 700;
+}
+
+/* --- stat tiles -------------------------------------------------------- */
+#stats { display: flex; flex-direction: column; gap: 0.4rem; }
+
+.tile {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.tile-icon {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 39px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tile-icon svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.tile-icon img { width: 26px; height: 39px; border-radius: 3px; display: block; }
+
+.tile-body { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+.tile-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.tile-label { color: var(--muted); font-size: 12px; }
+
+/* A wide tile carries words rather than a number -- the discard top names a
+   card, which does not fit the same slot a count does. */
+.tile.wide .tile-value { font-size: 0.95rem; font-weight: 600; }
+
+/* Out of draws is the one count that changes what you can do, so it is the
+   one that gets to shout. */
+.tile.spent { border-color: #ff9a9a; }
+.tile.spent .tile-value { color: #ff9a9a; }
+
+.tile.locked {
+  display: block;
+  color: #ff9a9a;
+  font-size: 13px;
 }

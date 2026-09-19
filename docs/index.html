@@ -18,45 +18,56 @@
   </form>
 </header>
 
-<main>
-  <section id="summary" aria-live="polite"></section>
-  <section id="objective"></section>
-  <section id="stats"></section>
+<main class="board">
+  <!-- The record of what has happened: read occasionally, never acted on. -->
+  <aside id="left">
+    <h2>Scorecard</h2>
+    <pre id="scorecard"></pre>
 
-  <div id="table-wrap" hidden>
-    <h2>The table <small>they race you to go out</small></h2>
-    <div id="table"></div>
-  </div>
+    <h2>Log <small>your game and the rest of the room</small></h2>
+    <div id="log" class="log" aria-live="polite"></div>
+  </aside>
 
-  <div id="mine-wrap" hidden>
-    <h2>Your phase <small>click a group to play onto it</small></h2>
-    <div id="mine"></div>
-  </div>
+  <!-- Everything you actually touch. -->
+  <section id="center">
+    <div id="summary" aria-live="polite"></div>
+    <div id="objective"></div>
 
-  <h2>Your hand <small>click a card to discard it</small></h2>
-  <div id="hand" class="cards"></div>
+    <div id="table-wrap" hidden>
+      <h2>The table <small>they race you to go out</small></h2>
+      <div id="table"></div>
+    </div>
 
-  <div id="dig" hidden>
-    <h2>Keep one</h2>
-    <div id="dig-cards" class="cards"></div>
-  </div>
+    <div id="mine-wrap" hidden>
+      <h2>Your phase <small>click a group to play onto it</small></h2>
+      <div id="mine"></div>
+    </div>
 
-  <div id="actions">
-    <button data-action="draw">Draw</button>
-    <button data-action="draw-discard">Take discard</button>
-    <button data-action="lay">Lay down</button>
-    <button data-action="skip">Dig (Skip)</button>
-    <button data-action="mulligan" id="mulligan-button">Mulligan</button>
-  </div>
+    <h2>Your hand <small>click a card to discard it</small></h2>
+    <div id="hand" class="cards"></div>
 
-  <h2>Phases</h2>
-  <div id="phases"></div>
+    <div id="dig" hidden>
+      <h2>Keep one</h2>
+      <div id="dig-cards" class="cards"></div>
+    </div>
 
-  <h2>Scorecard</h2>
-  <pre id="scorecard"></pre>
+    <div id="actions">
+      <button data-action="draw">Draw</button>
+      <button data-action="draw-discard">Take discard</button>
+      <button data-action="lay">Lay down</button>
+      <button data-action="skip">Dig (Skip)</button>
+      <button data-action="mulligan" id="mulligan-button">Mulligan</button>
+    </div>
 
-  <h2>Log <small>your game and the rest of the room</small></h2>
-  <div id="log" class="log" aria-live="polite"></div>
+    <h2>Phases</h2>
+    <div id="phases"></div>
+  </section>
+
+  <!-- What you are working with right now: glanced at constantly. -->
+  <aside id="right">
+    <h2>At the table</h2>
+    <div id="stats"></div>
+  </aside>
 </main>
 
 <script type="module" src="src/ui.js"></script>
