@@ -92,11 +92,64 @@ function sameCard(a, b) {
  * reference, so identity removal would silently miss an equal-but-distinct
  * card and corrupt the hand.
  */
-function removeCard(cards, card) {
+export function removeCard(cards, card) {
   const i = cards.findIndex((c) => sameCard(c, card));
   if (i === -1) throw new Error(`${cardToString(card)} is not in hand`);
   cards.splice(i, 1);
   return card;
+}
+
+/**
+ * The stock and the discard pile: what every seat shares.
+ *
+ * Port of engine.py's Table. Split out of PhaseHand so opponents can draw from
+ * the same deck the player is drawing from. With no seats a hand builds its own
+ * private Table and behaves exactly as it did when it owned these two lists.
+ */
+export class Table {
+  constructor() {
+    this.stock = [];
+    this.discard = [];
+    this.seats = [];
+    // Sticky: once somebody is out the round is over, and a player who keeps
+    // acting must keep losing it rather than slipping through because the
+    // transition already happened.
+    this.winner = null;
+  }
+
+  reset(stock, discard) {
+    this.stock = stock;
+    this.discard = discard;
+    this.winner = null;
+  }
+
+  deal(count) {
+    return this.stock.splice(0, count);
+  }
+
+  dealSeats(count) {
+    for (const seat of this.seats) {
+      seat.hand = this.deal(count);
+      seat.laidDown = false;
+      seat.wentOut = false;
+    }
+  }
+
+  get discardTop() {
+    return this.discard.length ? this.discard[this.discard.length - 1] : null;
+  }
+
+  /** Run every opponent's turn. Returns the seat that went out, if any. */
+  endOfTurn() {
+    if (this.winner !== null) return this.winner;
+    for (const seat of this.seats) {
+      if (seat.takeTurn(this)) {
+        this.winner = seat;
+        return seat;
+      }
+    }
+    return null;
+  }
 }
 
 /** One round: a single attempt at a single phase. */
@@ -118,6 +171,8 @@ export class PhaseHand {
     // opening deal only -- a redeal past it has nothing recorded to deal, so
     // the trace exporter does not emit redeals into the differential fixtures.
     this._random = opts.random ?? Math.random;
+    //: Shared with the opponents when there are any; private otherwise.
+    this.table = opts.table ?? new Table();
     this._deal(opts.deck);
 
     this.drawsUsed = 0;
@@ -145,8 +200,10 @@ export class PhaseHand {
     for (let i = 0; i < this.config.startingSkips; i++) this.hand.push({ ...SKIP });
 
     const rest = deck.slice(this.config.handSize);
-    this.discard = rest.length ? [rest[0]] : [];
-    this.stock = rest.slice(1);
+    this.table.reset(rest.slice(1), rest.length ? [rest[0]] : []);
+    // Opponents are dealt from the same deck, so a Mulligan before anyone has
+    // acted redeals the whole table -- which is what a reshuffle means.
+    this.table.dealSeats(this.config.handSize);
   }
 
   /**
@@ -170,6 +227,14 @@ export class PhaseHand {
   }
 
   // -- queries --------------------------------------------------------------
+  get stock() {
+    return this.table.stock;
+  }
+
+  get discard() {
+    return this.table.discard;
+  }
+
   get drawsLeft() {
     return Math.max(0, this.config.maxDraws - this.drawsUsed);
   }
@@ -224,7 +289,7 @@ export class PhaseHand {
     removeCard(this.hand, card);
     this.discard.push(card);
     this.drewThisTurn = false;
-    this._failIfOutOfRoad();
+    this._endTurn();
   }
 
   /**
@@ -268,8 +333,26 @@ export class PhaseHand {
     this.skipsPlayed += 1;
     this.drewThisTurn = false;
     this._emit("skip_dug", { card: cardToString(chosen) });
-    this._failIfOutOfRoad();
+    this._endTurn();
     return chosen;
+  }
+
+  /**
+   * Close out the player's turn, then let the table play.
+   *
+   * Order matters: a budget that just ran out ends the hand before the
+   * opponents move, so a loss is attributed to the thing that actually caused
+   * it rather than to whoever happened to go out next.
+   */
+  _endTurn() {
+    this._failIfOutOfRoad();
+    if (this.state !== HAND_STATE.IN_PROGRESS) return;
+    const winner = this.table.endOfTurn();
+    if (winner !== null) {
+      // Only a hand still being built can be lost this way. One already laid
+      // down has cleared its phase, and nobody else going out takes that back.
+      this.markFailed("opponent_out", { opponent: winner.name });
+    }
   }
 
   _failIfOutOfRoad() {
@@ -309,9 +392,9 @@ export class PhaseHand {
    * End the hand as a loss. Public because a driver that runs the turn loop
    * itself (the client, the autoplayer) has to be able to call it.
    */
-  markFailed(reason) {
+  markFailed(reason, detail = {}) {
     this.state = HAND_STATE.FAILED;
-    this._emit("hand_failed", { reason, score: handScore(this.hand) });
+    this._emit("hand_failed", { reason, score: handScore(this.hand), ...detail });
   }
 
   _emit(kind, detail = {}) {

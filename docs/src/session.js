@@ -17,7 +17,8 @@ import {
   WILD_THEFT, milestoneLocationName, phaseLocationName, phaseUnlock,
 } from "./data.js";
 import { STOCK_WILDS } from "./cards.js";
-import { HAND_STATE, gameConfig } from "./engine.js";
+import { HAND_STATE, Table, gameConfig } from "./engine.js";
+import { MID, buildOpponents } from "./opponents.js";
 import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js";
 
 export const LEAN_DEAL_PENALTY = 2;
@@ -28,10 +29,14 @@ export class Phase10Session {
     this.startingDraws = opts.startingDraws ?? 4;
     this.checksPerPhase = opts.checksPerPhase ?? 4;
     this.deathLink = opts.deathLink ?? false;
+    this.opponents = opts.opponents ?? 3;
 
     this.items = new Map();
     this.consumedTraps = new Map();
     this.mulligansUsed = 0;
+    this._opponentPhases = [];
+    //: The table the current hand is being played at, opponents included.
+    this.table = null;
     this.checkedLocations = new Set();
     this.lockedPhase = null;
     this.lastResult = null;
@@ -44,6 +49,7 @@ export class Phase10Session {
       startingDraws: Number(slotData.starting_draws ?? 4),
       checksPerPhase: Number(slotData.checks_per_phase ?? 4),
       deathLink: Boolean(slotData.death_link ?? false),
+      opponents: Number(slotData.opponents ?? 3),
       game: game ?? new Phase10Game(),
     });
   }
@@ -163,6 +169,31 @@ export class Phase10Session {
     return hand;
   }
 
+  // -- the table -----------------------------------------------------------
+  /** Which phase each seat is on. Grows as they clear their own. */
+  get opponentPhases() {
+    if (!this._opponentPhases.length) {
+      this._opponentPhases = new Array(this.opponents).fill(1);
+    }
+    return this._opponentPhases;
+  }
+
+  get seats() {
+    return this.table ? this.table.seats : [];
+  }
+
+  /** Move every seat that cleared its phase on to the next one. */
+  advanceOpponents() {
+    const moved = [];
+    this.seats.forEach((seat, index) => {
+      if (seat.laidDown && index < this.opponentPhases.length) {
+        this._opponentPhases[index] = Math.min(10, seat.phase + 1);
+        moved.push(seat.name);
+      }
+    });
+    return moved;
+  }
+
   startHand(phase, opts = {}) {
     const refusal = this.canPlay(phase);
     if (refusal) throw new Error(refusal);
@@ -174,7 +205,16 @@ export class Phase10Session {
         this.consumedTraps.set(trap, (this.consumedTraps.get(trap) ?? 0) + 1);
       }
     }
-    return this.game.startRound(phase, config, opts);
+    this.table = new Table();
+    if (this.opponents) {
+      // Each seat carries its own phase between rounds, so the table gets
+      // harder to beat as the run goes on rather than resetting to three
+      // players on phase 1 every time.
+      this.table.seats = buildOpponents(
+        this.opponents, [...this.opponentPhases], config, this.game.random, MID,
+      );
+    }
+    return this.game.startRound(phase, config, { table: this.table, ...opts });
   }
 
   /**
@@ -216,6 +256,7 @@ export class Phase10Session {
   finishHand(hand) {
     // Computed first: finishing the round takes the hand off the game.
     const tiers = this.earnedTiers(hand);
+    this.advanceOpponents();
     const result = this.game.finishRound(hand);
     this.lastResult = result;
 
@@ -259,6 +300,7 @@ export class Phase10Session {
       game: this.game.toPayload(),
       consumed_traps: traps,
       mulligans_used: this.mulligansUsed,
+      opponent_phases: [...this._opponentPhases],
       locked_phase: this.lockedPhase,
     };
   }
@@ -285,6 +327,14 @@ export class Phase10Session {
     // restores as zero rather than refusing the whole payload.
     const used = payload.mulligans_used;
     this.mulligansUsed = Number.isInteger(used) && used >= 0 ? used : 0;
+
+    // Without this a reconnect reseats everyone on phase 1, which quietly
+    // hands the player an easier table than they had earned.
+    const phases = payload.opponent_phases;
+    if (Array.isArray(phases)
+        && phases.every((v) => Number.isInteger(v) && v >= 1 && v <= 10)) {
+      this._opponentPhases = [...phases];
+    }
 
     const locked = payload.locked_phase;
     this.lockedPhase =

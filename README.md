@@ -284,6 +284,92 @@ Success rate at 8 draws with stock wilds:
 Skip Card is classified `useful`, not `progression`, so no access rule depends
 on it and the fill balance is unchanged.
 
+## Opponents
+
+Three computer seats share the deck by default. They build toward their own
+phases, lay down, shed, and going out ends your round wherever it stands. Each
+seat carries its phase between rounds, so the table stiffens as the run goes on.
+
+`Table` owns the stock and the discard; `PhaseHand` holds only your hand and
+reads the rest through properties. With no seats a hand builds its own private
+table and behaves exactly as it did before the split -- which is the point. The
+whole existing suite passed the refactor untouched, so the solo measurements
+are the regression guard for it.
+
+Skill is two probabilities over one policy rather than three policies:
+`discard_awareness` (does it look at the pile at all this turn) and
+`discard_error` (does it throw the second-best card). At 1.0/0.0 it is the
+greedy autoplayer exactly. Mid is 0.7/0.25, and costs the player 1 to 13 points
+of clear rate across the ten phases at eight draws.
+
+### The two clocks do not layer
+
+The guess was that the draw budget would bind early and the opponents would
+take over once Extra Draw items piled up. The opposite happens, and it is
+structural rather than a tuning miss:
+
+| fastest of N goes out at turn | 1 seat | 2 seats | 3 seats |
+|---|---|---|---|
+| opponents on phase 1 | 7.8 | 5.6 | **4.9** |
+| opponents on phase 7 | 14.6 | 9.0 | **8.0** |
+
+One seat needs about eight turns. Three seats race, and the round ends on the
+*fastest* of them -- a minimum-of-N effect that lands near turn five and barely
+moves with phase or skill. So the race resolves before a large budget can
+matter. Going from 4 draws to 8 buys real clear rate; from 8 to 14 buys nothing
+at all.
+
+That made roughly eight of the twelve Extra Draw items dead, so the pool was
+trimmed to match what the measurements say is worth having: `extra_draw_items`
+now defaults to 5, ranging 5 to 8.
+
+### A latent bug the trim uncovered
+
+The old range started at 3, but the No Wilds check on every phase asks for
+`Extra Draw x5`. At 3 or 4 those checks are unreachable and generation fails
+outright:
+
+    extra_draw_items=3: UNREACHABLE  Phase 1 - No Wilds unreachable
+    extra_draw_items=4: UNREACHABLE  Phase 1 - No Wilds unreachable
+    extra_draw_items=5: reachable
+
+The range start is now tied to `MIN_EXTRA_DRAWS`, and a test asserts the tie so
+the two cannot drift apart again.
+
+### Not built yet
+
+Hitting -- laying onto groups already on the table -- does not exist, so a seat
+that has laid down sheds one card a turn and draws nothing. That makes going
+out slower than the real game, not faster. A Skip still digs rather than
+skipping a player's turn; with opponents at the table it has a real meaning
+again, and that conflict is unresolved.
+
+### Keeping the two ports honest
+
+`crosscheck_opponents.mjs` replays recorded Python turns through the JS port and
+compares every seat's hand size, laid/out state and score, the discard top, the
+stock depth and the winner, turn by turn. Both clients read the same seed, so a
+divergence means they disagree about whether you lost a round -- and nothing
+else would catch it.
+
+It earned itself immediately, on three separate bugs:
+
+  * `card.points` is a *function* in the JS port, not a property, so every
+    tie-break was `-undefined` -- `NaN` -- and the discard ordering was junk.
+  * The JS laid cards down with `splice(indexOf(card), 1)`, but `solvePhase`
+    materialises its own card objects, so `indexOf` returned -1 and
+    `splice(-1, 1)` quietly deleted the *last* card in hand instead.
+  * `build_deck` repeats a card with `[number_card(...)] * COPIES_PER_RANK`, so
+    both copies of a rank are the **same object**. The Python seat excluded
+    candidates with `c is not card`, which dropped *both* copies, rated every
+    duplicate as twice the loss it really was, and refused to throw it -- in a
+    RUN phase, exactly the card it should throw. Both sides now exclude by
+    position.
+
+The third was a real AI bug in the engine that shipped nowhere near a test
+until the two implementations were forced to agree.
+
+
 ## Fillers
 
 Both filler items were inert for a long time — named in the tables, classified,

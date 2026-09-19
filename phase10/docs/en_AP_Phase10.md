@@ -22,6 +22,21 @@ difficulty ramp. Two sets of four (Phase 7) is by a wide margin the hardest
 objective in the game, harder than the run of nine (Phase 6), because each rank
 has only eight copies in the deck while any of eight copies can fill a run slot.
 
+## Who am I playing against?
+
+Three computer players by default, sharing your deck. They build toward their
+own phases, lay down, and shed; when one of them goes out your round ends where
+it stands. They carry their phase between rounds, so the table gets harder as
+your run goes on.
+
+You also still have a draw budget, so a round ends on whichever comes first --
+your draws running out, or somebody going out. Set `opponents` to 0 for the
+pure solo game.
+
+Both clients play the same table. The two opponent implementations are checked
+against each other turn for turn, so a seed plays identically in the browser and
+on the desktop.
+
 ## What items and locations exist?
 
 Items: phase unlocks, Wild Card, Extra Draw, Hand Size Upgrade and Skip Card,

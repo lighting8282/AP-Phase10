@@ -122,3 +122,23 @@ pre {
 .c-magenta { color: #f39bdc; }  .c-cyan { color: #7fd4d4; }
 .c-white { color: var(--ink); } .c-black { color: #7c8aa6; }
 .c-bold { font-weight: 700; }   .c-underline { text-decoration: underline; }
+
+/* --- the table ------------------------------------------------------- */
+#table { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+.seat {
+  flex: 1 1 8rem;
+  min-width: 7.5rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.seat .who { font-weight: 600; }
+.seat .what { color: var(--muted); font-size: 13px; }
+
+/* Laid down means they are shedding, which is the moment they become a
+   threat -- worth reading at a glance rather than from the text. */
+.seat.laid { border-color: var(--accent); }
+.seat.out { border-color: #ff9a9a; }
+.seat.out .who { color: #ff9a9a; }

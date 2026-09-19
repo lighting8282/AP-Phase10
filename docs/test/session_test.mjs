@@ -172,9 +172,12 @@ fixtures.sequences.forEach((script, index) => {
   check("it costs no draw", one.hand.drawsLeft, drawsBefore);
   check("the deal is full", one.hand.hand.length, one.config.handSize);
   check("the discard is reset to one", one.hand.discard.length, 1);
+  // The opponents hold cards off the same deck, so counting only what the
+  // player can see loses thirty of them.
+  const seated = one.seats.reduce((n, seat) => n + seat.hand.length, 0);
   check(
     "the deck is conserved",
-    one.hand.hand.length + one.hand.discard.length + one.hand.stock.length,
+    one.hand.hand.length + seated + one.hand.discard.length + one.hand.stock.length,
     96 + one.config.wildsInDeck,
   );
   check("and it is spent", one.mulligansLeft, 0);

@@ -109,6 +109,10 @@ function describe(card) {
 
 // -- actions -----------------------------------------------------------------
 async function settle(hand) {
+  const last = hand.events[hand.events.length - 1];
+  if (last && last.kind === "hand_failed" && last.detail.opponent) {
+    log(`${last.detail.opponent} went out -- your round ends here.`);
+  }
   await app.settle(hand);
 }
 
@@ -172,6 +176,7 @@ function render() {
       (s.lockedPhase ? ` - Phase Lock: replay ${s.lockedPhase}` : "");
   }
 
+  renderTable(s);
   renderHand(hand);
   renderDig(hand);
   renderPhases(s);
@@ -191,6 +196,39 @@ function render() {
     lines.push(`  Score Reduction  -${s.scoreReduction} -> ${s.totalScore} points`);
   }
   el("scorecard").textContent = lines.join("\n");
+}
+
+function renderTable(session) {
+  const wrap = el("table-wrap");
+  const box = el("table");
+  const seats = session.seats;
+  box.replaceChildren();
+  if (!seats.length) {
+    // Solo seeds have no table at all, so the whole block goes away rather
+    // than leaving an empty heading behind.
+    wrap.hidden = true;
+    return;
+  }
+  wrap.hidden = false;
+  for (const seat of seats) {
+    const div = document.createElement("div");
+    div.className = "seat";
+    if (seat.wentOut) div.classList.add("out");
+    else if (seat.laidDown) div.classList.add("laid");
+
+    const who = document.createElement("div");
+    who.className = "who";
+    who.textContent = `${seat.name} - phase ${seat.phase}`;
+
+    const what = document.createElement("div");
+    what.className = "what";
+    if (seat.wentOut) what.textContent = "went out";
+    else if (seat.laidDown) what.textContent = `laid down, shedding ${seat.hand.length}`;
+    else what.textContent = `${seat.hand.length} cards`;
+
+    div.append(who, what);
+    box.append(div);
+  }
 }
 
 function renderHand(hand) {
