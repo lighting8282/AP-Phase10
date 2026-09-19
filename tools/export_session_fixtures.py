@@ -38,6 +38,7 @@ from worlds.phase10.data import (  # noqa: E402
     EXTRA_DRAW,
     HAND_SIZE_UPGRADE,
     LEAN_DEAL,
+    PHASE_COUNT,
     PHASE_LOCK,
     PHASE_UNLOCK,
     SKIP_CARD,
@@ -110,7 +111,7 @@ def tier_cases():
 def sequence_cases():
     """Full settle sequences: which IDs come back, and when the goal trips."""
     scripts = [
-        {"goal": 0, "steps": [(p, "phase_laid") for p in range(1, 11)]},
+        {"goal": 0, "steps": [(p, "phase_laid") for p in range(1, PHASE_COUNT + 1)]},
         {"goal": 1, "steps": [(1, "phase_laid"), (10, "went_out")]},
         {"goal": 0, "steps": [(2, "phase_laid")] * 6},
         {"goal": 0, "steps": [(4, "failed"), (4, "phase_laid"), (4, "went_out")]},
@@ -119,7 +120,7 @@ def sequence_cases():
     for script in scripts:
         s = make(
             {"goal": script["goal"], "starting_draws": 8, "checks_per_phase": 4},
-            [PHASE_UNLOCK.format(p) for p in range(1, 11)] + [PHASE_LOCK],
+            [PHASE_UNLOCK.format(p) for p in range(1, PHASE_COUNT + 1)] + [PHASE_LOCK],
         )
         steps = []
         for phase, state in script["steps"]:

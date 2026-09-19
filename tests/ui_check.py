@@ -74,6 +74,19 @@ async def main():
         check(str(session.seats[0].phase) in view.seats.text,
               "and the strip shows what phase they are on")
 
+        # What the computers have face up, so a player can read whether a
+        # spare card of theirs would extend one of the groups.
+        for _ in range(20):
+            if any(s.layout for s in session.seats):
+                break
+            session.table.end_of_turn()
+        view.refresh(force=True)
+        down = [s for s in session.seats if s.layout]
+        check(bool(down), "a seat lays its phase down")
+        check(len(view.melds.children) > 0, "laid groups are rendered on the table")
+        laid_cards = sum(len(g) for s in down for g in s.layout)
+        check(laid_cards > 0, f"and carry real cards ({laid_cards})")
+
         # Mulligan, while the deal is still untouched. It has to run before
         # the draw below, which is exactly what makes it unavailable after.
         dealt = [str(c) for c in hand.hand]

@@ -37,7 +37,7 @@ from dataclasses import dataclass
 
 from .cards import Card, hand_score
 from .engine import GameConfig, Table, cards_short
-from .phases import PHASES, PhaseSpec, solve_phase
+from .phases import PHASES, Layout, Meld, PhaseSpec, solve_melds
 
 
 @dataclass(frozen=True)
@@ -69,6 +69,13 @@ class Opponent:
         self.skill = skill
 
         self.hand: list[Card] = []
+        #: The groups this seat has on the table, face up. Kept rather than
+        #: discarded: the player needs to see what is down to judge whether
+        #: they could hit onto it, and without this the cards simply vanish
+        #: from the deck -- six of them, silently, the moment a seat lays.
+        self.layout: Layout = []
+        #: The same groups, with what each one means, so they can be hit on.
+        self.melds: list[Meld] = []
         self.laid_down = False
         self.went_out = False
 
@@ -85,7 +92,7 @@ class Opponent:
         return cards_short(hand, self.spec, self.config.min_naturals_per_group)
 
     def _solution(self):
-        return solve_phase(self.hand, self.spec,
+        return solve_melds(self.hand, self.spec,
                            min_naturals_per_group=self.config.min_naturals_per_group)
 
     # -- policy -------------------------------------------------------------
@@ -117,12 +124,14 @@ class Opponent:
     def _try_lay_down(self) -> None:
         if self.laid_down:
             return
-        layout = self._solution()
-        if layout is None:
+        melds = self._solution()
+        if melds is None:
             return
-        for group in layout:
-            for card in group:
+        for meld in melds:
+            for card in meld.cards:
                 self.hand.remove(card)
+        self.melds = melds
+        self.layout = [m.cards for m in melds]
         self.laid_down = True
 
     # -- turn ---------------------------------------------------------------
@@ -138,13 +147,15 @@ class Opponent:
             return True
 
         if self.laid_down:
-            # Already down: shed, do not draw. Drawing one and discarding one
-            # leaves the hand the same size forever, so a seat that has laid
-            # down could never go out -- which is exactly what the first
-            # version of this did. Real Phase 10 sheds by hitting onto groups
-            # already on the table; until that exists, one card a turn and no
-            # draw is the conservative stand-in, slower than the real thing.
-            table.discard.append(self._shed())
+            # Already down: hit everything that legally extends a group on the
+            # table -- its own or anybody else's -- and throw one card besides.
+            # Drawing one and discarding one would leave the hand the same size
+            # forever, so a seat that had laid down could never go out.
+            self._hit_what_it_can(table)
+            if self._finished():
+                return True
+            if self.hand:
+                table.discard.append(self._shed())
             return self._finished()
 
         if self._wants_discard_top(table.discard_top):
@@ -158,6 +169,29 @@ class Opponent:
 
         table.discard.append(self._choose_discard_card())
         return self._finished()
+
+    def _hit_what_it_can(self, table: Table) -> int:
+        """Lay every card that legally extends a group already on the table.
+
+        Repeated rather than a single pass: hitting a run at one end opens the
+        next rank along, so one sweep would leave behind cards the very next
+        check would accept.
+        """
+        played = 0
+        moved = True
+        while moved and self.hand:
+            moved = False
+            for card in list(self.hand):
+                for meld in table.all_melds():
+                    if meld.accepts(card):
+                        self.hand.remove(card)
+                        meld.add(card)
+                        played += 1
+                        moved = True
+                        break
+                if moved:
+                    break
+        return played
 
     def _shed(self) -> Card:
         """Throw the most expensive card; nothing left is worth building on."""

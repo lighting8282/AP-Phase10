@@ -22,7 +22,7 @@ import {
   numberCard,
   COLORS,
 } from "./cards.js";
-import { GROUP, PHASES, phaseCardCount, solvePhase } from "./phases.js";
+import { GROUP, PHASES, phaseCardCount, solveMelds, solvePhase } from "./phases.js";
 
 /** How deep into the stock a played Skip lets you look. */
 export const SKIP_DIG_DEPTH = 3;
@@ -130,6 +130,8 @@ export class Table {
   dealSeats(count) {
     for (const seat of this.seats) {
       seat.hand = this.deal(count);
+      seat.layout = [];
+      seat.melds = [];
       seat.laidDown = false;
       seat.wentOut = false;
     }
@@ -137,6 +139,18 @@ export class Table {
 
   get discardTop() {
     return this.discard.length ? this.discard[this.discard.length - 1] : null;
+  }
+
+  /**
+   * Every group face up on the table, in seat order.
+   *
+   * Phase 10 lets a hit land on anybody's group, not just your own, so
+   * targeting has to see the whole table rather than one seat.
+   */
+  allMelds() {
+    const melds = [];
+    for (const seat of this.seats) melds.push(...seat.melds);
+    return melds;
   }
 
   /** Run every opponent's turn. Returns the seat that went out, if any. */
@@ -178,6 +192,9 @@ export class PhaseHand {
     this.drawsUsed = 0;
     this.state = HAND_STATE.IN_PROGRESS;
     this.layout = null;
+    // The player's own groups on the table, with what each one means, so
+    // cards can be hit onto them as well as onto the opponents'.
+    this.melds = [];
     this.events = [];
     this.drewThisTurn = false;
     this.usedWildsInLayout = 0;
@@ -368,8 +385,12 @@ export class PhaseHand {
   }
 
   layDown() {
-    const layout = this.solution();
-    if (layout === null) throw new Error(`phase ${this.phase} not satisfiable from hand`);
+    const melds = solveMelds(this.hand, this.spec, this.config.minNaturalsPerGroup);
+    if (melds === null) throw new Error(`phase ${this.phase} not satisfiable from hand`);
+    // The layout is built out of the melds, so what you can see and what the
+    // group means cannot drift apart.
+    this.melds = melds;
+    const layout = melds.map((m) => m.cards);
     this.layout = layout;
     this.usedWildsInLayout = layout.flat().filter(isWild).length;
     for (const group of layout) {

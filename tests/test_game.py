@@ -288,6 +288,45 @@ def test_an_opponent_sheds_after_laying_down_and_goes_out():
     assert sizes == sorted(sizes, reverse=True), f"hand must shrink, got {sizes}"
 
 
+def test_laid_down_cards_stay_on_the_table():
+    """They used to be removed from hand and stored nowhere at all, so six
+    cards left the deck the moment a seat laid down -- invisible to the player
+    and unaccounted for by any conservation check."""
+    hand, table = seated(3, max_draws=99)
+
+    def accounted():
+        laid = sum(len(g) for s in table.seats for g in s.layout)
+        seated_cards = sum(len(s.hand) for s in table.seats)
+        return len(hand.hand) + seated_cards + laid + len(table.stock) + len(table.discard)
+
+    total = 96 + hand.config.wilds_in_deck
+    assert accounted() == total
+    for _ in range(12):
+        table.end_of_turn()
+    assert any(s.laid_down for s in table.seats), "nobody laid down; test is vacuous"
+    assert accounted() == total
+
+
+def test_a_laid_layout_matches_the_phase_it_claims():
+    hand, table = seated(1, phases=[1], max_draws=99)
+    seat = table.seats[0]
+    for _ in range(30):
+        table.end_of_turn()
+        if seat.laid_down:
+            break
+    assert seat.laid_down
+    # Phase 1 is two sets of three.
+    assert [len(g) for g in seat.layout] == [3, 3]
+
+
+def test_a_redeal_clears_what_was_on_the_table():
+    hand, table = seated(3)
+    for _ in range(12):
+        table.end_of_turn()
+    hand.redeal()
+    assert all(s.layout == [] and not s.laid_down for s in table.seats)
+
+
 def test_an_opponent_going_out_ends_the_players_hand():
     hand, table = seated(1, max_draws=99)
     seat = table.seats[0]
@@ -361,6 +400,128 @@ def test_a_careless_seat_sometimes_looks_away():
                  number_card(2, R), number_card(7, R), number_card(11, R)]
     looks = [seat._wants_discard_top(number_card(5, Color.GREEN)) for _ in range(200)]
     assert any(looks) and not all(looks), "awareness below 1.0 must vary"
+
+
+# -- hitting ------------------------------------------------------------------
+# A laid group has to remember what it means, or a hit cannot be judged: for a
+# run, `3R W 5B` must know the wild is standing in for a 4. Deriving that after
+# the fact is ambiguous, so it is recorded when the group is built.
+
+def melds_for(cards, spec):
+    from game.phases import solve_melds
+    out = solve_melds(cards, spec)
+    assert out is not None, "fixture hand does not satisfy its own spec"
+    return out
+
+
+def test_a_run_remembers_the_span_its_wild_stands_in_for():
+    from game.phases import RUN
+    run = melds_for([number_card(3, R), WILD, number_card(5, Color.BLUE)], (RUN(3),))[0]
+    assert (run.lo, run.hi) == (3, 5)
+
+
+def test_a_run_takes_either_end_and_nothing_else():
+    from game.phases import RUN
+    run = melds_for([number_card(3, R), WILD, number_card(5, Color.BLUE)], (RUN(3),))[0]
+    assert run.accepts(number_card(2, R))
+    assert run.accepts(number_card(6, R))
+    assert not run.accepts(number_card(8, R))
+    assert not run.accepts(number_card(4, R))   # already inside the span
+
+
+def test_hitting_a_run_widens_it():
+    from game.phases import RUN
+    run = melds_for([number_card(3, R), WILD, number_card(5, Color.BLUE)], (RUN(3),))[0]
+    run.add(number_card(6, R))
+    assert (run.lo, run.hi) == (3, 6)
+    assert run.accepts(number_card(7, R)), "the new end has to open up"
+
+
+def test_a_run_pinned_to_both_ends_has_nowhere_for_a_wild():
+    from game.phases import RUN
+    full = melds_for([number_card(r, R) for r in range(1, 13)], (RUN(12),))[0]
+    assert (full.lo, full.hi) == (1, 12)
+    assert not full.accepts(WILD), "there is no rank left for it to stand in for"
+
+
+def test_a_set_takes_its_own_rank_only():
+    from game.phases import SET
+    st = melds_for([number_card(7, R), number_card(7, Color.BLUE),
+                    number_card(7, Color.GREEN)], (SET(3),))[0]
+    assert st.rank == 7
+    assert st.accepts(number_card(7, Color.YELLOW))
+    assert not st.accepts(number_card(8, Color.YELLOW))
+    assert st.accepts(WILD)
+
+
+def test_a_colour_group_takes_its_own_colour_only():
+    from game.phases import COLOR
+    col = melds_for([number_card(r, Color.GREEN) for r in range(1, 6)], (COLOR(5),))[0]
+    assert col.color is Color.GREEN
+    assert col.accepts(number_card(9, Color.GREEN))
+    assert not col.accepts(number_card(9, R))
+
+
+def test_a_skip_can_never_be_hit_anywhere():
+    from game.phases import SET, RUN
+    st = melds_for([number_card(7, R), number_card(7, Color.BLUE),
+                    number_card(7, Color.GREEN)], (SET(3),))[0]
+    run = melds_for([number_card(3, R), WILD, number_card(5, Color.BLUE)], (RUN(3),))[0]
+    assert not st.accepts(SKIP)
+    assert not run.accepts(SKIP)
+
+
+def test_a_skip_is_refused_even_by_an_unanchored_group():
+    """The Skip guard only bites here.
+
+    A normal group rejects a Skip incidentally -- a Skip has no rank, so the
+    rank check fails anyway. A group with no anchor (all wilds, which needs
+    min_naturals_per_group=0) answers "any rank will do", and without the
+    explicit guard it would happily swallow a Skip.
+    """
+    from game.phases import GroupKind, Meld, SET, COLOR
+
+    loose_set = Meld(SET(3), [WILD, WILD, WILD], GroupKind.SET, rank=None)
+    loose_color = Meld(COLOR(3), [WILD, WILD, WILD], GroupKind.COLOR, color=None)
+    assert loose_set.accepts(number_card(4, R)), "no anchor means any rank fits"
+    assert not loose_set.accepts(SKIP)
+    assert not loose_color.accepts(SKIP)
+
+
+def test_opponents_shed_by_hitting_the_table():
+    """The old stand-in threw one card a turn and drew nothing. Now a seat
+    lays every card that legally extends anything already down -- its own
+    groups or anybody else's -- so melds visibly grow."""
+    hand, table = seated(3, max_draws=99, seed=4)
+    for _ in range(40):
+        if table.end_of_turn() is not None:
+            break
+    grown = [m for s in table.seats for m in s.melds if len(m) > m.spec.size]
+    assert grown, "no meld ever grew, so nothing was ever hit"
+    for meld in grown:
+        assert len(meld.cards) == len(meld)
+
+
+def test_hitting_never_loses_a_card():
+    hand, table = seated(3, max_draws=99, seed=9)
+    total = 96 + hand.config.wilds_in_deck
+    for _ in range(40):
+        table.end_of_turn()
+        laid = sum(len(g) for s in table.seats for g in s.layout)
+        seated_cards = sum(len(s.hand) for s in table.seats)
+        assert (len(hand.hand) + seated_cards + laid
+                + len(table.stock) + len(table.discard)) == total
+
+
+def test_the_player_has_melds_of_their_own_once_laid_down():
+    """Their groups are on the table too, so a hit can land on them."""
+    hand, _ = seated(0, max_draws=99)
+    hand.hand = [number_card(7, R), number_card(7, Color.BLUE),
+                 number_card(7, Color.GREEN), number_card(2, R),
+                 number_card(2, Color.BLUE), number_card(2, Color.GREEN)]
+    hand.lay_down()
+    assert [m.rank for m in hand.melds] == [7, 2] or [m.rank for m in hand.melds] == [2, 7]
+    assert all(m.accepts(WILD) for m in hand.melds)
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from BaseClasses import Item, ItemClassification
 
 from .data import (
-    FILLERS, GAME_NAME, ITEM_NAME_TO_ID, MULLIGAN, PHASE_UNLOCK,
+    FILLERS, GAME_NAME, ITEM_NAME_TO_ID, MULLIGAN, PHASE_COUNT, PHASE_UNLOCK,
     SCORE_REDUCTION, SKIP_CARD, TRAPS,
 )
 from .rules import MIN_EXTRA_DRAWS, MIN_WILD_CARDS
@@ -14,7 +14,8 @@ if TYPE_CHECKING:
     from .world import Phase10World
 
 DEFAULT_ITEM_CLASSIFICATIONS = {
-    **{PHASE_UNLOCK.format(p): ItemClassification.progression for p in range(1, 11)},
+    **{PHASE_UNLOCK.format(p): ItemClassification.progression
+       for p in range(1, PHASE_COUNT + 1)},
     "Wild Card": ItemClassification.progression,
     "Extra Draw": ItemClassification.progression,
     "Hand Size Upgrade": ItemClassification.useful,
@@ -62,7 +63,7 @@ def build_power_item_counts(world: Phase10World, capacity: int) -> dict[str, int
     floors is trimmed -- comfort first, then draws, then wilds -- so that a
     small location pool cannot produce an unfillable seed.
     """
-    unlocks = 10
+    unlocks = PHASE_COUNT
     floor = unlocks + MIN_WILD_CARDS + MIN_EXTRA_DRAWS
     if capacity < floor:
         from Options import OptionError
@@ -97,7 +98,7 @@ def choose_starting_phases(world: Phase10World) -> list[int]:
     from .rules import EASY_PHASES
 
     easy = sorted(EASY_PHASES)
-    rest = [p for p in range(1, 11) if p not in EASY_PHASES]
+    rest = [p for p in range(1, PHASE_COUNT + 1) if p not in EASY_PHASES]
     world.random.shuffle(easy)
     world.random.shuffle(rest)
     return (easy + rest)[: int(world.options.starting_phases)]
@@ -112,7 +113,7 @@ def create_all_items(world: Phase10World) -> None:
 
     itempool: list[Item] = [
         world.create_item(PHASE_UNLOCK.format(p))
-        for p in range(1, 11)
+        for p in range(1, PHASE_COUNT + 1)
         if p not in starting
     ]
 

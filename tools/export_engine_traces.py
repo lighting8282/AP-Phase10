@@ -34,6 +34,7 @@ import ModuleUpdate  # noqa: E402
 ModuleUpdate.update_ran = True
 
 from worlds.phase10.game.engine import GameConfig, HandState, PhaseHand  # noqa: E402
+from worlds.phase10.game.phases import PHASE_COUNT  # noqa: E402
 
 MAX_ACTIONS = 120
 
@@ -128,7 +129,7 @@ def main() -> int:
     ]
 
     for config in configs:
-        for phase in range(1, 11):
+        for phase in range(1, PHASE_COUNT + 1):
             for _ in range(4):
                 hand = PhaseHand(phase, config, random.Random(rng.randrange(1 << 30)))
                 deck = deck_of(hand, config)

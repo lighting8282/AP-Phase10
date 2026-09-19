@@ -284,6 +284,81 @@ Success rate at 8 draws with stock wilds:
 Skip Card is classified `useful`, not `progression`, so no access rule depends
 on it and the fill balance is unchanged.
 
+## Twenty phases
+
+The stock ten, plus ten measured at the same baseline (0 wilds, 8 draws, greedy
+autoplayer) and ordered by that measurement:
+
+| phase | requirement | clears |
+|---|---|---|
+| 11 | 5 cards of one colour | 93% |
+| 12 | set of 3 + set of 2 | 90% |
+| 13 | run of 5 + set of 2 | 79% |
+| 14 | 6 cards of one colour | 72% |
+| 15 | run of 4 + run of 4 | 58% |
+| 16 | run of 4 + run of 4 + set of 2 | 52% |
+| 17 | run of 5 + set of 3 | 50% |
+| 18 | run of 6 + set of 3 | 31% |
+| 19 | run of 5 + run of 5 | 20% |
+| 20 | 3 sets of 3 | 12% |
+
+They fill a hole the originals left: nothing among the stock ten clears above
+66%, so every phase was a fight and a bad opening had nowhere to go.
+
+### A ceiling you cannot design past
+
+A phase can never ask for more cards than a hand holds. Three sets of four
+wants twelve; at a hand size of ten it measured a flat 0% even with eight wilds
+and sixteen draws, which is how the constraint surfaced. `MAX_PHASE_CARDS` and
+a test pin it now.
+
+### Anchored groups
+
+`SET` and `COLOR` can be pinned to a particular rank or colour -- `SET(3, rank=7)`
+is three 7s, `COLOR(5, color=GREEN)` is five green cards. Nothing ships using
+them yet; they exist for phases 21 and up.
+
+Anchoring runs opposite to the intuition that a named target is simpler. A free
+group lets you pivot to whichever rank or colour the deal was kind about; an
+anchored one does not. Measured, five cards of a *named* colour clears 49%
+where five of any one colour clears 79%, on the same budget. Each rank has only
+eight copies in the deck, so an anchored SET is scarcer still.
+
+`RUN` cannot be anchored, and COLOR still cannot be mixed with SET or RUN --
+that needs joint rank-and-colour search.
+
+### Two ID collisions, one caught and one nearly missed
+
+Phase unlocks take IDs 1..PHASE_COUNT. At twenty phases `Phase 20 Unlocked`
+walked straight onto `Wild Card` at ID 20; `test_item_ids_are_unique` caught it,
+which is exactly what it is for. The fixed items now start at 50 and a test
+pins the invariant rather than the symptom.
+
+Location addresses were the same shape of problem. Phase checks run to
+`100 + phase * 10 + tier`, which at twenty phases reaches 303 -- head on into
+milestones that had been moved to 300 precisely to avoid the last collision.
+They are at 400 now.
+
+### The pool could not absorb the locations
+
+Twenty phases at four checks each is ninety locations, and every power item is
+capped by something real: the deck holds eight wilds, extra draws stop buying
+anything past eight total, skips and hand size have their own ceilings. The
+remainder can only be filler, and it measured:
+
+| checks/phase | locations | power | filler |
+|---|---|---|---|
+| 1 | 30 | 10 | 7% |
+| **2** | **50** | **19** | **26%** |
+| 3 | 70 | 19 | 47% |
+| 4 | 90 | 19 | 59% |
+
+At four, the pool held **thirty-five Mulligans** -- an infinite supply of
+redeals. The default is two checks a phase now, which keeps the world at fifty
+locations, the size the item pool was actually built for, while doubling the
+phases. Tests guard both the ratio and the single-filler count.
+
+
 ## Opponents
 
 Three computer seats share the deck by default. They build toward their own

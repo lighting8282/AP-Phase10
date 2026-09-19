@@ -51,11 +51,21 @@ Traps, when enabled: Phase Lock pins you to the phase you just lost until you
 clear it, Lean Deal costs you two cards on one hand, and Wild Theft takes a wild
 out of the deck for one hand.
 
-Locations: each phase is worth up to four checks -- clearing it, clearing it and
+Locations: each of the twenty phases is worth up to four checks -- clearing it, clearing it and
 going out in the same hand, clearing it without using a wild, and clearing it
 inside half your draw budget.
 
+## How many phases are there?
+
+Twenty. The ten printed on the box, plus ten more measured to fill a hole the
+originals left: none of them clears more than about two thirds of the time, so
+every phase was a fight. The new ten run from a very gentle five cards of one
+colour down to three sets of three.
+
+The printed order is not a difficulty ramp and never was -- two sets of four is
+by a wide margin the hardest thing in the game, harder than the run of nine.
+
 ## What is the goal?
 
-By default, clear all ten phases. The goal option can shorten this to clearing
-Phase 10 alone.
+By default, clear all twenty phases. The goal option can shorten this to
+clearing Phase 10 alone.

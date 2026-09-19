@@ -48,6 +48,8 @@ for (const [index, trace] of traces.entries()) {
     const tag = `trace ${index} turn ${turn}`;
     same(`${tag} seats`, table.seats.map((s) => ({
       hand: s.hand.length, laid: s.laidDown, out: s.wentOut, score: s.score,
+      melds: s.melds.map((m) => m.length),
+      spans: s.melds.map((m) => [m.lo, m.hi]),
     })), expected.seats);
     same(`${tag} discard top`, table.discardTop ?? null, expected.discard_top);
     same(`${tag} stock`, table.stock.length, expected.stock);

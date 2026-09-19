@@ -124,18 +124,43 @@ pre {
 .c-bold { font-weight: 700; }   .c-underline { text-decoration: underline; }
 
 /* --- the table ------------------------------------------------------- */
-#table { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+#table { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: flex-start; }
 
 .seat {
-  flex: 1 1 8rem;
-  min-width: 7.5rem;
-  padding: 0.5rem 0.6rem;
+  flex: 1 1 13rem;
+  min-width: 11rem;
+  padding: 0.55rem 0.65rem;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
 }
 .seat .who { font-weight: 600; }
+.seat .seat-phase { font-weight: normal; color: var(--muted); font-size: 13px; }
 .seat .what { color: var(--muted); font-size: 13px; }
+
+/* Their hand, face down. Overlapped like a real fan so a big hand still fits
+   the seat rather than wrapping into a wall of backs. */
+.seat-hand { display: flex; margin-top: 0.4rem; padding-left: 9px; }
+.seat-hand img {
+  width: 26px;
+  height: 39px;
+  border-radius: 3px;
+  margin-left: -9px;
+  box-shadow: -1px 0 0 rgba(0, 0, 0, 0.35);
+}
+
+/* What they have down, face up and grouped -- this is the part you read to
+   work out whether a spare card of yours would extend it. */
+.melds { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.45rem; }
+.meld {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.05);
+  outline: 1px solid var(--line);
+}
+.meld img { width: 26px; height: 39px; border-radius: 3px; display: block; }
 
 /* Laid down means they are shedding, which is the moment they become a
    threat -- worth reading at a glance rather than from the text. */

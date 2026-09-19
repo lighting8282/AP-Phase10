@@ -115,15 +115,24 @@ class ChecksPerPhase(Range):
     """
     How many checks each phase is worth.
 
+    Twenty phases at four checks each is ninety locations, and the item pool
+    cannot fill that with anything meaningful: wilds are capped by the deck's
+    eight, extra draws by the point past which they buy nothing, and skips and
+    hand size by their own limits. The remainder is filler, and at four checks
+    it measured 59% of the pool -- thirty-five Mulligans, which is an infinite
+    supply. Two checks a phase keeps the world at fifty locations, the size the
+    item pool was actually built for. Raise it if you would rather have more
+    checks than more meaningful items.
+
     1: clear the phase.
     2: also clear it and go out in the same hand.
     3: also clear it without using a single wild.
     4: also clear it inside half your draw budget.
     """
     display_name = "Checks Per Phase"
-    range_start = 2
+    range_start = 1
     range_end = 4
-    default = 4
+    default = 2
 
 
 class SkipCardItems(Range):

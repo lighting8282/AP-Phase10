@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 
 from rule_builder.rules import Has, HasAll, Rule
 
+from .data import PHASE_COUNT
 from .options import Goal
 
 if TYPE_CHECKING:
@@ -27,9 +28,15 @@ if TYPE_CHECKING:
 # Measured clear rates at 0 wilds / 8 draws:
 #   1: 40%   2: 66%   3: 20%   4: 42%   5: 19%
 #   6: 14%   7:  1%   8: 38%   9:  7%  10:  4%
-EASY_PHASES = frozenset({1, 2, 4})
-MEDIUM_PHASES = frozenset({3, 5, 6, 8})
-HARD_PHASES = frozenset({7, 9, 10})
+# Phases 11-20 measured the same way, at 600 trials:
+#   11: 94%  12: 91%  13: 79%  14: 72%  15: 62%
+#   16: 57%  17: 49%  18: 29%  19: 22%  20: 11%
+# They fill a hole the stock ten left: nothing above 66%, so every phase was a
+# fight. The boundaries are the same ones the original ten implied -- easy at
+# roughly 40% and up, hard below 15%.
+EASY_PHASES = frozenset({1, 2, 4, 11, 12, 13, 14, 15, 16, 17})
+MEDIUM_PHASES = frozenset({3, 5, 6, 8, 18, 19})
+HARD_PHASES = frozenset({7, 9, 10, 20})
 
 #: How many of each power item logic can actually demand. Items beyond these
 #: counts are comfort, not progression -- see items.py, which classifies the
@@ -66,14 +73,14 @@ def set_all_rules(world: Phase10World) -> None:
 
 
 def set_phase_entrance_rules(world: Phase10World) -> None:
-    for phase in range(1, 11):
+    for phase in range(1, PHASE_COUNT + 1):
         world.set_rule(
             world.get_entrance(f"Menu to Phase {phase}"), Has(f"Phase {phase} Unlocked")
         )
 
 
 def set_location_rules(world: Phase10World) -> None:
-    for phase in range(1, 11):
+    for phase in range(1, PHASE_COUNT + 1):
         difficulty = difficulty_requirement(phase)
 
         for location in world.get_region(f"Phase {phase}").locations:
@@ -99,6 +106,6 @@ def set_completion_condition(world: Phase10World) -> None:
     if world.options.goal == Goal.option_phase_ten:
         goal_rule: Rule = Has("Phase 10 Clear")
     else:
-        goal_rule = HasAll(*(f"Phase {p} Clear" for p in range(1, 11)))
+        goal_rule = HasAll(*(f"Phase {p} Clear" for p in range(1, PHASE_COUNT + 1)))
     world.set_rule(world.get_entrance("Menu to Victory"), goal_rule)
     world.set_completion_rule(Has("Victory"))

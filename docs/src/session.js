@@ -12,7 +12,8 @@
 
 import {
   BASE_HAND_SIZE, EXTRA_DRAW, HANDS_WON_MILESTONES, HAND_SIZE_UPGRADE, LEAN_DEAL,
-  LOCATION_NAME_TO_ID, MAX_SKIPS, MULLIGAN, PHASE_LOCK, SCORE_REDUCTION,
+  LOCATION_NAME_TO_ID, MAX_SKIPS, MULLIGAN, PHASE_COUNT, PHASE_LOCK,
+  SCORE_REDUCTION,
   SCORE_REDUCTION_VALUE, SKIP_CARD, TIERS, WILD_CARD,
   WILD_THEFT, milestoneLocationName, phaseLocationName, phaseUnlock,
 } from "./data.js";
@@ -106,7 +107,7 @@ export class Phase10Session {
 
   get unlockedPhases() {
     const open = new Set();
-    for (let p = 1; p <= 10; p += 1) {
+    for (let p = 1; p <= PHASE_COUNT; p += 1) {
       if (this.count(phaseUnlock(p)) > 0) open.add(p);
     }
     return open;
@@ -332,13 +333,13 @@ export class Phase10Session {
     // hands the player an easier table than they had earned.
     const phases = payload.opponent_phases;
     if (Array.isArray(phases)
-        && phases.every((v) => Number.isInteger(v) && v >= 1 && v <= 10)) {
+        && phases.every((v) => Number.isInteger(v) && v >= 1 && v <= PHASE_COUNT)) {
       this._opponentPhases = [...phases];
     }
 
     const locked = payload.locked_phase;
     this.lockedPhase =
-      Number.isInteger(locked) && locked >= 1 && locked <= 10 ? locked : null;
+      Number.isInteger(locked) && locked >= 1 && locked <= PHASE_COUNT ? locked : null;
     return true;
   }
 

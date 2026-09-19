@@ -27,9 +27,10 @@ from kivy.uix.button import Button
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.image import Image
 from kivy.uix.label import Label
+from kivy.uix.widget import Widget
 from kivy.uix.layout import Layout
 
-from ..data import GAME_NAME
+from ..data import GAME_NAME, PHASE_COUNT
 from ..game.cards import Color, card_filename
 from ..game.engine import HandState
 from ..game.phases import PHASES, phase_description
@@ -122,6 +123,10 @@ CARD_ROW_HEIGHT = 96
 CARD_WIDTH = CARD_ROW_HEIGHT * 2 // 3   # the faces are rendered 2:3
 HAND_COLS = 8
 
+#: Melds are reference, not something you act on, so they get a shorter row.
+MELD_ROW_HEIGHT = 58
+MELD_CARD_WIDTH = MELD_ROW_HEIGHT * 2 // 3
+
 
 class Phase10View(BoxLayout):
     """The tab body. Reads the session; writes only through commands."""
@@ -148,13 +153,17 @@ class Phase10View(BoxLayout):
         self.seats = Label(text="", markup=True, size_hint_y=None, height=24,
                            halign="left", valign="middle")
         self.seats.bind(size=lambda w, _: setattr(w, "text_size", w.size))
+        #: What every seat has face up on the table. Real cards rather than
+        #: a count, because the point is to read whether a spare of yours
+        #: would extend one of these.
+        self.melds = BoxLayout(size_hint_y=None, height=MELD_ROW_HEIGHT, spacing=10)
         self.actions = BoxLayout(size_hint_y=None, height=40, spacing=4)
         self.phase_grid = GridLayout(cols=10, spacing=4, size_hint_y=None, height=38)
 
         for widget in (self.header, self.objective, self.stats, self.seats,
                        Label(text="[b]Your hand[/b] -- click a card to discard it",
                              markup=True, size_hint_y=None, height=22),
-                       self.hand_grid, self.dig_row, self.actions,
+                       self.melds, self.hand_grid, self.dig_row, self.actions,
                        Label(text="[b]Phases[/b]", markup=True, size_hint_y=None, height=22),
                        self.phase_grid):
             self.add_widget(widget)
@@ -197,7 +206,8 @@ class Phase10View(BoxLayout):
             str(hand.discard_top) if hand else None,
             hand.draws_left if hand else None,
             s.mulligans_left,
-            tuple((seat.name, seat.phase, len(seat.hand), seat.laid_down, seat.went_out)
+            tuple((seat.name, seat.phase, len(seat.hand), seat.laid_down, seat.went_out,
+                   tuple(tuple(str(c) for c in g) for g in seat.layout))
                   for seat in s.seats),
             hand.state.value if hand else None,
             tuple(str(c) for c in (hand.dig_options or ())) if hand else (),
@@ -215,7 +225,7 @@ class Phase10View(BoxLayout):
         self.header.text = (
             f"[b]Round {s.game.round_number}[/b]    "
             f"score [b]{s.total_score}[/b] (lower is better)    "
-            f"won {s.hands_won}    cleared {len(s.cleared_phases)}/10"
+            f"won {s.hands_won}    cleared {len(s.cleared_phases)}/{PHASE_COUNT}"
         )
         if s.score_reduction:
             self.header.text += f"    [color=88cc88]-{s.score_reduction} reduced[/color]"
@@ -239,6 +249,7 @@ class Phase10View(BoxLayout):
                 self.stats.text += f"    [color=ff8888]Phase Lock: replay {s.locked_phase}[/color]"
 
         self._render_seats(s)
+        self._render_melds(s)
         self._render_hand(hand)
         self._render_dig(hand)
         self._render_phases(s)
@@ -262,6 +273,36 @@ class Phase10View(BoxLayout):
             else:
                 parts.append(f"{seat.name} p{seat.phase} ({len(seat.hand)})")
         self.seats.text = "table:  " + "    ".join(parts)
+
+    def _render_melds(self, session) -> None:
+        """Every seat's laid-down groups, face up and grouped by meld."""
+        self.melds.clear_widgets()
+        down = [s for s in session.seats if s.layout]
+        if not down:
+            self.melds.height = 0
+            return
+        self.melds.height = MELD_ROW_HEIGHT
+
+        for seat in down:
+            block = BoxLayout(orientation="vertical", size_hint_x=None,
+                              width=sum(len(g) for g in seat.layout) * MELD_CARD_WIDTH
+                                    + 12 * len(seat.layout))
+            label = Label(text=f"{seat.name} p{seat.phase}", font_size="11sp",
+                          size_hint_y=None, height=14)
+            row = BoxLayout(spacing=10)
+            for group in seat.layout:
+                # One box per group, so two sets of three read as two sets
+                # rather than one run of six.
+                meld = BoxLayout(spacing=1, size_hint_x=None,
+                                 width=len(group) * MELD_CARD_WIDTH)
+                for card in group:
+                    meld.add_widget(make_card(card, size_hint_x=None,
+                                              width=MELD_CARD_WIDTH))
+                row.add_widget(meld)
+            block.add_widget(label)
+            block.add_widget(row)
+            self.melds.add_widget(block)
+        self.melds.add_widget(Widget())
 
     def _render_hand(self, hand) -> None:
         self.hand_grid.clear_widgets()
@@ -297,7 +338,7 @@ class Phase10View(BoxLayout):
     def _render_phases(self, session) -> None:
         self.phase_grid.clear_widgets()
         unlocked = session.unlocked_phases
-        for phase in range(1, 11):
+        for phase in range(1, PHASE_COUNT + 1):
             button = Button(text=str(phase), font_size="14sp", background_normal="")
             if phase in session.cleared_phases:
                 button.background_color = (0.18, 0.55, 0.30, 1)

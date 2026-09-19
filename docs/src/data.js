@@ -7,6 +7,12 @@
 
 export const GAME_NAME = "AP_Phase10";
 
+/** How many phases the world ships. Mirrors PHASE_COUNT in data.py. */
+export const PHASE_COUNT = 20;
+
+/** The lowest non-unlock item ID. Phase unlocks must stay clear of it. */
+export const FIRST_FIXED_ITEM_ID = 50;
+
 export const phaseUnlock = (phase) => `Phase ${phase} Unlocked`;
 export const phaseClearEvent = (phase) => `Phase ${phase} Clear`;
 
@@ -34,16 +40,19 @@ export const SCORE_REDUCTION_VALUE = 25;
 
 export const ITEM_NAME_TO_ID = (() => {
   const table = {};
-  for (let p = 1; p <= 10; p += 1) table[phaseUnlock(p)] = p;
-  table[WILD_CARD] = 20;
-  table[EXTRA_DRAW] = 21;
-  table[HAND_SIZE_UPGRADE] = 22;
-  table[SKIP_CARD] = 23;
-  table[PHASE_LOCK] = 30;
-  table[LEAN_DEAL] = 31;
-  table[WILD_THEFT] = 32;
-  table[MULLIGAN] = 40;
-  table[SCORE_REDUCTION] = 41;
+  for (let p = 1; p <= PHASE_COUNT; p += 1) table[phaseUnlock(p)] = p;
+  // Phase unlocks own 1..PHASE_COUNT, so everything else starts above any
+  // phase count this world will plausibly reach. At twenty phases, "Phase 20
+  // Unlocked" and "Wild Card" both wanted ID 20.
+  table[WILD_CARD] = 50;
+  table[EXTRA_DRAW] = 51;
+  table[HAND_SIZE_UPGRADE] = 52;
+  table[SKIP_CARD] = 53;
+  table[PHASE_LOCK] = 60;
+  table[LEAN_DEAL] = 61;
+  table[WILD_THEFT] = 62;
+  table[MULLIGAN] = 70;
+  table[SCORE_REDUCTION] = 71;
   return Object.freeze(table);
 })();
 
@@ -61,15 +70,16 @@ export const milestoneLocationName = (hands) => `Hands Won: ${hands}`;
 
 export const LOCATION_NAME_TO_ID = (() => {
   const table = {};
-  for (let phase = 1; phase <= 10; phase += 1) {
+  for (let phase = 1; phase <= PHASE_COUNT; phase += 1) {
     TIERS.forEach((tier, index) => {
       table[phaseLocationName(phase, tier)] = 100 + phase * 10 + index;
     });
   }
-  // Phase checks occupy 110..203, so milestones start well clear of Phase 10
-  // rather than colliding with it at 200.
+  // Phase checks reach 100 + PHASE_COUNT * 10 + 3, which at twenty phases is
+  // 303 -- head on into milestones that used to start at 300. Moved to 400,
+  // which clears any phase count up to 29.
   HANDS_WON_MILESTONES.forEach((n, index) => {
-    table[milestoneLocationName(n)] = 300 + index;
+    table[milestoneLocationName(n)] = 400 + index;
   });
   return Object.freeze(table);
 })();

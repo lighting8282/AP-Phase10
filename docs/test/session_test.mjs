@@ -14,7 +14,7 @@ import { dirname, join } from "node:path";
 import { Phase10Session } from "../src/session.js";
 import { Phase10Game } from "../src/game.js";
 import {
-  MULLIGAN, SCORE_REDUCTION, SCORE_REDUCTION_VALUE, phaseUnlock,
+  MULLIGAN, PHASE_COUNT, SCORE_REDUCTION, SCORE_REDUCTION_VALUE, phaseUnlock,
 } from "../src/data.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -78,7 +78,7 @@ for (const t of fixtures.tiers) {
 // -- full settle sequences ---------------------------------------------------
 fixtures.sequences.forEach((script, index) => {
   const items = [];
-  for (let p = 1; p <= 10; p += 1) items.push(phaseUnlock(p));
+  for (let p = 1; p <= PHASE_COUNT; p += 1) items.push(phaseUnlock(p));
   items.push("Phase Lock");
   const s = session(
     { goal: script.goal, starting_draws: 8, checks_per_phase: 4 },

@@ -6,7 +6,7 @@
 
 import { cardFilename } from "./cards.js";
 import { HAND_STATE } from "./engine.js";
-import { phaseDescription } from "./phases.js";
+import { PHASE_COUNT, phaseDescription } from "./phases.js";
 import { Phase10Client } from "./client.js";
 
 const el = (id) => document.getElementById(id);
@@ -158,7 +158,7 @@ function render() {
 
   el("summary").textContent =
     `Round ${s.game.roundNumber} - score ${s.totalScore} (lower is better) - ` +
-    `won ${s.handsWon} - cleared ${s.clearedPhases.size}/10` +
+    `won ${s.handsWon} - cleared ${s.clearedPhases.size}/${PHASE_COUNT}` +
     (s.scoreReduction ? ` - ${s.scoreReduction} reduced` : "");
 
   if (hand) {
@@ -218,15 +218,55 @@ function renderTable(session) {
 
     const who = document.createElement("div");
     who.className = "who";
-    who.textContent = `${seat.name} - phase ${seat.phase}`;
+    who.append(document.createTextNode(`${seat.name} `));
+    const tag = document.createElement("span");
+    tag.className = "seat-phase";
+    tag.textContent = `phase ${seat.phase}`;
+    tag.title = phaseDescription(seat.phase);
+    who.append(tag);
 
     const what = document.createElement("div");
     what.className = "what";
     if (seat.wentOut) what.textContent = "went out";
-    else if (seat.laidDown) what.textContent = `laid down, shedding ${seat.hand.length}`;
-    else what.textContent = `${seat.hand.length} cards`;
+    else if (seat.laidDown) what.textContent = `down - ${seat.hand.length} left to shed`;
+    else what.textContent = `building - ${seat.hand.length} cards`;
 
     div.append(who, what);
+
+    // Their hand, face down. A count is information; a row of backs is the
+    // table, and it reads at a glance how close somebody is to going out.
+    if (seat.hand.length) {
+      const back = document.createElement("div");
+      back.className = "seat-hand";
+      for (let i = 0; i < seat.hand.length; i += 1) {
+        const img = document.createElement("img");
+        img.src = "assets/cards/back.png";
+        img.alt = "";
+        back.append(img);
+      }
+      div.append(back);
+    }
+
+    // What they have on the table, face up and grouped, so you can read
+    // whether your spare card would extend one of these.
+    if (seat.layout && seat.layout.length) {
+      const melds = document.createElement("div");
+      melds.className = "melds";
+      for (const group of seat.layout) {
+        const g = document.createElement("div");
+        g.className = "meld";
+        for (const card of group) {
+          const img = document.createElement("img");
+          img.src = `assets/cards/${cardFilename(card)}`;
+          img.alt = describe(card);
+          img.title = img.alt;
+          g.append(img);
+        }
+        melds.append(g);
+      }
+      div.append(melds);
+    }
+
     box.append(div);
   }
 }
@@ -258,7 +298,7 @@ function renderPhases(session) {
   const box = el("phases");
   box.replaceChildren();
   const unlocked = session.unlockedPhases;
-  for (let phase = 1; phase <= 10; phase += 1) {
+  for (let phase = 1; phase <= PHASE_COUNT; phase += 1) {
     const button = document.createElement("button");
     button.textContent = String(phase);
     button.title = phaseDescription(phase);

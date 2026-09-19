@@ -7,7 +7,7 @@ from BaseClasses import Location
 from . import items
 from .data import (
     GAME_NAME,
-    HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS,
+    HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, PHASE_COUNT, TIERS,
     milestone_location_name, phase_location_name,
 )
 
@@ -27,7 +27,7 @@ def create_all_locations(world: Phase10World) -> None:
         {name: LOCATION_NAME_TO_ID[name] for name in milestone_names}, Phase10Location
     )
 
-    for phase in range(1, 11):
+    for phase in range(1, PHASE_COUNT + 1):
         region = world.get_region(f"Phase {phase}")
         names = [phase_location_name(phase, tier) for tier in tiers]
         region.add_locations(

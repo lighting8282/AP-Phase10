@@ -15,7 +15,7 @@
 
 import { handScore, points } from "./cards.js";
 import { cardsShort, removeCard } from "./engine.js";
-import { PHASES, solvePhase } from "./phases.js";
+import { PHASES, solveMelds } from "./phases.js";
 
 /**
  * How well a seat plays. 1.0 / 0.0 is the greedy autoplayer exactly.
@@ -41,6 +41,13 @@ export class Opponent {
     this.skill = skill;
 
     this.hand = [];
+    // The groups this seat has on the table, face up. Kept rather than
+    // discarded: the player needs to see what is down to judge whether they
+    // could hit onto it, and without this the cards simply vanish from the
+    // deck -- six of them, silently, the moment a seat lays.
+    this.layout = [];
+    // The same groups, with what each one means, so they can be hit on.
+    this.melds = [];
     this.laidDown = false;
     this.wentOut = false;
   }
@@ -59,7 +66,7 @@ export class Opponent {
   }
 
   _solution() {
-    return solvePhase(this.hand, this.spec, this.config.minNaturalsPerGroup);
+    return solveMelds(this.hand, this.spec, this.config.minNaturalsPerGroup);
   }
 
   // -- policy ---------------------------------------------------------------
@@ -91,16 +98,18 @@ export class Opponent {
 
   _tryLayDown() {
     if (this.laidDown) return;
-    const layout = this._solution();
-    if (layout === null) return;
-    for (const group of layout) {
-      for (const card of group) {
+    const melds = this._solution();
+    if (melds === null) return;
+    for (const meld of melds) {
+      for (const card of meld.cards) {
         // By value, not identity: solvePhase materialises its own card
         // objects, so indexOf gives -1 and splice(-1, 1) would quietly
         // delete the last card in hand instead of the one laid down.
         removeCard(this.hand, card);
       }
     }
+    this.melds = melds;
+    this.layout = melds.map((m) => m.cards);
     this.laidDown = true;
   }
 
@@ -114,12 +123,13 @@ export class Opponent {
     if (this._finished()) return true;
 
     if (this.laidDown) {
-      // Already down: shed, do not draw. Drawing one and discarding one leaves
-      // the hand the same size forever, so a seat that has laid down could
-      // never go out. Real Phase 10 sheds by hitting onto groups already on
-      // the table; until that exists, one card a turn and no draw is the
-      // conservative stand-in -- slower than the real thing, not faster.
-      table.discard.push(this._shed());
+      // Already down: hit everything that legally extends a group on the
+      // table -- its own or anybody else's -- and throw one card besides.
+      // Drawing one and discarding one would leave the hand the same size
+      // forever, so a seat that had laid down could never go out.
+      this._hitWhatItCan(table);
+      if (this._finished()) return true;
+      if (this.hand.length) table.discard.push(this._shed());
       return this._finished();
     }
 
@@ -134,6 +144,34 @@ export class Opponent {
 
     table.discard.push(this._takeChosenDiscard());
     return this._finished();
+  }
+
+  /**
+   * Lay every card that legally extends a group already on the table.
+   *
+   * Repeated rather than a single pass: hitting a run at one end opens the
+   * next rank along, so one sweep would leave behind cards the very next
+   * check would accept.
+   */
+  _hitWhatItCan(table) {
+    let played = 0;
+    let moved = true;
+    while (moved && this.hand.length) {
+      moved = false;
+      for (const card of [...this.hand]) {
+        for (const meld of table.allMelds()) {
+          if (meld.accepts(card)) {
+            removeCard(this.hand, card);
+            meld.add(card);
+            played += 1;
+            moved = true;
+            break;
+          }
+        }
+        if (moved) break;
+      }
+    }
+    return played;
   }
 
   /** Throw the most expensive card; nothing left is worth building on. */

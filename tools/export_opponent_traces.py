@@ -59,7 +59,11 @@ def trace(seed: int, phases: list[int], hand_size: int, awareness: float,
         turns.append({
             "seats": [
                 {"hand": len(s.hand), "laid": s.laid_down, "out": s.went_out,
-                 "score": s.score}
+                 "score": s.score,
+                 # Group sizes catch a hit that landed on the wrong meld --
+                 # hand size alone would call that identical.
+                 "melds": [len(m) for m in s.melds],
+                 "spans": [[m.lo, m.hi] for m in s.melds]}
                 for s in table.seats
             ],
             "discard_top": card_json(table.discard[-1]) if table.discard else None,

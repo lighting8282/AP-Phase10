@@ -15,6 +15,11 @@ from __future__ import annotations
 #: they are not Python; the generation test catches it if those drift.
 GAME_NAME = "AP_Phase10"
 
+#: How many phases the world ships. Kept as a literal rather than imported
+#: from game.phases so this module stays dependency-free; test_data asserts the
+#: two agree.
+PHASE_COUNT = 20
+
 PHASE_UNLOCK = "Phase {} Unlocked"
 PHASE_CLEAR_EVENT = "Phase {} Clear"
 
@@ -38,18 +43,25 @@ FILLERS = [MULLIGAN, SCORE_REDUCTION]
 #: one of these is worth exactly the worst card you can be caught holding.
 SCORE_REDUCTION_VALUE = 25
 
+# Phase unlocks own 1..PHASE_COUNT, so everything else starts above any phase
+# count this world will plausibly reach. At ten phases the power items sat at
+# 20-23 and were fine; at twenty, "Phase 20 Unlocked" and "Wild Card" both
+# wanted ID 20. test_data caught it, which is exactly what it is for.
 ITEM_NAME_TO_ID = {
-    **{PHASE_UNLOCK.format(p): p for p in range(1, 11)},
-    WILD_CARD: 20,
-    EXTRA_DRAW: 21,
-    HAND_SIZE_UPGRADE: 22,
-    SKIP_CARD: 23,
-    PHASE_LOCK: 30,
-    LEAN_DEAL: 31,
-    WILD_THEFT: 32,
-    MULLIGAN: 40,
-    SCORE_REDUCTION: 41,
+    **{PHASE_UNLOCK.format(p): p for p in range(1, PHASE_COUNT + 1)},
+    WILD_CARD: 50,
+    EXTRA_DRAW: 51,
+    HAND_SIZE_UPGRADE: 52,
+    SKIP_CARD: 53,
+    PHASE_LOCK: 60,
+    LEAN_DEAL: 61,
+    WILD_THEFT: 62,
+    MULLIGAN: 70,
+    SCORE_REDUCTION: 71,
 }
+
+#: The lowest non-unlock item ID. Phase unlocks must stay clear of it.
+FIRST_FIXED_ITEM_ID = 50
 
 #: Check tiers in unlock order; `checks_per_phase` takes a prefix of this list.
 TIERS = ["Cleared", "Went Out", "No Wilds", "Under Par"]
@@ -70,13 +82,16 @@ def milestone_location_name(hands: int) -> str:
 LOCATION_NAME_TO_ID = {
     **{
         phase_location_name(phase, tier): 100 + phase * 10 + index
-        for phase in range(1, 11)
+        for phase in range(1, PHASE_COUNT + 1)
         for index, tier in enumerate(TIERS)
     },
-    # Phase checks occupy 110..203 (100 + phase * 10 + tier), so milestones
-    # start well clear of Phase 10 rather than colliding with it at 200.
+    # Phase checks occupy 110..(100 + PHASE_COUNT * 10 + 3). At ten phases that
+    # topped out at 203 and milestones sat safely at 300; at twenty it reaches
+    # 303 and collides with them head on. Moved to 400, which clears any phase
+    # count up to 29. The first version of this world shipped a duplicate
+    # address exactly once, and only a real generation caught it.
     **{
-        milestone_location_name(n): 300 + index
+        milestone_location_name(n): 400 + index
         for index, n in enumerate(HANDS_WON_MILESTONES)
     },
 }

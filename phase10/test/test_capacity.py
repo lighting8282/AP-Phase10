@@ -90,3 +90,28 @@ class TestOptionRangesMatchLogic(Phase10TestBase):
                         value, option.range_start, f"{name}.{key}")
                     self.assertLessEqual(
                         value, option.range_end, f"{name}.{key}")
+
+
+class TestPoolStaysMeaningful(Phase10TestBase):
+    """Doubling the phases doubled the locations, not the useful items.
+
+    Every power item is capped by something real -- the deck holds eight
+    wilds, extra draws stop buying anything past the range, skips and hand
+    size have their own limits -- so a bigger location pool can only absorb
+    the difference as filler. At four checks a phase it measured 59% filler
+    and thirty-five Mulligans, which is an infinite supply of redeals. Two
+    checks a phase is the default for that reason.
+    """
+
+    options = {"checks_per_phase": 2}
+
+    def test_filler_does_not_dominate_the_default_pool(self) -> None:
+        pool = [item.name for item in self.multiworld.itempool]
+        filler = sum(1 for n in pool if n in ("Mulligan", "Score Reduction"))
+        self.assertLess(filler / len(pool), 0.40, "filler has taken over the pool")
+
+    def test_no_single_filler_is_an_infinite_supply(self) -> None:
+        from collections import Counter
+
+        counts = Counter(item.name for item in self.multiworld.itempool)
+        self.assertLessEqual(counts["Mulligan"], 15)

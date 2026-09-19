@@ -40,7 +40,7 @@ from worlds.phase10.game.cards import (  # noqa: E402
     build_deck,
     number_card,
 )
-from worlds.phase10.game.phases import PHASES, solve_phase  # noqa: E402
+from worlds.phase10.game.phases import PHASE_COUNT, PHASES, solve_phase  # noqa: E402
 
 MIN_NATURAL_VARIANTS = (0, 1)
 
@@ -105,7 +105,7 @@ def main() -> int:
         for min_nat in MIN_NATURAL_VARIANTS:
             verdicts[str(min_nat)] = [
                 solve_phase(hand, PHASES[p], min_naturals_per_group=min_nat) is not None
-                for p in range(1, 11)
+                for p in range(1, PHASE_COUNT + 1)
             ]
         cases.append({"hand": [card_key(c) for c in hand], "verdicts": verdicts})
 
@@ -116,7 +116,7 @@ def main() -> int:
                 "note": "Emitted by tools/export_fixtures.py from the Python engine. "
                         "Regenerate whenever the solver changes.",
                 "min_naturals_variants": list(MIN_NATURAL_VARIANTS),
-                "phases": list(range(1, 11)),
+                "phases": list(range(1, PHASE_COUNT + 1)),
                 "cases": cases,
             },
             indent=1,

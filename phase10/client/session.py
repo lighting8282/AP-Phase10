@@ -21,6 +21,7 @@ from ..data import (
     LOCATION_NAME_TO_ID,
     MAX_SKIPS,
     MULLIGAN,
+    PHASE_COUNT,
     PHASE_LOCK,
     PHASE_UNLOCK,
     SCORE_REDUCTION,
@@ -113,7 +114,7 @@ class Phase10Session:
 
     @property
     def unlocked_phases(self) -> set[int]:
-        return {p for p in range(1, 11) if self.items[PHASE_UNLOCK.format(p)]}
+        return {p for p in range(1, PHASE_COUNT + 1) if self.items[PHASE_UNLOCK.format(p)]}
 
     # -- configuration -----------------------------------------------------
     @property
@@ -322,12 +323,14 @@ class Phase10Session:
 
         phases = payload.get("opponent_phases")
         if isinstance(phases, list) and all(
-            isinstance(v, int) and 1 <= v <= 10 for v in phases
+            isinstance(v, int) and 1 <= v <= PHASE_COUNT for v in phases
         ):
             self._opponent_phases = list(phases)
 
         locked = payload.get("locked_phase")
-        self.locked_phase = locked if isinstance(locked, int) and 1 <= locked <= 10 else None
+        self.locked_phase = (
+            locked if isinstance(locked, int) and 1 <= locked <= PHASE_COUNT else None
+        )
         return True
 
     # -- goal --------------------------------------------------------------

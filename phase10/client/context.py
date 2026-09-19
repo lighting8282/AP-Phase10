@@ -22,7 +22,7 @@ from CommonClient import (
 )
 from NetUtils import ClientStatus
 
-from ..data import GAME_NAME
+from ..data import GAME_NAME, PHASE_COUNT
 from ..game.autoplay import play_out
 from ..game.engine import HandState
 from ..game.phases import PHASES, phase_description
@@ -52,7 +52,7 @@ class Phase10CommandProcessor(ClientCommandProcessor):
         """List every phase, what it needs, and whether it is available."""
         s = self.ctx.session
         unlocked = s.unlocked_phases
-        for phase in range(1, 11):
+        for phase in range(1, PHASE_COUNT + 1):
             if phase in s.cleared_phases:
                 mark = "done"
             elif phase in unlocked:
@@ -70,8 +70,8 @@ class Phase10CommandProcessor(ClientCommandProcessor):
             f"| draws per hand {c.max_draws} | skips per hand {c.starting_skips}"
         )
         self.output(
-            f"phases unlocked {len(s.unlocked_phases)}/10 "
-            f"| cleared {len(s.cleared_phases)}/10 | hands won {s.hands_won}"
+            f"phases unlocked {len(s.unlocked_phases)}/{PHASE_COUNT} "
+            f"| cleared {len(s.cleared_phases)}/{PHASE_COUNT} | hands won {s.hands_won}"
         )
         self.output(
             f"round {s.game.round_number} | {s.hands_won} won | "

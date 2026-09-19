@@ -23,7 +23,8 @@ from enum import Enum
 
 from .cards import SKIP, WILD, Card, Color, hand_score, number_card, shuffled_deck
 from .phases import (
-    PHASES, GroupKind, GroupSpec, Layout, PhaseSpec, phase_card_count, solve_phase,
+    PHASES, GroupKind, GroupSpec, Layout, Meld, PhaseSpec, phase_card_count,
+    solve_melds, solve_phase,
 )
 
 
@@ -96,12 +97,24 @@ class Table:
         """Deal every opponent an opening hand off the same deck."""
         for seat in self.seats:
             seat.hand = self.deal(count)
+            seat.layout = []
             seat.laid_down = False
             seat.went_out = False
 
     @property
     def discard_top(self) -> Card | None:
         return self.discard[-1] if self.discard else None
+
+    def all_melds(self) -> list:
+        """Every group face up on the table, in seat order.
+
+        Phase 10 lets a hit land on anybody's group, not just your own, so
+        targeting has to see the whole table rather than one seat.
+        """
+        melds = []
+        for seat in self.seats:
+            melds.extend(seat.melds)
+        return melds
 
     def end_of_turn(self) -> object | None:
         """Run every opponent's turn. Returns the seat that went out, if any.
@@ -137,6 +150,9 @@ class PhaseHand:
         self.draws_used = 0
         self.state = HandState.IN_PROGRESS
         self.layout: Layout | None = None
+        #: The player's own groups on the table, with what each one means, so
+        #: cards can be hit onto them as well as onto the opponents'.
+        self.melds: list[Meld] = []
         self.events: list[HandEvent] = []
         self.drew_this_turn = False
         self.used_wilds_in_layout = 0
@@ -318,9 +334,14 @@ class PhaseHand:
             self.mark_failed("out_of_draws")
 
     def lay_down(self) -> Layout:
-        layout = self.solution()
-        if layout is None:
+        melds = solve_melds(self.hand, self.spec,
+                            min_naturals_per_group=self.config.min_naturals_per_group)
+        if melds is None:
             raise RuntimeError(f"phase {self.phase} not satisfiable from hand")
+        # The layout is built out of the melds, so what you can see and what
+        # the group means cannot drift apart.
+        self.melds = melds
+        layout = [m.cards for m in melds]
         self.layout = layout
         self.used_wilds_in_layout = sum(1 for g in layout for c in g if c.is_wild)
         for group in layout:
