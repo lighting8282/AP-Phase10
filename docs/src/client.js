@@ -29,6 +29,43 @@ export class Phase10Client {
     this.connected = false;
     this.restoreState = "needed";
     this.goalSent = false;
+
+    this.#listen();
+  }
+
+  /**
+   * Subscribe to the socket. Called once, from the constructor.
+   *
+   * Deliberately NOT done in connect(). archipelago.js never drops a listener
+   * on disconnect, so registering there stacks a fresh copy on every attempt:
+   * reconnect twice and the room's chat arrives in triplicate. The handlers
+   * read `this.session` at call time, so they survive the session being
+   * rebuilt from slot data on each connect.
+   */
+  #listen() {
+    this.client.items.on("itemsReceived", () => this.syncItems());
+    this.client.messages.on("message", (text, nodes) => this.onMessage(text, nodes));
+
+    this.client.deathLink.on("deathReceived", (source, _time, cause) => {
+      // Registered unconditionally, so it must check the option itself -- the
+      // session it was registered against is not the one being played.
+      if (!this.session.deathLink) return;
+      this.onLog(`DeathLink from ${source}${cause ? `: ${cause}` : ""}`);
+      const hand = this.session.killHand();
+      if (!hand) {
+        this.onLog("No hand in progress, so nothing to lose.");
+        return;
+      }
+      // sendDeath false: settling this must not bounce a death back at
+      // whoever killed us.
+      this.settle(hand, { sendDeath: false });
+    });
+
+    this.client.socket.on("disconnected", () => {
+      this.connected = false;
+      this.onLog("Disconnected.");
+      this.onUpdate();
+    });
   }
 
   get saveKey() {
@@ -53,28 +90,11 @@ export class Phase10Client {
     this.restoreState = "needed";
     this.connected = true;
 
-    this.client.items.on("itemsReceived", () => this.syncItems());
-    this.client.messages.on("message", (text, nodes) => this.onMessage(text, nodes));
-
+    // Listeners are already attached (see #listen). Only the tag has to be
+    // set, and only when this slot asked for it.
     if (this.session.deathLink) {
       this.client.deathLink.enableDeathLink();
-      this.client.deathLink.on("deathReceived", (source, _time, cause) => {
-        this.onLog(`DeathLink from ${source}${cause ? `: ${cause}` : ""}`);
-        const hand = this.session.killHand();
-        if (!hand) {
-          this.onLog("No hand in progress, so nothing to lose.");
-          return;
-        }
-        // sendDeath false: settling this must not bounce a death back at
-        // whoever killed us.
-        this.settle(hand, { sendDeath: false });
-      });
     }
-    this.client.socket.on("disconnected", () => {
-      this.connected = false;
-      this.onLog("Disconnected.");
-      this.onUpdate();
-    });
 
     this.syncItems();
     await this.restore();

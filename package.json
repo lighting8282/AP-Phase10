@@ -10,11 +10,12 @@
   },
   "type": "module",
   "scripts": {
-    "test": "python tools/check_js_tables.py && node docs/test/crosscheck.mjs && node docs/test/crosscheck_engine.mjs && node docs/test/game_test.mjs && node docs/test/session_test.mjs",
+    "test": "python tools/check_js_tables.py && node docs/test/crosscheck.mjs && node docs/test/crosscheck_engine.mjs && node docs/test/game_test.mjs && node docs/test/session_test.mjs && node docs/test/client_test.mjs",
     "test:tables": "python tools/check_js_tables.py",
     "test:solver": "node docs/test/crosscheck.mjs",
     "test:engine": "node docs/test/crosscheck_engine.mjs",
     "test:game": "node docs/test/game_test.mjs",
-    "test:session": "node docs/test/session_test.mjs"
+    "test:session": "node docs/test/session_test.mjs",
+    "test:client": "node docs/test/client_test.mjs"
   }
 }
