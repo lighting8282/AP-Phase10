@@ -1,8 +1,8 @@
 name: P10Default
-game: AP_Phase10
+game: AP_10
 description: Default options, default progression balancing
 
-AP_Phase10:
+AP_10:
   progression_balancing: 50
   accessibility: full
   goal: all_phases

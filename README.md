@@ -1,4 +1,4 @@
-# AP_Phase10
+# AP_10
 
 A solo Phase 10 implementation that ships *inside* its own apworld — Python game
 and Archipelago world in one package, no mod loader, no IPC. Structured after
@@ -679,7 +679,7 @@ break: fill putting this world's items into someone else's locations, and
 someone else's into this world's.
 
 `tests/yaml/multi/` is four slots -- APQuest, ChecksFinder, and **two
-AP_Phase10 slots with deliberately different options**. Same game twice is
+AP_10 slots with deliberately different options**. Same game twice is
 where item IDs, option-dependent location counts and progression balancing
 collide, and one of the two runs the tightest legal option set (two checks per
 phase, one starting phase, minimum items, `accessibility: minimal`), because
@@ -692,7 +692,7 @@ playthrough before writing anything.
 
 Current result: 4 slots, 210 placements, 64 of this world's items placed
 elsewhere, 79 foreign items placed here, 37 crossing between the two
-AP_Phase10 slots.
+AP_10 slots.
 
 Pointed at the single-slot set it must fail, and does:
 
@@ -735,7 +735,7 @@ how the problem actually shows up, several steps from its cause.
 
 Nothing in this world needs 0.6.8. Verified by generating with the 0.6.7
 release build's own `ArchipelagoGenerate.exe`, and by running its Launcher's
-"Generate Template Options", which now produces `AP_Phase10.yaml` with all ten
+"Generate Template Options", which now produces `AP_10.yaml` with all ten
 options.
 
 The lesson for next time: the floor is a claim about the oldest release that
@@ -789,15 +789,24 @@ while it runs.
 
 ## Naming
 
-The world is registered as `AP_Phase10`, defined once in `data.py` as
+The world is registered as `AP_10`, defined once in `data.py` as
 `GAME_NAME` and read from there by the world, items, locations, client,
 launcher and UI tab. `archipelago.json` and the docs filename carry their own
 copies because they are not Python — a generation run is what catches those
 drifting.
 
 Game rules are not copyrightable, so the engine is original work, and the card
-art is generated rather than borrowed. The **name** is the part still shared
-with Mattel's product: `AP_Phase10` prefixes the mark rather than replacing it,
-so it does not create legal distance. That was a deliberate choice for an
-identifier matching the repo, not a claim that the trademark question is
-settled.
+art is generated rather than borrowed. The **name** was the one part still
+shared with Mattel's product, and `AP_Phase10` prefixed the mark rather than
+replacing it, which creates no distance at all.
+
+`AP_10` drops the word "Phase", which is the half that carried the mark. It is
+a placeholder rather than a decision: it is short and it no longer reproduces
+the product name, but it also says nothing about what the game is, and a bare
+"10" next to a rummy game is still suggestive. The candidates worth a proper
+look are the ones from the folk game this is a version of -- contract rummy,
+and the family it belongs to -- since naming it after what it actually is
+resolves the question rather than dodging it.
+
+Renaming is cheap while nobody is mid-seed and expensive afterwards, because
+the game name is what a client sends on connect.

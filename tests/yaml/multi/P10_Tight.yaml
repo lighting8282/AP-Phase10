@@ -1,11 +1,11 @@
 name: P10Tight
-game: AP_Phase10
+game: AP_10
 description: >
   The tightest legal option set -- fewest locations, fewest items, one
   starting phase. Fill has the least room here, so if a multiworld breaks
   this slot is where it shows.
 
-AP_Phase10:
+AP_10:
   progression_balancing: 99
   accessibility: minimal
   goal: phase_ten

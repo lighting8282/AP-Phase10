@@ -13,7 +13,7 @@ from __future__ import annotations
 #: world, items, locations, client, launcher, UI tab -- reads it from here.
 #: archipelago.json and the docs filename carry their own copies because
 #: they are not Python; the generation test catches it if those drift.
-GAME_NAME = "AP_Phase10"
+GAME_NAME = "AP_10"
 
 #: How many phases the world ships. Kept as a literal rather than imported
 #: from game.phases so this module stays dependency-free; test_data asserts the

@@ -1,8 +1,8 @@
 name: P10Tester
-game: AP_Phase10
-description: AP_Phase10 apworld generation smoke test
+game: AP_10
+description: AP_10 apworld generation smoke test
 
-AP_Phase10:
+AP_10:
   progression_balancing: 0
   accessibility: full
   goal: all_phases

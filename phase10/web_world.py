@@ -10,7 +10,7 @@ class Phase10WebWorld(WebWorld):
     theme = "partyTime"
     setup_en = Tutorial(
         "Multiworld Setup Guide",
-        "A guide to setting up AP_Phase10 for MultiWorld.",
+        "A guide to setting up AP_10 for MultiWorld.",
         "English",
         "setup_en.md",
         "setup/en",

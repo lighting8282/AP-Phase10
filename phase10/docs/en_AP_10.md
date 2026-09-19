@@ -1,4 +1,4 @@
-# AP_Phase10
+# AP_10
 
 ## What is this game?
 

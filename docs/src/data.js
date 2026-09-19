@@ -5,7 +5,7 @@
 // would notice until a seed was half played -- data_test.mjs diffs this file
 // against the Python one rather than trusting that they were kept in step.
 
-export const GAME_NAME = "AP_Phase10";
+export const GAME_NAME = "AP_10";
 
 /** How many phases the world ships. Mirrors PHASE_COUNT in data.py. */
 export const PHASE_COUNT = 20;

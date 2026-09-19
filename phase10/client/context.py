@@ -1,4 +1,4 @@
-"""Archipelago client for AP_Phase10.
+"""Archipelago client for AP_10.
 
 The game is played through commands in the client console rather than a bespoke
 GUI -- a card game reads fine as text, and it keeps everything in one process

@@ -3,7 +3,7 @@
 Every seed this project generated for a long time held a single slot of a
 single game, which is the one arrangement that cannot exercise the thing most
 likely to break: fill placing this world's items into someone else's
-locations, and someone else's into this world's. Two AP_Phase10 slots with
+locations, and someone else's into this world's. Two AP_10 slots with
 different options are in the set deliberately -- same game twice is where item
 IDs, option-dependent location counts and progression balancing collide.
 
@@ -27,7 +27,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 YAMLS = PROJECT_ROOT / "tests" / "yaml" / "multi"
-GAME = "AP_Phase10"
+GAME = "AP_10"
 
 AP = os.environ.get("AP_ROOT", "C:/Users/turtl/Archipelago")
 sys.path.insert(0, AP)
