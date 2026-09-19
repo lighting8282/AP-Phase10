@@ -33,14 +33,46 @@ class StartingDraws(Range):
     default = 4
 
 
+class Opponents(Range):
+    """
+    How many computer players share the table with you.
+
+    They draw from the same deck, build toward their own phases, and when one
+    of them goes out your round ends wherever it stands. Set to 0 for the solo
+    game, where only your draw budget can end a round.
+
+    Three opponents end a round around turn five. That is a minimum-of-N
+    effect -- one seat alone takes about eight turns -- so more opponents make
+    rounds shorter, not just busier.
+    """
+    display_name = "Opponents"
+    range_start = 0
+    range_end = 3
+    default = 3
+
+
 class ExtraDrawItems(Range):
     """
     How many Extra Draw items go in the pool. Each adds one draw per hand.
+
+    The floor of 5 is the most logic can demand: the No Wilds check on every
+    phase asks for Extra Draw x5, so a smaller pool leaves those checks
+    unreachable and the seed will not generate.
+
+    The ceiling is low on purpose. With opponents at the table the round ends
+    when somebody goes out, and past roughly eight *total* draws the budget
+    stops buying anything. Measured across the ten phases, going from 4 draws
+    to 8 is worth real clear rate; from 8 to 14 is worth nothing at all.
+    Anything past that range is a dead item in the pool.
+
+    At the default starting_draws of 4 the floor of 5 already puts you at 9
+    total, so the fifth copy is carrying a logic requirement rather than any
+    real difficulty. Lower starting_draws if you want every copy to bite.
     """
     display_name = "Extra Draw Items"
-    range_start = 3
-    range_end = 16
-    default = 12
+    range_start = 5
+    range_end = 8
+    default = 5
 
 
 class WildCardItems(Range):
@@ -137,6 +169,7 @@ class TrapChance(Range):
 class Phase10Options(PerGameCommonOptions):
     goal: Goal
     starting_phases: StartingPhases
+    opponents: Opponents
     starting_draws: StartingDraws
     extra_draw_items: ExtraDrawItems
     wild_card_items: WildCardItems
@@ -149,8 +182,8 @@ class Phase10Options(PerGameCommonOptions):
 
 option_groups = [
     OptionGroup("Goal", [Goal, ChecksPerPhase, StartingPhases]),
-    OptionGroup("Difficulty", [StartingDraws, ExtraDrawItems, WildCardItems,
-                               HandSizeUpgrades, SkipCardItems]),
+    OptionGroup("Difficulty", [Opponents, StartingDraws, ExtraDrawItems,
+                               WildCardItems, HandSizeUpgrades, SkipCardItems]),
     OptionGroup("Deck", [TrapChance, Phase10DeathLink]),
 ]
 
@@ -158,8 +191,9 @@ option_presets = {
     "tight": {
         "goal": Goal.option_all_phases,
         "starting_phases": 1,
+        "opponents": 3,
         "starting_draws": 2,
-        "extra_draw_items": 16,
+        "extra_draw_items": 8,
         "wild_card_items": 8,
         "hand_size_upgrades": 0,
         "checks_per_phase": 4,
@@ -169,6 +203,7 @@ option_presets = {
     "short": {
         "goal": Goal.option_phase_ten,
         "starting_phases": 3,
+        "opponents": 0,
         "starting_draws": 6,
         "extra_draw_items": 6,
         "wild_card_items": 8,

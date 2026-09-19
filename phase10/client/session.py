@@ -33,7 +33,8 @@ from ..data import (
     phase_location_name,
 )
 from ..game.cards import STOCK_WILDS
-from ..game.engine import GameConfig, HandState, PhaseHand
+from ..game.engine import GameConfig, HandState, PhaseHand, Table
+from ..game.opponents import MID, build_opponents
 from ..game.game import SAVE_VERSION, Phase10Game, RoundResult
 
 #: Traps are one-shot. Received counts only ever grow, so pending effects are
@@ -49,13 +50,17 @@ class Phase10Session:
     starting_draws: int = 4
     checks_per_phase: int = 4
     death_link: bool = False
+    opponents: int = 3
 
     items: Counter = field(default_factory=Counter)
     consumed_traps: Counter = field(default_factory=Counter)
     mulligans_used: int = 0
+    _opponent_phases: list[int] = field(default_factory=list)
     checked_locations: set[int] = field(default_factory=set)
     locked_phase: int | None = None
     last_result: RoundResult | None = None
+    #: The table the current hand is being played at, opponents included.
+    table: Table | None = None
     game: Phase10Game = field(default_factory=Phase10Game)
 
     @classmethod
@@ -65,6 +70,7 @@ class Phase10Session:
             starting_draws=int(slot_data.get("starting_draws", 4)),
             checks_per_phase=int(slot_data.get("checks_per_phase", 4)),
             death_link=bool(slot_data.get("death_link", False)),
+            opponents=int(slot_data.get("opponents", 3)),
             game=Phase10Game(rng),
         )
 
@@ -138,6 +144,27 @@ class Phase10Session:
             return f"A Phase Lock trap is forcing you to replay Phase {self.locked_phase}."
         return None
 
+    # -- the table ---------------------------------------------------------
+    @property
+    def opponent_phases(self) -> list[int]:
+        """Which phase each seat is on. Grows as they clear their own."""
+        if not self._opponent_phases:
+            self._opponent_phases = [1] * self.opponents
+        return self._opponent_phases
+
+    @property
+    def seats(self) -> list:
+        return self.table.seats if self.table else []
+
+    def advance_opponents(self) -> list[str]:
+        """Move every seat that cleared its phase on to the next one."""
+        moved = []
+        for index, seat in enumerate(self.seats):
+            if seat.laid_down and index < len(self.opponent_phases):
+                self._opponent_phases[index] = min(10, seat.phase + 1)
+                moved.append(seat.name)
+        return moved
+
     # -- mulligans ---------------------------------------------------------
     @property
     def mulligans_left(self) -> int:
@@ -179,7 +206,16 @@ class Phase10Session:
             if self.pending(trap):
                 self.consumed_traps[trap] += 1
 
-        return self.game.start_round(phase, config)
+        self.table = Table()
+        if self.opponents:
+            # Each seat carries its own phase between rounds, so the table
+            # gets harder to beat as the run goes on rather than resetting
+            # to three players on phase 1 every time.
+            self.table.seats = build_opponents(
+                self.opponents, list(self.opponent_phases),
+                config, self.game.rng, MID,
+            )
+        return self.game.start_round(phase, config, table=self.table)
 
     def kill_hand(self) -> PhaseHand | None:
         """Fail the hand in progress, if there is one.
@@ -216,6 +252,7 @@ class Phase10Session:
     def finish_hand(self, hand: PhaseHand) -> list[int]:
         """Settle a finished hand. Returns newly checked location IDs."""
         tiers = self.earned_tiers(hand)
+        self.advance_opponents()
         result = self.game.finish_round(hand)
         self.last_result = result
 
@@ -254,6 +291,7 @@ class Phase10Session:
             "game": self.game.to_payload(),
             "consumed_traps": {k: int(v) for k, v in self.consumed_traps.items() if v},
             "mulligans_used": self.mulligans_used,
+            "opponent_phases": list(self._opponent_phases),
             "locked_phase": self.locked_phase,
         }
 
@@ -281,6 +319,12 @@ class Phase10Session:
         # key restores as zero rather than refusing the whole payload.
         used = payload.get("mulligans_used")
         self.mulligans_used = used if isinstance(used, int) and used >= 0 else 0
+
+        phases = payload.get("opponent_phases")
+        if isinstance(phases, list) and all(
+            isinstance(v, int) and 1 <= v <= 10 for v in phases
+        ):
+            self._opponent_phases = list(phases)
 
         locked = payload.get("locked_phase")
         self.locked_phase = locked if isinstance(locked, int) and 1 <= locked <= 10 else None

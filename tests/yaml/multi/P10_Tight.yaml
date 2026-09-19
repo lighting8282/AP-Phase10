@@ -9,6 +9,7 @@ AP_Phase10:
   progression_balancing: 99
   accessibility: minimal
   goal: phase_ten
+  opponents: 0
   starting_draws: 2
   extra_draw_items: 5
   wild_card_items: 4

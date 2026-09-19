@@ -230,9 +230,12 @@ class TestMulligan(unittest.TestCase):
         self.assertEqual(hand.draws_left, draws)
         self.assertEqual(len(hand.hand), s.config.hand_size)
         self.assertEqual(len(hand.discard), 1)
-        # Deal, discard and stock still account for every card dealt.
+        # Deal, discard and stock still account for every card dealt --
+        # including the hands the opponents are holding, since they come off
+        # the same deck.
+        seated = sum(len(seat.hand) for seat in s.seats)
         self.assertEqual(
-            len(hand.hand) + len(hand.discard) + len(hand.stock),
+            len(hand.hand) + seated + len(hand.discard) + len(hand.stock),
             96 + s.config.wilds_in_deck,
         )
 
@@ -318,3 +321,89 @@ class TestScoreReduction(unittest.TestCase):
         s = self.scored(80, reductions=1)
         self.assertEqual(s.game.total_score, 80)
         self.assertEqual(s.total_score, 55)
+
+
+class TestOpponents(unittest.TestCase):
+    def opened(self, count=3, phase=1):
+        s = session(opponents=count)
+        s.set_items([PHASE_UNLOCK.format(phase)])
+        hand = s.start_hand(phase)
+        return s, hand
+
+    def test_three_by_default(self) -> None:
+        self.assertEqual(session().opponents, 3)
+
+    def test_slot_data_carries_the_count(self) -> None:
+        self.assertEqual(session(opponents=0).opponents, 0)
+        self.assertEqual(session(opponents=2).opponents, 2)
+
+    def test_seats_are_dealt_from_the_same_deck(self) -> None:
+        s, hand = self.opened()
+        self.assertEqual(len(s.seats), 3)
+        seated = sum(len(seat.hand) for seat in s.seats)
+        self.assertEqual(
+            len(hand.hand) + seated + len(hand.discard) + len(hand.stock),
+            96 + s.config.wilds_in_deck,
+        )
+
+    def test_no_opponents_means_an_empty_table(self) -> None:
+        s, hand = self.opened(count=0)
+        self.assertEqual(s.seats, [])
+        self.assertEqual(
+            len(hand.hand) + len(hand.discard) + len(hand.stock),
+            96 + s.config.wilds_in_deck,
+        )
+
+    def test_seats_start_on_phase_one(self) -> None:
+        s, _ = self.opened()
+        self.assertEqual([seat.phase for seat in s.seats], [1, 1, 1])
+
+    def test_a_seat_that_laid_down_moves_up_a_phase(self) -> None:
+        s, hand = self.opened()
+        s.seats[0].laid_down = True
+        s.seats[1].laid_down = False
+        hand.mark_failed("test")
+        s.finish_hand(hand)
+        self.assertEqual(s.opponent_phases[0], 2)
+        self.assertEqual(s.opponent_phases[1], 1)
+
+    def test_progress_stops_at_ten(self) -> None:
+        # Seated on 10 from the start: seats are built from opponent_phases,
+        # so setting it after start_hand would only desync the two.
+        s = session(opponents=3)
+        s._opponent_phases = [10, 10, 10]
+        s.set_items([PHASE_UNLOCK.format(1)])
+        hand = s.start_hand(1)
+        self.assertEqual([seat.phase for seat in s.seats], [10, 10, 10])
+        for seat in s.seats:
+            seat.laid_down = True
+        hand.mark_failed("test")
+        s.finish_hand(hand)
+        self.assertEqual(s.opponent_phases, [10, 10, 10])
+
+    def test_progress_survives_a_reconnect(self) -> None:
+        """Without this a reconnect reseats everyone on phase 1, which quietly
+        hands the player an easier table than they had earned."""
+        s = session(opponents=3)
+        s._opponent_phases = [4, 2, 7]
+        s.set_items([PHASE_UNLOCK.format(1)])
+        hand = s.start_hand(1)
+        hand.mark_failed("test")
+        s.finish_hand(hand)
+
+        fresh = session(opponents=3)
+        self.assertTrue(fresh.load_payload(s.to_payload()))
+        self.assertEqual(fresh.opponent_phases, s.opponent_phases)
+
+    def test_losing_the_race_is_a_lost_round(self) -> None:
+        s, hand = self.opened()
+        for seat in s.seats:
+            seat.laid_down, seat.hand, seat.went_out = True, [], False
+        s.seats[0].hand = []
+        s.table.end_of_turn()
+        hand.draw()
+        hand.discard_card(hand.hand[0])
+        self.assertIs(hand.state, HandState.FAILED)
+        self.assertEqual(hand.events[-1].detail["reason"], "opponent_out")
+        self.assertEqual(hand.events[-1].detail["opponent"], s.seats[0].name)
+        self.assertEqual(s.finish_hand(hand), [])

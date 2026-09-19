@@ -36,7 +36,7 @@ class TestMaximumItems(Phase10TestBase):
     options = {
         "checks_per_phase": 2,
         "starting_phases": 1,
-        "extra_draw_items": 16,
+        "extra_draw_items": 8,
         "wild_card_items": 8,
         "hand_size_upgrades": 2,
     }
@@ -54,3 +54,39 @@ class TestMaximumItems(Phase10TestBase):
 
 class TestFullSize(Phase10TestBase):
     options = {"checks_per_phase": 4, "starting_phases": 4}
+
+
+class TestOptionRangesMatchLogic(Phase10TestBase):
+    """The option ranges have to be able to satisfy the rules.
+
+    Found by probing: at extra_draw_items 3 or 4 the No Wilds check on every
+    phase is unreachable, because it asks for Extra Draw x5 and the pool
+    cannot hold five. Generation fails outright. The range start is the fix,
+    so it has to stay tied to the floor rather than drift from it.
+    """
+
+    options = {"checks_per_phase": 4}
+
+    def test_extra_draw_range_cannot_starve_its_own_logic(self) -> None:
+        from ..options import ExtraDrawItems
+        from ..rules import MIN_EXTRA_DRAWS
+
+        self.assertGreaterEqual(ExtraDrawItems.range_start, MIN_EXTRA_DRAWS)
+
+    def test_wild_card_range_cannot_starve_its_own_logic(self) -> None:
+        from ..options import WildCardItems
+        from ..rules import MIN_WILD_CARDS
+
+        self.assertGreaterEqual(WildCardItems.range_start, MIN_WILD_CARDS)
+
+    def test_every_preset_is_inside_its_option_range(self) -> None:
+        from ..options import option_presets, Phase10Options
+
+        for name, preset in option_presets.items():
+            for key, value in preset.items():
+                option = Phase10Options.type_hints[key]
+                if hasattr(option, "range_start"):
+                    self.assertGreaterEqual(
+                        value, option.range_start, f"{name}.{key}")
+                    self.assertLessEqual(
+                        value, option.range_end, f"{name}.{key}")

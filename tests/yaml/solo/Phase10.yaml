@@ -6,8 +6,9 @@ AP_Phase10:
   progression_balancing: 0
   accessibility: full
   goal: all_phases
+  opponents: 3
   starting_draws: 4
-  extra_draw_items: 12
+  extra_draw_items: 5
   wild_card_items: 8
   hand_size_upgrades: 2
   checks_per_phase: 4

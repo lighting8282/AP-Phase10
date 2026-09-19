@@ -66,6 +66,14 @@ async def main():
         hand = session.hand
         check(len(hand.hand) == 12, "hand shows 10 dealt cards plus 2 granted skips")
 
+        # The table strip has to show the seats, or a round that ends because
+        # somebody went out looks like it ended for no reason at all.
+        check(len(session.seats) == 3, "three opponents are seated")
+        check(all(s.name in view.seats.text for s in session.seats),
+              "every seat is named in the table strip")
+        check(str(session.seats[0].phase) in view.seats.text,
+              "and the strip shows what phase they are on")
+
         # Mulligan, while the deal is still untouched. It has to run before
         # the draw below, which is exactly what makes it unavailable after.
         dealt = [str(c) for c in hand.hand]
@@ -84,7 +92,12 @@ async def main():
         card = hand.hand[0]
         list(reversed(view.hand_grid.children))[0].dispatch("on_release")
         check(len(hand.hand) == size - 1, "clicking a card discards it")
-        check(hand.discard_top == card, "the clicked card is the one discarded")
+        # Not the discard *top* any more: the opponents take their turns as
+        # soon as yours ends, and each throws a card on the same pile. What
+        # has to hold is that the card you clicked is the one that left your
+        # hand and reached the pile.
+        check(card in hand.discard, "the clicked card is the one discarded")
+        check(card not in hand.hand, "and it left your hand")
 
         # Dig with a Skip and keep a revealed card.
         view.refresh(force=True)

@@ -113,6 +113,14 @@ class Phase10CommandProcessor(ClientCommandProcessor):
             f"discard top {hand.discard_top} | draws left {hand.draws_left} "
             f"| stock {len(hand.stock)}"
         )
+        seats = self.ctx.session.seats
+        if seats:
+            racing = ", ".join(
+                f"{s.name} p{s.phase}"
+                + ("!" if s.laid_down else f"({len(s.hand)})")
+                for s in seats
+            )
+            self.output(f"table: {racing}    -- /table for detail")
         if hand.skips_in_hand:
             self.output(f"{hand.skips_in_hand} Skip(s) in hand -- /skip digs for free")
         if hand.can_lay_down():
@@ -182,6 +190,29 @@ class Phase10CommandProcessor(ClientCommandProcessor):
             self.ctx.settle(hand)
         else:
             self._cmd_hand()
+
+    def _cmd_table(self) -> None:
+        """Show the computer players: their phase, and how close they are."""
+        session = self.ctx.session
+        if not session.opponents:
+            self.output("No opponents -- this is the solo game.")
+            return
+        seats = session.seats
+        if not seats:
+            self.output(
+                f"{session.opponents} opponent(s) will be seated when you "
+                f"start a hand. Phases: "
+                + ", ".join(str(p) for p in session.opponent_phases)
+            )
+            return
+        for seat in seats:
+            if seat.went_out:
+                state = "went out"
+            elif seat.laid_down:
+                state = f"laid down, shedding {len(seat.hand)}"
+            else:
+                state = f"building, {len(seat.hand)} cards"
+            self.output(f"  {seat.name:<4} phase {seat.phase:>2}  {state}")
 
     def _cmd_mulligan(self) -> None:
         """Throw back a dead opening hand and deal a fresh one."""
@@ -362,8 +393,14 @@ class Phase10Context(CommonContext):
     def settle(self, hand, quiet: bool = False, send_death: bool = True) -> None:
         """Finish a hand and queue whatever checks it earned."""
         died = hand.state is HandState.FAILED
+        # Read before finish_hand, which takes the hand off the game.
+        lost_to = None
+        if hand.events and hand.events[-1].kind == "hand_failed":
+            lost_to = hand.events[-1].detail.get("opponent")
         new = self.session.finish_hand(hand)
         result = self.session.last_result
+        if not quiet and lost_to:
+            logger.info(f"{lost_to} went out -- your round ends here.")
         if not quiet and result is not None:
             logger.info(str(result))
         if new:

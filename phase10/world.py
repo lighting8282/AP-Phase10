@@ -11,9 +11,10 @@ from .data import GAME_NAME
 class Phase10World(World):
     """
     Phase 10 is a rummy-style card game of ten escalating objectives. This
-    implementation is solo: instead of racing opponents to go out, you have a
-    limited draw budget to lay each phase down. Archipelago decides which
-    phases you may attempt, and how many wild cards and draws you get.
+    implementation seats you against computer players who race you to go out,
+    and gives you a draw budget on top -- a round ends on whichever comes
+    first. Archipelago decides which phases you may attempt, and how many wild
+    cards, draws and skips you get. Set opponents to 0 for the solo game.
     """
 
     game = GAME_NAME
@@ -46,4 +47,5 @@ class Phase10World(World):
         # one-to-one onto the option names.
         return self.options.as_dict(
             "goal", "starting_draws", "checks_per_phase", "death_link",
+            "opponents",
         )

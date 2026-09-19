@@ -145,10 +145,13 @@ class Phase10View(BoxLayout):
 
         self.hand_grid = GridLayout(cols=8, spacing=4, size_hint_y=None, height=110)
         self.dig_row = BoxLayout(size_hint_y=None, height=0, spacing=4)
+        self.seats = Label(text="", markup=True, size_hint_y=None, height=24,
+                           halign="left", valign="middle")
+        self.seats.bind(size=lambda w, _: setattr(w, "text_size", w.size))
         self.actions = BoxLayout(size_hint_y=None, height=40, spacing=4)
         self.phase_grid = GridLayout(cols=10, spacing=4, size_hint_y=None, height=38)
 
-        for widget in (self.header, self.objective, self.stats,
+        for widget in (self.header, self.objective, self.stats, self.seats,
                        Label(text="[b]Your hand[/b] -- click a card to discard it",
                              markup=True, size_hint_y=None, height=22),
                        self.hand_grid, self.dig_row, self.actions,
@@ -194,6 +197,8 @@ class Phase10View(BoxLayout):
             str(hand.discard_top) if hand else None,
             hand.draws_left if hand else None,
             s.mulligans_left,
+            tuple((seat.name, seat.phase, len(seat.hand), seat.laid_down, seat.went_out)
+                  for seat in s.seats),
             hand.state.value if hand else None,
             tuple(str(c) for c in (hand.dig_options or ())) if hand else (),
         )
@@ -233,9 +238,30 @@ class Phase10View(BoxLayout):
             if s.locked_phase:
                 self.stats.text += f"    [color=ff8888]Phase Lock: replay {s.locked_phase}[/color]"
 
+        self._render_seats(s)
         self._render_hand(hand)
         self._render_dig(hand)
         self._render_phases(s)
+
+    def _render_seats(self, session) -> None:
+        """One line for the table. Laid-down seats are the ones about to
+        end your round, so they are the ones that have to stand out."""
+        seats = session.seats
+        if not seats:
+            self.seats.text = ""
+            return
+        parts = []
+        for seat in seats:
+            if seat.went_out:
+                parts.append(f"[color=ff8888]{seat.name} out[/color]")
+            elif seat.laid_down:
+                parts.append(
+                    f"[color=ffd479]{seat.name} p{seat.phase} down, "
+                    f"{len(seat.hand)} left[/color]"
+                )
+            else:
+                parts.append(f"{seat.name} p{seat.phase} ({len(seat.hand)})")
+        self.seats.text = "table:  " + "    ".join(parts)
 
     def _render_hand(self, hand) -> None:
         self.hand_grid.clear_widgets()
