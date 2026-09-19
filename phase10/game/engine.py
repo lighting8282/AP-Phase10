@@ -63,18 +63,75 @@ class HandEvent:
     detail: dict = field(default_factory=dict)
 
 
+class Table:
+    """The stock and the discard pile: what every seat shares.
+
+    Split out of PhaseHand so opponents can draw from the same deck the player
+    is drawing from. With no opponents a hand builds its own private Table and
+    behaves exactly as it did when it owned these two lists outright -- which
+    is what lets the solo measurements stand as a regression guard.
+    """
+
+    def __init__(self) -> None:
+        self.stock: list[Card] = []
+        self.discard: list[Card] = []
+        self.seats: list = []
+        #: The seat that went out, once one has. Sticky: the round is over,
+        #: and a player who keeps acting must keep losing it rather than
+        #: slipping through because the transition already happened.
+        self.winner = None
+
+    def reset(self, stock: list[Card], discard: list[Card]) -> None:
+        self.stock = stock
+        self.discard = discard
+        self.winner = None
+
+    def deal(self, count: int) -> list[Card]:
+        """Take `count` cards off the stock for a seat."""
+        dealt = self.stock[:count]
+        del self.stock[:count]
+        return dealt
+
+    def deal_seats(self, count: int) -> None:
+        """Deal every opponent an opening hand off the same deck."""
+        for seat in self.seats:
+            seat.hand = self.deal(count)
+            seat.laid_down = False
+            seat.went_out = False
+
+    @property
+    def discard_top(self) -> Card | None:
+        return self.discard[-1] if self.discard else None
+
+    def end_of_turn(self) -> object | None:
+        """Run every opponent's turn. Returns the seat that went out, if any.
+
+        Once somebody is out nobody plays on: the round ended, and further
+        turns would let a player who drew again quietly survive a race they
+        had already lost.
+        """
+        if self.winner is not None:
+            return self.winner
+        for seat in self.seats:
+            if seat.take_turn(self):
+                self.winner = seat
+                return seat
+        return None
+
+
 class PhaseHand:
     """One round: a single attempt at a single phase."""
 
-    def __init__(self, phase: int, config: GameConfig, rng: random.Random, spec: PhaseSpec | None = None):
+    def __init__(self, phase: int, config: GameConfig, rng: random.Random,
+                 spec: PhaseSpec | None = None, table: Table | None = None):
         self.phase = phase
         self.spec = spec if spec is not None else PHASES[phase]
         self.config = config
         self.rng = rng
 
         self.hand: list[Card] = []
-        self.discard: list[Card] = []
-        self.stock: list[Card] = []
+        #: Shared with the opponents when there are any; private otherwise.
+        self.table = table if table is not None else Table()
         self._deal()
 
         self.draws_used = 0
@@ -96,8 +153,10 @@ class PhaseHand:
         # holding them costs no room to build the phase in.
         self.hand += [SKIP] * self.config.starting_skips
         rest = deck[self.config.hand_size:]
-        self.discard = [rest[0]]
-        self.stock = rest[1:]
+        self.table.reset(stock=rest[1:], discard=[rest[0]])
+        # Opponents are dealt from the same deck, so a Mulligan before anyone
+        # has acted redeals the whole table -- which is what a reshuffle means.
+        self.table.deal_seats(self.config.hand_size)
 
     def redeal(self) -> None:
         """Throw the opening hand back and deal a fresh one -- a Mulligan.
@@ -120,6 +179,14 @@ class PhaseHand:
         self._emit("redeal", hand=len(self.hand))
 
     # -- queries -----------------------------------------------------------
+    @property
+    def stock(self) -> list[Card]:
+        return self.table.stock
+
+    @property
+    def discard(self) -> list[Card]:
+        return self.table.discard
+
     @property
     def draws_left(self) -> int:
         return max(0, self.config.max_draws - self.draws_used)
@@ -171,7 +238,7 @@ class PhaseHand:
         self.hand.remove(card)
         self.discard.append(card)
         self.drew_this_turn = False
-        self._fail_if_out_of_road()
+        self._end_turn()
 
     def play_skip(self) -> list[Card]:
         """Spend a Skip to look at the top of the stock.
@@ -220,8 +287,25 @@ class PhaseHand:
         self.skips_played += 1
         self.drew_this_turn = False
         self._emit("skip_dug", card=str(chosen))
-        self._fail_if_out_of_road()
+        self._end_turn()
         return chosen
+
+    def _end_turn(self) -> None:
+        """Close out the player's turn, then let the table play.
+
+        Order matters: a budget that just ran out ends the hand before the
+        opponents move, so a loss is attributed to the thing that actually
+        caused it rather than to whoever happened to go out next.
+        """
+        self._fail_if_out_of_road()
+        if self.state is not HandState.IN_PROGRESS:
+            return
+        winner = self.table.end_of_turn()
+        if winner is not None:
+            # Only a hand still being built can be lost this way. One already
+            # laid down has cleared its phase, and nobody else going out
+            # can take that back.
+            self.mark_failed("opponent_out", opponent=winner.name)
 
     def _fail_if_out_of_road(self) -> None:
         # A budget that just ran out is only a loss if the phase is not already
@@ -251,11 +335,12 @@ class PhaseHand:
         return layout
 
     # -- bookkeeping -------------------------------------------------------
-    def mark_failed(self, reason: str) -> None:
+    def mark_failed(self, reason: str, **detail) -> None:
         """End the hand as a loss. Public because a driver that runs the turn
         loop itself (the client, the autoplayer) has to be able to call it."""
         self.state = HandState.FAILED
-        self._emit("hand_failed", reason=reason, score=hand_score(self.hand))
+        self._emit("hand_failed", reason=reason, score=hand_score(self.hand),
+                   **detail)
 
     def _emit(self, kind: str, **detail) -> None:
         self.events.append(HandEvent(kind, self.phase, detail))

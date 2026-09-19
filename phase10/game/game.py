@@ -90,10 +90,11 @@ class Phase10Game:
         return [r for r in self.rounds if r.phase == phase]
 
     # -- play --------------------------------------------------------------
-    def start_round(self, phase: int, config: GameConfig) -> PhaseHand:
+    def start_round(self, phase: int, config: GameConfig,
+                    table=None) -> PhaseHand:
         if self.hand is not None and self.hand.state is HandState.IN_PROGRESS:
             raise RuntimeError(f"round {self.round_number} is still in progress")
-        self.hand = PhaseHand(phase, config, self.rng)
+        self.hand = PhaseHand(phase, config, self.rng, table=table)
         return self.hand
 
     def finish_round(self, hand: PhaseHand | None = None) -> RoundResult:

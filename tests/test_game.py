@@ -8,7 +8,8 @@ import random
 
 from game.cards import SKIP, WILD, hand_score, number_card
 from game.cards import Color
-from game.engine import GameConfig, HandState, PhaseHand
+from game.engine import GameConfig, HandState, PhaseHand, Table
+from game.opponents import MID, Opponent, OpponentSkill, build_opponents
 from game.game import Phase10Game, RoundResult
 
 R = Color.RED
@@ -238,6 +239,128 @@ def test_redeal_refused_with_a_dig_pending():
     except RuntimeError:
         return
     raise AssertionError("redeal must be refused with a dig pending")
+
+
+# -- the shared table ---------------------------------------------------------
+# With no seats a Table is a hand's own private stock and discard, which is what
+# lets every solo measurement above stand as the regression guard for the split.
+
+def seated(n, phases=None, skill=MID, seed=5, **cfg_kw):
+    """A player hand sharing a table with `n` opponents."""
+    cfg = GameConfig(max_draws=cfg_kw.pop("max_draws", 8), **cfg_kw)
+    rng = random.Random(seed)
+    table = Table()
+    table.seats = build_opponents(n, phases or [1] * n, cfg, rng, skill)
+    return PhaseHand(1, cfg, rng, table=table), table
+
+
+def test_seats_are_dealt_from_the_same_deck():
+    hand, table = seated(3)
+    dealt = len(hand.hand) + sum(len(s.hand) for s in table.seats)
+    total = dealt + len(table.stock) + len(table.discard)
+    assert total == 96 + hand.config.wilds_in_deck
+    assert all(len(s.hand) == hand.config.hand_size for s in table.seats)
+
+
+def test_no_seats_leaves_the_table_to_the_player():
+    hand, table = seated(0)
+    assert table.seats == []
+    assert len(hand.hand) + len(table.stock) + len(table.discard) == 96 + hand.config.wilds_in_deck
+
+
+def test_an_opponent_sheds_after_laying_down_and_goes_out():
+    """The first version drew one and discarded one, so it never shed at all
+    and no opponent could ever go out. Sizes must strictly decrease."""
+    cfg = GameConfig(max_draws=99)
+    rng = random.Random(1)
+    table = Table()
+    table.seats = build_opponents(1, [1], cfg, rng, MID)
+    PhaseHand(1, cfg, rng, table=table)
+    seat = table.seats[0]
+
+    sizes = []
+    for _ in range(40):
+        if seat.take_turn(table):
+            break
+        if seat.laid_down:
+            sizes.append(len(seat.hand))
+    assert seat.went_out, "an opponent that laid down must eventually go out"
+    assert sizes == sorted(sizes, reverse=True), f"hand must shrink, got {sizes}"
+
+
+def test_an_opponent_going_out_ends_the_players_hand():
+    hand, table = seated(1, max_draws=99)
+    seat = table.seats[0]
+    for _ in range(60):
+        if seat.went_out:
+            break
+        table.end_of_turn()
+    assert seat.went_out
+
+    # The player is mid-hand, so the race is lost.
+    hand.draw()
+    hand.discard_card(hand.hand[0])
+    assert hand.state is HandState.FAILED
+    assert hand.events[-1].detail["reason"] == "opponent_out"
+
+
+def test_going_out_cannot_undo_a_phase_already_laid():
+    hand, table = seated(1, max_draws=99)
+    hand.state = HandState.PHASE_LAID
+    for seat in table.seats:
+        seat.laid_down, seat.hand = True, []
+        seat.went_out = True
+    hand._end_turn()
+    assert hand.state is HandState.PHASE_LAID
+
+
+def test_running_out_of_draws_beats_the_race_to_the_blame():
+    """Both clocks can expire on the same turn; the budget is the real cause."""
+    hand, table = seated(1, max_draws=1)
+    # A hand of six distinct ranks cannot make two sets of three, so the
+    # player is genuinely out of road rather than entitled to lay down.
+    hand.hand = [number_card(r, R) for r in range(1, 7)]
+    hand.draws_used = hand.config.max_draws
+    hand.drew_this_turn = True
+    # The seat is one shed away from going out, so a wrong blame order shows.
+    seat = table.seats[0]
+    seat.laid_down, seat.hand, seat.went_out = True, [number_card(9, R)], False
+
+    hand.discard_card(hand.hand[0])
+    assert hand.state is HandState.FAILED
+    assert hand.events[-1].detail["reason"] == "out_of_draws"
+
+
+def test_a_mulligan_redeals_the_whole_table():
+    hand, table = seated(3)
+    before = [[str(c) for c in s.hand] for s in table.seats]
+    hand.redeal()
+    after = [[str(c) for c in s.hand] for s in table.seats]
+    assert before != after
+    assert all(len(s.hand) == hand.config.hand_size for s in table.seats)
+
+
+def test_a_perfect_seat_never_ignores_a_useful_discard():
+    """Skill is two probabilities over one policy; at 1.0/0.0 it is the greedy
+    autoplayer, which is what makes later difficulty levels just numbers."""
+    perfect = OpponentSkill("perfect", discard_awareness=1.0, discard_error=0.0)
+    cfg = GameConfig()
+    rng = random.Random(0)
+    seat = Opponent("T", 1, cfg, rng, perfect)
+    seat.hand = [number_card(5, R), number_card(5, Color.BLUE), number_card(9, R),
+                 number_card(2, R), number_card(7, R), number_card(11, R)]
+    assert seat._wants_discard_top(number_card(5, Color.GREEN)) is True
+    for _ in range(20):
+        assert seat._wants_discard_top(number_card(5, Color.GREEN)) is True
+
+
+def test_a_careless_seat_sometimes_looks_away():
+    careless = OpponentSkill("careless", discard_awareness=0.5, discard_error=0.0)
+    seat = Opponent("T", 1, GameConfig(), random.Random(3), careless)
+    seat.hand = [number_card(5, R), number_card(5, Color.BLUE), number_card(9, R),
+                 number_card(2, R), number_card(7, R), number_card(11, R)]
+    looks = [seat._wants_discard_top(number_card(5, Color.GREEN)) for _ in range(200)]
+    assert any(looks) and not all(looks), "awareness below 1.0 must vary"
 
 
 if __name__ == "__main__":
