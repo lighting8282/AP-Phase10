@@ -442,6 +442,21 @@ for (const button of document.querySelectorAll("#actions button")) {
   button.addEventListener("click", () => ACTIONS[button.dataset.action]());
 }
 
+/**
+ * Show or fold away the connection form.
+ *
+ * Folded is the resting state after a successful connect: the header is
+ * sticky, so whatever it holds costs that much of every screen for the whole
+ * session. "Change" brings it back.
+ */
+function setConnectionFormOpen(open) {
+  document.querySelector("header").classList.toggle("slim", !open);
+  el("edit-connection").hidden = open;
+  if (open) el("slot").focus();
+}
+
+el("edit-connection").addEventListener("click", () => setConnectionFormOpen(true));
+
 el("connect").addEventListener("submit", async (event) => {
   event.preventDefault();
   const status = el("status");
@@ -452,10 +467,15 @@ el("connect").addEventListener("submit", async (event) => {
   try {
     await app.connect(el("url").value.trim(), el("slot").value.trim(), el("password").value);
     status.className = "live";
-    status.textContent = "connected";
+    status.textContent = `connected as ${el("slot").value.trim()}`;
+    // The form is used once. On a phone it was eating a fifth of the screen
+    // for the rest of the session, permanently, above everything you play
+    // with -- so it folds away and leaves the one line worth keeping.
+    setConnectionFormOpen(false);
   } catch (err) {
     status.className = "error";
     status.textContent = err.message || "connection failed";
+    setConnectionFormOpen(true);
     log(`Connection failed: ${err.message}`);
     button.disabled = false;
     return;

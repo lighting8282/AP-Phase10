@@ -8,13 +8,17 @@
 </head>
 <body>
 <header>
-  <h1>AP_Phase10</h1>
+  <div class="bar">
+    <h1>AP_Phase10</h1>
+    <span id="status" role="status">not connected</span>
+    <!-- Only useful once the form is out of the way; hidden until then. -->
+    <button type="button" id="edit-connection" hidden>Change</button>
+  </div>
   <form id="connect" autocomplete="off">
     <input id="url" value="archipelago.gg:38281" size="22" aria-label="Server">
     <input id="slot" placeholder="Slot name" size="14" aria-label="Slot name">
     <input id="password" type="password" placeholder="Password" size="12" aria-label="Password">
     <button type="submit" id="connect-button">Connect</button>
-    <span id="status" role="status">not connected</span>
   </form>
 </header>
 

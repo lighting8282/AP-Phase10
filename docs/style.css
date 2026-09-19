@@ -27,7 +27,17 @@ header {
   border-bottom: 1px solid var(--line);
 }
 
-h1 { margin: 0 0 0.5rem; font-size: 1.1rem; letter-spacing: 0.02em; }
+h1 { margin: 0; font-size: 1.1rem; letter-spacing: 0.02em; }
+
+/* The one line worth keeping in a sticky header. */
+header .bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+header #connect { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
+header.slim #connect { display: none; }
 h2 { margin: 1.4rem 0 0.5rem; font-size: 0.95rem; }
 h2 small { color: var(--muted); font-weight: normal; }
 
@@ -75,7 +85,7 @@ button { cursor: pointer; background: #22304d; }
 button:hover:not(:disabled) { background: #2c3e63; }
 button:disabled { opacity: 0.4; cursor: not-allowed; }
 
-#status { color: var(--muted); margin-left: 0.5rem; }
+#status { color: var(--muted); }
 #status.live { color: #6ee7a8; }
 #status.error { color: #ff9a9a; }
 
@@ -270,4 +280,28 @@ button.meld::after {
   display: block;
   color: #ff9a9a;
   font-size: 13px;
+}
+
+/* --- touch ------------------------------------------------------------- */
+/* 36px was the old height everywhere. Apple asks for 44, Google for 48dp,
+   and the phase grid at 48x36 was the worst of it -- twenty small squares
+   is exactly where a miss costs you. Applied by pointer type as well as by
+   width, so a touchscreen laptop gets it too. */
+@media (max-width: 768px), (pointer: coarse) {
+  input, button {
+    min-height: 44px;
+    padding: 0.5rem 0.8rem;
+  }
+  #phases button { min-width: 44px; min-height: 44px; }
+  #actions { gap: 0.55rem; }
+  #phases { gap: 0.5rem; }
+
+  /* A meld is a row of small cards; the row is the target, so give it the
+     same floor rather than enlarging the cards themselves. */
+  button.meld { min-height: 44px; }
+
+  /* Rem heights are a large slice of a phone screen. Cap by viewport so the
+     log and scorecard stay panels rather than pages. */
+  .log { max-height: min(16rem, 30vh); }
+  pre { max-height: min(14rem, 26vh); }
 }
