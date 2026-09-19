@@ -51,7 +51,7 @@ main.board {
   max-width: 96rem;
   display: grid;
   gap: 0 1.25rem;
-  grid-template-columns: 21rem minmax(0, 1fr) 13.5rem;
+  grid-template-columns: 27rem minmax(0, 1fr) 13.5rem;
   grid-template-areas: "left center right";
   align-items: start;
 }
@@ -61,7 +61,7 @@ main.board {
 
 /* Below three columns' worth of room, stack -- and put the play area first,
    because that is what you came for. */
-@media (max-width: 1080px) {
+@media (max-width: 1280px) {
   main.board {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "center" "right" "left";
@@ -118,10 +118,15 @@ pre {
   border-radius: 8px;
   padding: 0.75rem;
   margin: 0;
-  max-height: 14rem;
+  max-height: min(26rem, 38vh);
   overflow: auto;
   color: var(--muted);
-  white-space: pre-wrap;
+  /* Column-aligned text: it needs a monospace family, and it must not wrap,
+     or the alignment that makes it readable is the first thing lost. */
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  white-space: pre;
+  overflow-x: auto;
 }
 
 @media (max-width: 480px) {
@@ -134,7 +139,7 @@ pre {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 0.6rem 0.75rem;
-  max-height: 16rem;
+  max-height: min(40rem, 52vh);
   overflow: auto;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 13px;
@@ -166,7 +171,7 @@ pre {
 #table { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: flex-start; }
 
 .seat {
-  flex: 1 1 13rem;
+  flex: 1 1 11rem;
   min-width: 11rem;
   padding: 0.55rem 0.65rem;
   border: 1px solid var(--line);
@@ -302,6 +307,26 @@ button.meld::after {
 
   /* Rem heights are a large slice of a phone screen. Cap by viewport so the
      log and scorecard stay panels rather than pages. */
-  .log { max-height: min(16rem, 30vh); }
-  pre { max-height: min(14rem, 26vh); }
+  .log { max-height: min(28rem, 42vh); }
+  #scorecard { max-height: min(20rem, 32vh); }
+}
+
+/* --- filling the left column ------------------------------------------ */
+/* In three columns the record of the game has a tall, otherwise empty
+   column to itself, and the play area is far taller than either panel. Let
+   the log take what is going spare rather than stopping at an arbitrary
+   line count with dead space beneath it. */
+@media (min-width: 1281px) {
+  #left {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  #left .log {
+    flex: 1 1 auto;
+    /* A floor as well as a ceiling: on a short screen the ceiling is doing
+       the work, on a tall one the floor keeps it from collapsing. */
+    min-height: 18rem;
+    max-height: min(52rem, 62vh);
+  }
 }
