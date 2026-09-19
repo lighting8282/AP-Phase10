@@ -37,6 +37,17 @@ Both clients play the same table. The two opponent implementations are checked
 against each other turn for turn, so a seed plays identically in the browser and
 on the desktop.
 
+## Hitting
+
+Once your own phase is down, the round carries on. You keep drawing and
+discarding, and you can play cards onto any group already on the table --
+yours or an opponent's. A set takes its own rank, a run takes either end and
+grows as it does, a colour group takes its own colour, and nothing ever takes a
+Skip. Shed your whole hand and you have gone out.
+
+Laying down clears the phase whatever happens next: running out of draws, or
+somebody else going out, ends the round but cannot take the clear back.
+
 ## What items and locations exist?
 
 Items: phase unlocks, Wild Card, Extra Draw, Hand Size Upgrade and Skip Card,

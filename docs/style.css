@@ -167,3 +167,23 @@ pre {
 .seat.laid { border-color: var(--accent); }
 .seat.out { border-color: #ff9a9a; }
 .seat.out .who { color: #ff9a9a; }
+
+/* --- your own groups, and hittable ones ------------------------------- */
+#mine { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+
+/* A group you can play onto is a button; one you cannot is just a picture.
+   The affordance is the whole point -- it answers "can I add onto it" at a
+   glance, which reading the cards alone does not. */
+button.meld {
+  cursor: pointer;
+  border: none;
+  outline: 2px solid var(--accent);
+}
+button.meld:hover { outline-color: #6ee7a8; }
+button.meld::after {
+  content: "+";
+  align-self: center;
+  padding: 0 0.15rem;
+  color: var(--accent);
+  font-weight: 700;
+}

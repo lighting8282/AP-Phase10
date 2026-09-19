@@ -195,6 +195,14 @@ export class PhaseHand {
     // The player's own groups on the table, with what each one means, so
     // cards can be hit onto them as well as onto the opponents'.
     this.melds = [];
+    // Phase is on the table. Separate from `state`, which stays IN_PROGRESS
+    // so the round can continue into shedding.
+    this.laid = false;
+    this.hits = 0;
+    // Draws spent when the phase went down. "Under Par" asks how fast you
+    // cleared, not how long the round then ran -- and the round now runs on
+    // past the lay-down, burning the rest of the budget to shed.
+    this.drawsAtLayDown = null;
     this.events = [];
     this.drewThisTurn = false;
     this.usedWildsInLayout = 0;
@@ -306,6 +314,13 @@ export class PhaseHand {
     removeCard(this.hand, card);
     this.discard.push(card);
     this.drewThisTurn = false;
+    if (this.laid && !this.hand.length) {
+      // Shedding the last card onto the discard pile is going out, the
+      // ordinary way it happens: hit what you can and throw the rest.
+      this.state = HAND_STATE.WENT_OUT;
+      this._emit("went_out", { draws_used: this.drawsUsed });
+      return;
+    }
     this._endTurn();
   }
 
@@ -366,25 +381,36 @@ export class PhaseHand {
     if (this.state !== HAND_STATE.IN_PROGRESS) return;
     const winner = this.table.endOfTurn();
     if (winner !== null) {
-      // Only a hand still being built can be lost this way. One already laid
-      // down has cleared its phase, and nobody else going out takes that back.
-      this.markFailed("opponent_out", { opponent: winner.name });
+      if (this.laid) {
+        // The phase is down, so it is cleared. Somebody else going out only
+        // stops the shedding; it cannot take the clear back.
+        this.state = HAND_STATE.PHASE_LAID;
+        this._emit("raced_after_laying", { opponent: winner.name, held: this.hand.length });
+      } else {
+        this.markFailed("opponent_out", { opponent: winner.name });
+      }
     }
   }
 
+  /**
+   * Settle the hand if the draw budget has run out.
+   *
+   * Once the phase is down this is not a loss at all -- it was cleared, and
+   * the budget expiring only stops you shedding the rest.
+   */
   _failIfOutOfRoad() {
-    // A budget that just ran out is only a loss if the phase is not already
-    // satisfiable -- otherwise the player is entitled to lay it down.
-    if (
-      this.state === HAND_STATE.IN_PROGRESS &&
-      this.drawsLeft === 0 &&
-      !this.canLayDown()
-    ) {
+    if (this.state !== HAND_STATE.IN_PROGRESS || this.drawsLeft !== 0) return;
+    if (this.laid) {
+      this.state = HAND_STATE.PHASE_LAID;
+      this._emit("out_of_draws_after_laying", { held: this.hand.length });
+    } else if (!this.canLayDown()) {
       this.markFailed("out_of_draws");
     }
   }
 
+
   layDown() {
+    if (this.laid) throw new Error("phase is already down");
     const melds = solveMelds(this.hand, this.spec, this.config.minNaturalsPerGroup);
     if (melds === null) throw new Error(`phase ${this.phase} not satisfiable from hand`);
     // The layout is built out of the melds, so what you can see and what the
@@ -396,7 +422,11 @@ export class PhaseHand {
     for (const group of layout) {
       for (const card of group) removeCard(this.hand, card);
     }
-    this.state = HAND_STATE.PHASE_LAID;
+    // Deliberately NOT terminal. Laying down clears the phase, and the round
+    // then carries on so the cards still in hand can be hit onto whatever is
+    // on the table -- which is the whole point of hitting.
+    this.laid = true;
+    this.drawsAtLayDown = this.drawsUsed;
     this._emit("phase_completed", {
       draws_used: this.drawsUsed,
       wilds_used: this.usedWildsInLayout,
@@ -406,6 +436,37 @@ export class PhaseHand {
       this._emit("went_out", { draws_used: this.drawsUsed });
     }
     return layout;
+  }
+
+  /**
+   * Lay one card from hand onto a group already on the table.
+   *
+   * Only after your own phase is down -- that is the rule the whole mechanic
+   * hangs on, and it is what stops hitting being a way to dump cards you
+   * could not otherwise place.
+   */
+  hit(card, meld) {
+    if (this.state !== HAND_STATE.IN_PROGRESS) throw new Error(`hand is ${this.state}`);
+    if (!this.laid) throw new Error("lay your own phase down before hitting");
+    if (this.digPending) throw new Error("finish the dig first");
+    if (!meld.accepts(card)) throw new Error(`${cardToString(card)} does not fit that group`);
+
+    removeCard(this.hand, card);
+    meld.add(card);
+    this.hits += 1;
+    this._emit("hit", { card: cardToString(card) });
+    if (!this.hand.length) {
+      // Shedding the last card is going out, with no discard needed.
+      this.state = HAND_STATE.WENT_OUT;
+      this._emit("went_out", { draws_used: this.drawsUsed });
+    }
+  }
+
+  /** Every group on the table you could legally play onto right now. */
+  hittable() {
+    if (this.state !== HAND_STATE.IN_PROGRESS || !this.laid) return [];
+    const targets = [...this.melds, ...this.table.allMelds()];
+    return targets.filter((m) => this.hand.some((c) => m.accepts(c)));
   }
 
   // -- bookkeeping ----------------------------------------------------------

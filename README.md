@@ -411,13 +411,53 @@ outright:
 The range start is now tied to `MIN_EXTRA_DRAWS`, and a test asserts the tie so
 the two cannot drift apart again.
 
-### Not built yet
+### Hitting
 
-Hitting -- laying onto groups already on the table -- does not exist, so a seat
-that has laid down sheds one card a turn and draws nothing. That makes going
-out slower than the real game, not faster. A Skip still digs rather than
-skipping a player's turn; with opponents at the table it has a real meaning
-again, and that conflict is unresolved.
+Laying down is no longer terminal. It sets `laid` and clears the phase, while
+`state` stays IN_PROGRESS so the round carries on and the rest of the hand can
+be shed onto anything already on the table -- your groups or an opponent's. The
+hand settles when a clock actually runs out, and once the phase is down neither
+clock is a loss: running out of draws and losing the race both settle as
+PHASE_LAID, because a clear cannot be taken back.
+
+Hand size only falls by hitting. Drawing one and discarding one is net zero, so
+going out means hitting enough that a final discard empties the hand, which is
+how the real game works.
+
+Two things that restructure broke, both found by measuring rather than by the
+suite:
+
+  * Discarding your *last* card was not going out. `discard_card` had no such
+    check, so a player who shed down to one card and threw it finished holding
+    nothing and was never credited with it.
+  * **Under Par** became unearnable on the easy phases. It asks whether you
+    cleared inside half your budget, but the round now runs on past the
+    lay-down burning the rest of it, so `draws_used` was always the maximum. It
+    measures `draws_at_lay_down` now -- 0% on phases 1 and 11 before the fix,
+    49% and 87% after.
+
+### What the tiers are worth now
+
+At 4 wilds and 9 draws, with three opponents:
+
+| phase | Cleared | Went Out | No Wilds | Under Par |
+|---|---|---|---|---|
+| 1 | 68% | 7% | 29% | 56% |
+| 6 | 35% | 24% | 7% | 20% |
+| 11 | 96% | 7% | 58% | 94% |
+| 20 | 32% | 23% | 6% | 18% |
+
+Solo, Went Out is 0% on the small phases (1 and 11) and 21-24% on the larger
+ones. That is not a bug: a small phase leaves more cards in hand and fewer
+groups to hit onto, so there is nowhere to put them. It matters because
+`checks_per_phase` defaults to 2, which takes Cleared and Went Out -- so half a
+solo world's phase checks sit on a tier that solo play barely produces.
+Reordering TIERS would fix it, and would move every location ID again.
+
+### Still not built
+
+A Skip still digs rather than skipping a player's turn. With opponents at the
+table it has a real meaning again, and that conflict is unresolved.
 
 ### Keeping the two ports honest
 

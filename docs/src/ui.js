@@ -4,7 +4,7 @@
 // client, and holds no game state of its own. Anything it needed to remember
 // would be a second copy of something the session already owns.
 
-import { cardFilename } from "./cards.js";
+import { cardFilename, isWild, points } from "./cards.js";
 import { HAND_STATE } from "./engine.js";
 import { PHASE_COUNT, phaseDescription } from "./phases.js";
 import { Phase10Client } from "./client.js";
@@ -116,6 +116,37 @@ async function settle(hand) {
   await app.settle(hand);
 }
 
+/**
+ * Play onto a group on the table.
+ *
+ * Naturals before wilds, then the most expensive card, because a wild is worth
+ * keeping and points in hand are what a lost round costs you.
+ */
+function hitMeld(meld) {
+  const hand = app.session.hand;
+  if (!hand || hand.state !== HAND_STATE.IN_PROGRESS) return;
+  if (!hand.laid) {
+    log("Lay your own phase down before hitting.");
+    return;
+  }
+  const playable = hand.hand
+    .filter((c) => meld.accepts(c))
+    .sort((a, b) => (isWild(a) - isWild(b)) || (points(b) - points(a)));
+  if (!playable.length) {
+    log("Nothing in your hand fits that group.");
+    return;
+  }
+  try {
+    hand.hit(playable[0], meld);
+  } catch (err) {
+    log(err.message);
+    return;
+  }
+  log(`Played ${describe(playable[0])} onto the table.`);
+  if (hand.state !== HAND_STATE.IN_PROGRESS) settle(hand);
+  render();
+}
+
 function withHand(fn) {
   const hand = app.session.hand;
   if (!hand || hand.state !== HAND_STATE.IN_PROGRESS) {
@@ -177,6 +208,7 @@ function render() {
   }
 
   renderTable(s);
+  renderOwnMelds(hand);
   renderHand(hand);
   renderDig(hand);
   renderPhases(s);
@@ -196,6 +228,27 @@ function render() {
     lines.push(`  Score Reduction  -${s.scoreReduction} -> ${s.totalScore} points`);
   }
   el("scorecard").textContent = lines.join("\n");
+}
+
+/** One group on the table. A button when you could play onto it. */
+function meldNode(meld) {
+  const hand = app.session.hand;
+  const live = Boolean(hand) && hand.state === HAND_STATE.IN_PROGRESS
+    && hand.laid && hand.hand.some((c) => meld.accepts(c));
+
+  const node = document.createElement(live ? "button" : "div");
+  node.className = live ? "meld live" : "meld";
+  if (live) {
+    node.title = "Play a card onto this group";
+    node.addEventListener("click", () => hitMeld(meld));
+  }
+  for (const card of meld.cards) {
+    const img = document.createElement("img");
+    img.src = `assets/cards/${cardFilename(card)}`;
+    img.alt = describe(card);
+    node.append(img);
+  }
+  return node;
 }
 
 function renderTable(session) {
@@ -247,28 +300,31 @@ function renderTable(session) {
       div.append(back);
     }
 
-    // What they have on the table, face up and grouped, so you can read
-    // whether your spare card would extend one of these.
-    if (seat.layout && seat.layout.length) {
+    // What they have on the table, face up and grouped -- and clickable once
+    // you are down and holding something that fits.
+    if (seat.melds && seat.melds.length) {
       const melds = document.createElement("div");
       melds.className = "melds";
-      for (const group of seat.layout) {
-        const g = document.createElement("div");
-        g.className = "meld";
-        for (const card of group) {
-          const img = document.createElement("img");
-          img.src = `assets/cards/${cardFilename(card)}`;
-          img.alt = describe(card);
-          img.title = img.alt;
-          g.append(img);
-        }
-        melds.append(g);
+      for (const meld of seat.melds) {
+        melds.append(meldNode(meld));
       }
       div.append(melds);
     }
 
     box.append(div);
   }
+}
+
+function renderOwnMelds(hand) {
+  const wrap = el("mine-wrap");
+  const box = el("mine");
+  box.replaceChildren();
+  if (!hand || !hand.melds.length) {
+    wrap.hidden = true;
+    return;
+  }
+  wrap.hidden = false;
+  for (const meld of hand.melds) box.append(meldNode(meld));
 }
 
 function renderHand(hand) {

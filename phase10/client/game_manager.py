@@ -184,6 +184,7 @@ class Phase10View(BoxLayout):
             ("Lay down", "/lay"),
             ("Dig (Skip)", "/skip"),
             ("Mulligan", "/mulligan"),
+            ("Hit", "/hit"),
             ("Auto", "/auto"),
             ("Score", "/score"),
         ):
@@ -283,6 +284,8 @@ class Phase10View(BoxLayout):
             return
         self.melds.height = MELD_ROW_HEIGHT
 
+        hand = session.hand
+        targets = hand.hittable() if hand is not None else []
         for seat in down:
             block = BoxLayout(orientation="vertical", size_hint_x=None,
                               width=sum(len(g) for g in seat.layout) * MELD_CARD_WIDTH
@@ -290,14 +293,20 @@ class Phase10View(BoxLayout):
             label = Label(text=f"{seat.name} p{seat.phase}", font_size="11sp",
                           size_hint_y=None, height=14)
             row = BoxLayout(spacing=10)
-            for group in seat.layout:
+            for group_index, group in enumerate(seat.layout):
+                meld_index = (targets.index(seat.melds[group_index]) + 1
+                              if seat.melds[group_index] in targets else 0)
                 # One box per group, so two sets of three read as two sets
                 # rather than one run of six.
                 meld = BoxLayout(spacing=1, size_hint_x=None,
                                  width=len(group) * MELD_CARD_WIDTH)
                 for card in group:
-                    meld.add_widget(make_card(card, size_hint_x=None,
-                                              width=MELD_CARD_WIDTH))
+                    face = make_card(card, size_hint_x=None,
+                                     width=MELD_CARD_WIDTH)
+                    # Clicking any card in a group plays onto that group, so
+                    # the melds are the targets rather than a numbered list.
+                    face.bind(on_release=lambda _w, m=meld_index: self.run(f"/hit {m}"))
+                    meld.add_widget(face)
                 row.add_widget(meld)
             block.add_widget(label)
             block.add_widget(row)

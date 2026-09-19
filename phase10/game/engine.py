@@ -153,6 +153,15 @@ class PhaseHand:
         #: The player's own groups on the table, with what each one means, so
         #: cards can be hit onto them as well as onto the opponents'.
         self.melds: list[Meld] = []
+        #: Phase is on the table. Separate from `state`, which stays
+        #: IN_PROGRESS so the round can continue into shedding.
+        self.laid = False
+        self.hits = 0
+        #: Draws spent at the moment the phase went down. "Under Par" asks how
+        #: fast you cleared, not how long the round then ran -- and the round
+        #: now runs on past the lay-down, burning the rest of the budget to
+        #: shed, which would leave that tier unearnable on an easy phase.
+        self.draws_at_lay_down: int | None = None
         self.events: list[HandEvent] = []
         self.drew_this_turn = False
         self.used_wilds_in_layout = 0
@@ -254,6 +263,12 @@ class PhaseHand:
         self.hand.remove(card)
         self.discard.append(card)
         self.drew_this_turn = False
+        if self.laid and not self.hand:
+            # Shedding the last card onto the discard pile is going out, the
+            # ordinary way it happens: you hit what you can and throw the rest.
+            self.state = HandState.WENT_OUT
+            self._emit("went_out", draws_used=self.draws_used)
+            return
         self._end_turn()
 
     def play_skip(self) -> list[Card]:
@@ -318,22 +333,34 @@ class PhaseHand:
             return
         winner = self.table.end_of_turn()
         if winner is not None:
-            # Only a hand still being built can be lost this way. One already
-            # laid down has cleared its phase, and nobody else going out
-            # can take that back.
-            self.mark_failed("opponent_out", opponent=winner.name)
+            if self.laid:
+                # The phase is down, so it is cleared. Somebody else going out
+                # only stops the shedding; it cannot take the clear back.
+                self.state = HandState.PHASE_LAID
+                self._emit("raced_after_laying", opponent=winner.name,
+                           held=len(self.hand))
+            else:
+                self.mark_failed("opponent_out", opponent=winner.name)
 
     def _fail_if_out_of_road(self) -> None:
-        # A budget that just ran out is only a loss if the phase is not already
-        # satisfiable -- otherwise the player is entitled to lay it down.
-        if (
-            self.state is HandState.IN_PROGRESS
-            and self.draws_left == 0
-            and not self.can_lay_down()
-        ):
+        """Settle the hand if the draw budget has run out.
+
+        Once the phase is down this is not a loss at all -- it was cleared,
+        and the budget expiring only stops you shedding the rest. Before it is
+        down, a budget that just ran out is still only a loss if the phase is
+        not already satisfiable, since the player is entitled to lay it.
+        """
+        if self.state is not HandState.IN_PROGRESS or self.draws_left != 0:
+            return
+        if self.laid:
+            self.state = HandState.PHASE_LAID
+            self._emit("out_of_draws_after_laying", held=len(self.hand))
+        elif not self.can_lay_down():
             self.mark_failed("out_of_draws")
 
     def lay_down(self) -> Layout:
+        if self.laid:
+            raise RuntimeError("phase is already down")
         melds = solve_melds(self.hand, self.spec,
                             min_naturals_per_group=self.config.min_naturals_per_group)
         if melds is None:
@@ -347,13 +374,52 @@ class PhaseHand:
         for group in layout:
             for card in group:
                 self.hand.remove(card)
-        self.state = HandState.PHASE_LAID
+        # Deliberately NOT terminal. Laying down clears the phase, and the
+        # round then carries on so the cards still in hand can be hit onto
+        # whatever is on the table -- which is the whole point of hitting.
+        # The hand settles as PHASE_LAID when a clock actually runs out.
+        self.laid = True
+        self.draws_at_lay_down = self.draws_used
         self._emit("phase_completed", draws_used=self.draws_used,
                    wilds_used=self.used_wilds_in_layout)
         if not self.hand:
             self.state = HandState.WENT_OUT
             self._emit("went_out", draws_used=self.draws_used)
         return layout
+
+    def hit(self, card: Card, meld) -> None:
+        """Lay one card from hand onto a group already on the table.
+
+        Only after your own phase is down -- that is the rule the whole
+        mechanic hangs on, and it is what stops hitting being a way to dump
+        cards you could not otherwise place.
+        """
+        if self.state is not HandState.IN_PROGRESS:
+            raise RuntimeError(f"hand is {self.state.value}")
+        if not self.laid:
+            raise RuntimeError("lay your own phase down before hitting")
+        if self.dig_pending:
+            raise RuntimeError("finish the dig first")
+        if card not in self.hand:
+            raise RuntimeError(f"{card} is not in hand")
+        if not meld.accepts(card):
+            raise RuntimeError(f"{card} does not fit that group")
+
+        self.hand.remove(card)
+        meld.add(card)
+        self.hits += 1
+        self._emit("hit", card=str(card))
+        if not self.hand:
+            # Shedding the last card is going out, with no discard needed.
+            self.state = HandState.WENT_OUT
+            self._emit("went_out", draws_used=self.draws_used)
+
+    def hittable(self) -> list:
+        """Every group on the table you could legally play onto right now."""
+        if self.state is not HandState.IN_PROGRESS or not self.laid:
+            return []
+        targets = self.melds + self.table.all_melds()
+        return [m for m in targets if any(m.accepts(c) for c in self.hand)]
 
     # -- bookkeeping -------------------------------------------------------
     def mark_failed(self, reason: str, **detail) -> None:

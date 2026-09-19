@@ -123,8 +123,10 @@ class Phase10CommandProcessor(ClientCommandProcessor):
             self.output(f"table: {racing}    -- /table for detail")
         if hand.skips_in_hand:
             self.output(f"{hand.skips_in_hand} Skip(s) in hand -- /skip digs for free")
-        if hand.can_lay_down():
+        if not hand.laid and hand.can_lay_down():
             self.output("You can lay this phase down now: /lay")
+        if hand.laid and hand.hittable():
+            self.output(f"{len(hand.hittable())} group(s) will take a card -- /hit")
 
     def _cmd_draw(self, source: str = "") -> None:
         """Draw a card. Plain /draw takes stock, /draw d takes the discard."""
@@ -187,6 +189,52 @@ class Phase10CommandProcessor(ClientCommandProcessor):
             return
         self.output(f"kept {card}")
         if hand.state is HandState.FAILED:
+            self.ctx.settle(hand)
+        else:
+            self._cmd_hand()
+
+    def _cmd_hit(self, target: str = "") -> None:
+        """Play a card onto a group on the table. Usage: /hit 2
+
+        With no argument, lists what you could play onto. The card is chosen
+        for you -- naturals before wilds, then the most expensive -- because
+        for a set any match is interchangeable and for a run usually only one
+        rank fits at all.
+        """
+        hand = self._require_hand()
+        if hand is None:
+            return
+        if not hand.laid:
+            self.output("Lay your own phase down first, then you can hit.")
+            return
+
+        targets = hand.hittable()
+        if not targets:
+            self.output("Nothing in your hand fits anything on the table.")
+            return
+
+        if not target:
+            self.output("You can play onto:")
+            for index, meld in enumerate(targets, 1):
+                fits = [c for c in hand.hand if meld.accepts(c)]
+                self.output(f"  [{index}] {meld}   <- {' '.join(str(c) for c in fits)}")
+            self.output("Play one with /hit <number>.")
+            return
+
+        try:
+            index = int(target)
+            meld = targets[index - 1]
+        except (ValueError, IndexError):
+            self.output(f"Pick a group from 1 to {len(targets)}.")
+            return
+
+        playable = sorted(
+            (c for c in hand.hand if meld.accepts(c)),
+            key=lambda c: (c.is_wild, -c.points),
+        )
+        hand.hit(playable[0], meld)
+        self.output(f"Played {playable[0]} onto {meld}.")
+        if hand.state is not HandState.IN_PROGRESS:
             self.ctx.settle(hand)
         else:
             self._cmd_hand()

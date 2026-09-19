@@ -37,6 +37,9 @@ function snapshot(hand) {
     skips_played: hand.skipsPlayed,
     skips_in_hand: hand.skipsInHand,
     can_lay_down: hand.canLayDown(),
+    laid: hand.laid,
+    hits: hand.hits,
+    draws_at_lay_down: hand.drawsAtLayDown,
     used_wilds_in_layout: hand.usedWildsInLayout,
     events: hand.events.map((e) => ({ kind: e.kind, detail: e.detail })),
   };

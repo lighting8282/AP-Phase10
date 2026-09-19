@@ -243,7 +243,11 @@ export class Phase10Session {
     if (hand.state === HAND_STATE.WENT_OUT) tiers.push("Went Out");
     if (hand.usedWildsInLayout === 0) tiers.push("No Wilds");
     
-    if (hand.drawsUsed <= Math.max(1, Math.floor(hand.config.maxDraws / 2))) {
+    // Measured at the lay-down, not at the end of the round: the round
+    // carries on afterwards so the rest of the hand can be shed, and counting
+    // those draws would make this unearnable.
+    const spent = hand.drawsAtLayDown ?? hand.drawsUsed;
+    if (spent <= Math.max(1, Math.floor(hand.config.maxDraws / 2))) {
       tiers.push("Under Par");
     }
 

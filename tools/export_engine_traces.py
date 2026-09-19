@@ -54,6 +54,9 @@ def snapshot(hand: PhaseHand) -> dict:
         "skips_played": hand.skips_played,
         "skips_in_hand": hand.skips_in_hand,
         "can_lay_down": hand.can_lay_down(),
+        "laid": hand.laid,
+        "hits": hand.hits,
+        "draws_at_lay_down": hand.draws_at_lay_down,
         "used_wilds_in_layout": hand.used_wilds_in_layout,
         "events": [{"kind": e.kind, "detail": e.detail} for e in hand.events],
     }
@@ -91,8 +94,10 @@ def play(hand: PhaseHand, rng: random.Random) -> list[dict]:
             choices.append("draw_discard")
         if hand.skips_in_hand and hand.stock:
             choices += ["skip", "skip"]        # weight digs so they get exercised
-        if hand.can_lay_down():
-            choices += ["lay", "lay", "lay"]   # and finish reasonably often
+        if not hand.laid and hand.can_lay_down():
+            # Only once: laying down is no longer terminal, so the loop
+            # would otherwise keep offering an action that now raises.
+            choices += ["lay", "lay", "lay"]
 
         action = rng.choice(choices)
         if action == "lay":

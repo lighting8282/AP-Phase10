@@ -51,9 +51,16 @@ def play_out(h: PhaseHand) -> PhaseHand:
     """
     cfg, spec = h.config, h.spec
 
-    while h.state is HandState.IN_PROGRESS:
-        if h.can_lay_down():
+    def settle_phase() -> None:
+        """Lay down if we can, then shed whatever the table will take."""
+        if not h.laid and h.can_lay_down():
             h.lay_down()
+        if h.laid:
+            hit_everything(h)
+
+    while h.state is HandState.IN_PROGRESS:
+        settle_phase()
+        if h.state is not HandState.IN_PROGRESS:
             break
         if not h.stock:
             h.mark_failed("stock_empty")
@@ -64,8 +71,6 @@ def play_out(h: PhaseHand) -> PhaseHand:
         if h.skips_in_hand:
             options = h.play_skip()
             h.take_dug(choose_dig(options, h.hand, spec, cfg))
-            if h.can_lay_down():
-                h.lay_down()
             continue
 
         base = _short(h.hand, spec, cfg)
@@ -75,13 +80,37 @@ def play_out(h: PhaseHand) -> PhaseHand:
             take_discard = _short(h.hand + [top], spec, cfg) < base
 
         h.draw(from_discard=take_discard)
-
-        if h.can_lay_down():
-            h.lay_down()
+        settle_phase()
+        if h.state is not HandState.IN_PROGRESS:
             break
-        h.discard_card(choose_discard(h.hand, spec, cfg))
+        if h.hand:
+            h.discard_card(choose_discard(h.hand, spec, cfg))
 
     return h
+
+
+def hit_everything(h: PhaseHand) -> int:
+    """Play every card that legally extends a group already on the table.
+
+    Repeated rather than a single pass: hitting a run at one end opens the
+    next rank along, so one sweep would leave behind cards the very next check
+    would accept. Once the phase is down `cards_short` is zero for every
+    subset, so there is nothing to weigh -- shedding is pure gain.
+    """
+    played = 0
+    moved = True
+    while moved and h.hand and h.state is HandState.IN_PROGRESS:
+        moved = False
+        for card in list(h.hand):
+            for meld in h.hittable():
+                if meld.accepts(card):
+                    h.hit(card, meld)
+                    played += 1
+                    moved = True
+                    break
+            if moved:
+                break
+    return played
 
 
 def play_hand(phase: int, cfg: GameConfig, rng: random.Random) -> PhaseHand:

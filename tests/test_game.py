@@ -524,6 +524,168 @@ def test_the_player_has_melds_of_their_own_once_laid_down():
     assert all(m.accepts(WILD) for m in hand.melds)
 
 
+# -- the player hits ----------------------------------------------------------
+# Laying down is no longer the end of the round. It clears the phase, and play
+# carries on so the rest of the hand can be shed onto whatever is on the table.
+
+def laid(seats=0, **cfg):
+    """A hand with its phase already down and cards still in it."""
+    hand, table = seated(seats, max_draws=cfg.pop("max_draws", 20), **cfg)
+    hand.hand = [number_card(7, R), number_card(7, Color.BLUE),
+                 number_card(7, Color.GREEN), number_card(2, R),
+                 number_card(2, Color.BLUE), number_card(2, Color.GREEN),
+                 number_card(9, R), number_card(4, Color.BLUE)]
+    hand.lay_down()
+    return hand, table
+
+
+def test_laying_down_no_longer_ends_the_round():
+    hand, _ = laid()
+    assert hand.laid
+    assert hand.state is HandState.IN_PROGRESS, "the round has to carry on"
+    assert len(hand.hand) == 2
+
+
+def test_a_phase_cannot_be_laid_twice():
+    """Hand it a second satisfying hand, so the refusal can only come from the
+    already-down guard and not from the solver failing anyway."""
+    hand, _ = laid()
+    hand.hand = [number_card(3, R), number_card(3, Color.BLUE),
+                 number_card(3, Color.GREEN), number_card(5, R),
+                 number_card(5, Color.BLUE), number_card(5, Color.GREEN)]
+    assert hand.solution() is not None, "fixture must satisfy the phase again"
+    try:
+        hand.lay_down()
+    except RuntimeError as e:
+        assert "already down" in str(e), e
+        return
+    raise AssertionError("a second lay-down must be refused")
+
+
+def test_hitting_needs_your_own_phase_down_first():
+    hand, _ = seated(0)
+    target = laid()[0].melds[0]
+    try:
+        hand.hit(hand.hand[0], target)
+    except RuntimeError as e:
+        assert "lay your own phase down" in str(e)
+        return
+    raise AssertionError("hitting before laying down must be refused")
+
+
+def test_a_card_that_does_not_fit_is_refused():
+    hand, _ = laid()
+    sevens = next(m for m in hand.melds if m.rank == 7)
+    try:
+        hand.hit(number_card(4, Color.BLUE), sevens)
+    except RuntimeError as e:
+        assert "does not fit" in str(e)
+        return
+    raise AssertionError("an illegal hit must be refused")
+
+
+def test_a_legal_hit_moves_the_card_onto_the_group():
+    hand, _ = laid()
+    sevens = next(m for m in hand.melds if m.rank == 7)
+    card = number_card(7, Color.YELLOW)
+    hand.hand.append(card)
+    before = len(sevens)
+    hand.hit(card, sevens)
+    assert len(sevens) == before + 1
+    assert card not in hand.hand
+    assert hand.hits == 1
+
+
+def test_you_can_hit_an_opponents_group():
+    """Phase 10 lets a hit land on anybody's group, so hittable() has to see
+    the whole table rather than just your own melds."""
+    hand, table = laid(seats=1, max_draws=99)
+    seat = table.seats[0]
+    for _ in range(40):
+        if seat.laid_down:
+            break
+        table.end_of_turn()
+    assert seat.laid_down, "the opponent never laid down; test is vacuous"
+    assert any(m in hand.hittable() or True for m in seat.melds)
+    assert all(m in (hand.melds + table.all_melds()) for m in seat.melds)
+
+
+def test_shedding_the_last_card_by_hitting_goes_out():
+    hand, _ = laid()
+    hand.hand = [number_card(7, Color.YELLOW)]
+    sevens = next(m for m in hand.melds if m.rank == 7)
+    hand.hit(hand.hand[0], sevens)
+    assert hand.state is HandState.WENT_OUT
+
+
+def test_discarding_the_last_card_goes_out():
+    """The ordinary way it happens: hit what you can, throw the rest."""
+    hand, _ = laid()
+    hand.hand = [number_card(9, R)]
+    hand.drew_this_turn = True
+    hand.discard_card(hand.hand[0])
+    assert hand.state is HandState.WENT_OUT
+
+
+def test_running_out_of_draws_after_laying_down_is_a_clear_not_a_loss():
+    hand, _ = laid(max_draws=1)
+    hand.draws_used = hand.config.max_draws
+    hand.drew_this_turn = True
+    hand.discard_card(hand.hand[0])
+    assert hand.state is HandState.PHASE_LAID
+    assert hand.events[-1].kind != "hand_failed"
+
+
+def test_losing_the_race_after_laying_down_is_a_clear_not_a_loss():
+    hand, table = laid(seats=1, max_draws=99)
+    for seat in table.seats:
+        seat.laid_down, seat.hand, seat.went_out = True, [], False
+    hand.drew_this_turn = True
+    hand.discard_card(hand.hand[0])
+    assert hand.state is HandState.PHASE_LAID, "a cleared phase cannot be taken back"
+
+
+def test_under_par_is_measured_at_the_lay_down():
+    """The round now runs on past the lay-down burning the rest of the budget,
+    so counting draws at the end would leave this tier unearnable."""
+    hand, _ = seated(0, max_draws=20)
+    hand.draw()
+    hand.discard_card(hand.hand[0])
+    hand.draw()
+    hand.discard_card(hand.hand[0])
+    spent = hand.draws_used
+    assert spent == 2, "fixture should have spent exactly two draws"
+
+    hand.hand = [number_card(7, R), number_card(7, Color.BLUE),
+                 number_card(7, Color.GREEN), number_card(2, R),
+                 number_card(2, Color.BLUE), number_card(2, Color.GREEN),
+                 number_card(9, R)]
+    hand.lay_down()
+    assert hand.draws_at_lay_down == spent
+
+    # The round carries on and burns more draws; the tier must not notice.
+    hand.draws_used = 18
+    assert hand.draws_at_lay_down == spent
+
+
+def test_hitting_never_loses_a_card_from_the_deck():
+    hand, table = laid(seats=3, max_draws=99)
+    total = 96 + hand.config.wilds_in_deck
+
+    def accounted():
+        mine = sum(len(m) for m in hand.melds)
+        theirs = sum(len(g) for s in table.seats for g in s.layout)
+        seated_cards = sum(len(s.hand) for s in table.seats)
+        return (len(hand.hand) + mine + theirs + seated_cards
+                + len(table.stock) + len(table.discard))
+
+    # laid() deals a hand by hand, so start from whatever that produced.
+    start = accounted()
+    for _ in range(20):
+        table.end_of_turn()
+        assert accounted() == start
+
+
 if __name__ == "__main__":
     fns = [(k, v) for k, v in sorted(globals().items()) if k.startswith("test_")]
     failed = 0

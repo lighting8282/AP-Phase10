@@ -242,7 +242,13 @@ class Phase10Session:
             tiers.append("Went Out")
         if hand.used_wilds_in_layout == 0:
             tiers.append("No Wilds")
-        if hand.draws_used <= max(1, hand.config.max_draws // 2):
+        # Measured at the lay-down, not at the end of the round: the round
+        # carries on afterwards so the rest of the hand can be shed, and
+        # counting those draws would make this unearnable.
+        spent = hand.draws_at_lay_down
+        if spent is None:
+            spent = hand.draws_used
+        if spent <= max(1, hand.config.max_draws // 2):
             tiers.append("Under Par")
 
         # Tiers the player's options did not create locations for must never be
