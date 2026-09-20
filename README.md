@@ -447,12 +447,35 @@ At 4 wilds and 9 draws, with three opponents:
 | 11 | 96% | 7% | 58% | 94% |
 | 20 | 32% | 23% | 6% | 18% |
 
-Solo, Went Out is 0% on the small phases (1 and 11) and 21-24% on the larger
-ones. That is not a bug: a small phase leaves more cards in hand and fewer
-groups to hit onto, so there is nowhere to put them. It matters because
-`checks_per_phase` defaults to 2, which takes Cleared and Went Out -- so half a
-solo world's phase checks sit on a tier that solo play barely produces.
-Reordering TIERS would fix it, and would move every location ID again.
+### The tier order is a tuning decision
+
+`checks_per_phase` takes a *prefix* of TIERS, so the order decides which tiers
+a low setting keeps. Measured per attempt across all twenty phases:
+
+| mean rate | Cleared | Under Par | No Wilds | Went Out |
+|---|---|---|---|---|
+| 3 opponents | 57% | 47% | 23% | 23% |
+| solo | 66% | 39% | 25% | 17% |
+| **phases under 2%, solo** | 0 | 0 | 1 | **8** |
+
+Went Out was second. Solo it is 0% on eight of the twenty phases -- the small
+ones, which leave more cards in hand and fewer groups to hit onto, so there is
+nowhere to put them. At the default of two checks that put a fifth of a solo
+world out of reach. It is also bimodal rather than merely low: 40-79% on
+phases 15-19, where a big multi-group phase leaves almost nothing in hand.
+
+The order is now Cleared, Under Par, No Wilds, Went Out, which also reads as a
+ladder: clear it, clear it fast, clear it clean, clear it completely. Under Par
+tracks Cleared closely and has no dead cases in either configuration.
+
+`earned_tiers` walks TIERS rather than the order it collected them in, so a
+future reorder reaches it for free -- it did not, before, and the reorder
+silently failed to take until the tests caught it.
+
+Under Par's gate dropped from Wild Card x4 to x2. It is the second tier now, so
+at the default it gates every phase's other check, and x4 is also the
+hard-phase gate -- most of the world would have funnelled through one
+threshold.
 
 ### Still not built
 

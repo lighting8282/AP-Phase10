@@ -459,7 +459,8 @@
    "draws": 0,
    "budget": 8,
    "tiers": [
-    "Cleared"
+    "Cleared",
+    "Under Par"
    ]
   },
   {
@@ -469,7 +470,8 @@
    "draws": 4,
    "budget": 8,
    "tiers": [
-    "Cleared"
+    "Cleared",
+    "Under Par"
    ]
   },
   {
@@ -489,7 +491,8 @@
    "draws": 1,
    "budget": 1,
    "tiers": [
-    "Cleared"
+    "Cleared",
+    "Under Par"
    ]
   },
   {
@@ -499,7 +502,8 @@
    "draws": 0,
    "budget": 8,
    "tiers": [
-    "Cleared"
+    "Cleared",
+    "Under Par"
    ]
   },
   {
@@ -509,7 +513,8 @@
    "draws": 4,
    "budget": 8,
    "tiers": [
-    "Cleared"
+    "Cleared",
+    "Under Par"
    ]
   },
   {
@@ -529,7 +534,8 @@
    "draws": 1,
    "budget": 1,
    "tiers": [
-    "Cleared"
+    "Cleared",
+    "Under Par"
    ]
   },
   {
@@ -540,7 +546,7 @@
    "budget": 8,
    "tiers": [
     "Cleared",
-    "Went Out"
+    "Under Par"
    ]
   },
   {
@@ -551,7 +557,7 @@
    "budget": 8,
    "tiers": [
     "Cleared",
-    "Went Out"
+    "Under Par"
    ]
   },
   {
@@ -561,8 +567,7 @@
    "draws": 8,
    "budget": 8,
    "tiers": [
-    "Cleared",
-    "Went Out"
+    "Cleared"
    ]
   },
   {
@@ -573,7 +578,7 @@
    "budget": 1,
    "tiers": [
     "Cleared",
-    "Went Out"
+    "Under Par"
    ]
   },
   {
@@ -584,7 +589,7 @@
    "budget": 8,
    "tiers": [
     "Cleared",
-    "Went Out"
+    "Under Par"
    ]
   },
   {
@@ -595,7 +600,7 @@
    "budget": 8,
    "tiers": [
     "Cleared",
-    "Went Out"
+    "Under Par"
    ]
   },
   {
@@ -605,8 +610,7 @@
    "draws": 8,
    "budget": 8,
    "tiers": [
-    "Cleared",
-    "Went Out"
+    "Cleared"
    ]
   },
   {
@@ -617,7 +621,7 @@
    "budget": 1,
    "tiers": [
     "Cleared",
-    "Went Out"
+    "Under Par"
    ]
   },
   {
@@ -692,6 +696,7 @@
    "budget": 8,
    "tiers": [
     "Cleared",
+    "Under Par",
     "No Wilds"
    ]
   },
@@ -703,6 +708,7 @@
    "budget": 8,
    "tiers": [
     "Cleared",
+    "Under Par",
     "No Wilds"
    ]
   },
@@ -725,6 +731,7 @@
    "budget": 1,
    "tiers": [
     "Cleared",
+    "Under Par",
     "No Wilds"
    ]
   },
@@ -735,7 +742,8 @@
    "draws": 0,
    "budget": 8,
    "tiers": [
-    "Cleared"
+    "Cleared",
+    "Under Par"
    ]
   },
   {
@@ -745,7 +753,8 @@
    "draws": 4,
    "budget": 8,
    "tiers": [
-    "Cleared"
+    "Cleared",
+    "Under Par"
    ]
   },
   {
@@ -765,7 +774,8 @@
    "draws": 1,
    "budget": 1,
    "tiers": [
-    "Cleared"
+    "Cleared",
+    "Under Par"
    ]
   },
   {
@@ -776,7 +786,7 @@
    "budget": 8,
    "tiers": [
     "Cleared",
-    "Went Out",
+    "Under Par",
     "No Wilds"
    ]
   },
@@ -788,7 +798,7 @@
    "budget": 8,
    "tiers": [
     "Cleared",
-    "Went Out",
+    "Under Par",
     "No Wilds"
    ]
   },
@@ -800,7 +810,6 @@
    "budget": 8,
    "tiers": [
     "Cleared",
-    "Went Out",
     "No Wilds"
    ]
   },
@@ -812,7 +821,7 @@
    "budget": 1,
    "tiers": [
     "Cleared",
-    "Went Out",
+    "Under Par",
     "No Wilds"
    ]
   },
@@ -824,7 +833,7 @@
    "budget": 8,
    "tiers": [
     "Cleared",
-    "Went Out"
+    "Under Par"
    ]
   },
   {
@@ -835,7 +844,7 @@
    "budget": 8,
    "tiers": [
     "Cleared",
-    "Went Out"
+    "Under Par"
    ]
   },
   {
@@ -845,8 +854,7 @@
    "draws": 8,
    "budget": 8,
    "tiers": [
-    "Cleared",
-    "Went Out"
+    "Cleared"
    ]
   },
   {
@@ -857,7 +865,7 @@
    "budget": 1,
    "tiers": [
     "Cleared",
-    "Went Out"
+    "Under Par"
    ]
   },
   {
@@ -929,127 +937,127 @@
    "state": "phase_laid",
    "wilds": 0,
    "draws": 0,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Under Par",
+    "No Wilds"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "phase_laid",
+   "wilds": 0,
+   "draws": 4,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Under Par",
+    "No Wilds"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "phase_laid",
+   "wilds": 0,
+   "draws": 8,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "No Wilds"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "phase_laid",
+   "wilds": 0,
+   "draws": 1,
+   "budget": 1,
+   "tiers": [
+    "Cleared",
+    "Under Par",
+    "No Wilds"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "phase_laid",
+   "wilds": 2,
+   "draws": 0,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Under Par"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "phase_laid",
+   "wilds": 2,
+   "draws": 4,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Under Par"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "phase_laid",
+   "wilds": 2,
+   "draws": 8,
+   "budget": 8,
+   "tiers": [
+    "Cleared"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "phase_laid",
+   "wilds": 2,
+   "draws": 1,
+   "budget": 1,
+   "tiers": [
+    "Cleared",
+    "Under Par"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "went_out",
+   "wilds": 0,
+   "draws": 0,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Under Par",
+    "No Wilds",
+    "Went Out"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "went_out",
+   "wilds": 0,
+   "draws": 4,
+   "budget": 8,
+   "tiers": [
+    "Cleared",
+    "Under Par",
+    "No Wilds",
+    "Went Out"
+   ]
+  },
+  {
+   "checks_per_phase": 4,
+   "state": "went_out",
+   "wilds": 0,
+   "draws": 8,
    "budget": 8,
    "tiers": [
     "Cleared",
     "No Wilds",
-    "Under Par"
-   ]
-  },
-  {
-   "checks_per_phase": 4,
-   "state": "phase_laid",
-   "wilds": 0,
-   "draws": 4,
-   "budget": 8,
-   "tiers": [
-    "Cleared",
-    "No Wilds",
-    "Under Par"
-   ]
-  },
-  {
-   "checks_per_phase": 4,
-   "state": "phase_laid",
-   "wilds": 0,
-   "draws": 8,
-   "budget": 8,
-   "tiers": [
-    "Cleared",
-    "No Wilds"
-   ]
-  },
-  {
-   "checks_per_phase": 4,
-   "state": "phase_laid",
-   "wilds": 0,
-   "draws": 1,
-   "budget": 1,
-   "tiers": [
-    "Cleared",
-    "No Wilds",
-    "Under Par"
-   ]
-  },
-  {
-   "checks_per_phase": 4,
-   "state": "phase_laid",
-   "wilds": 2,
-   "draws": 0,
-   "budget": 8,
-   "tiers": [
-    "Cleared",
-    "Under Par"
-   ]
-  },
-  {
-   "checks_per_phase": 4,
-   "state": "phase_laid",
-   "wilds": 2,
-   "draws": 4,
-   "budget": 8,
-   "tiers": [
-    "Cleared",
-    "Under Par"
-   ]
-  },
-  {
-   "checks_per_phase": 4,
-   "state": "phase_laid",
-   "wilds": 2,
-   "draws": 8,
-   "budget": 8,
-   "tiers": [
-    "Cleared"
-   ]
-  },
-  {
-   "checks_per_phase": 4,
-   "state": "phase_laid",
-   "wilds": 2,
-   "draws": 1,
-   "budget": 1,
-   "tiers": [
-    "Cleared",
-    "Under Par"
-   ]
-  },
-  {
-   "checks_per_phase": 4,
-   "state": "went_out",
-   "wilds": 0,
-   "draws": 0,
-   "budget": 8,
-   "tiers": [
-    "Cleared",
-    "Went Out",
-    "No Wilds",
-    "Under Par"
-   ]
-  },
-  {
-   "checks_per_phase": 4,
-   "state": "went_out",
-   "wilds": 0,
-   "draws": 4,
-   "budget": 8,
-   "tiers": [
-    "Cleared",
-    "Went Out",
-    "No Wilds",
-    "Under Par"
-   ]
-  },
-  {
-   "checks_per_phase": 4,
-   "state": "went_out",
-   "wilds": 0,
-   "draws": 8,
-   "budget": 8,
-   "tiers": [
-    "Cleared",
-    "Went Out",
-    "No Wilds"
+    "Went Out"
    ]
   },
   {
@@ -1060,9 +1068,9 @@
    "budget": 1,
    "tiers": [
     "Cleared",
-    "Went Out",
+    "Under Par",
     "No Wilds",
-    "Under Par"
+    "Went Out"
    ]
   },
   {
@@ -1073,8 +1081,8 @@
    "budget": 8,
    "tiers": [
     "Cleared",
-    "Went Out",
-    "Under Par"
+    "Under Par",
+    "Went Out"
    ]
   },
   {
@@ -1085,8 +1093,8 @@
    "budget": 8,
    "tiers": [
     "Cleared",
-    "Went Out",
-    "Under Par"
+    "Under Par",
+    "Went Out"
    ]
   },
   {
@@ -1108,8 +1116,8 @@
    "budget": 1,
    "tiers": [
     "Cleared",
-    "Went Out",
-    "Under Par"
+    "Under Par",
+    "Went Out"
    ]
   },
   {
@@ -1410,7 +1418,7 @@
      "state": "went_out",
      "ids": [
       200,
-      201,
+      203,
       401
      ],
      "handsWon": 2,
@@ -1507,7 +1515,7 @@
      "phase": 4,
      "state": "went_out",
      "ids": [
-      141,
+      143,
       401
      ],
      "handsWon": 2,

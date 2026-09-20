@@ -113,15 +113,25 @@ class TestAwards(unittest.TestCase):
         self.assertEqual(s.earned_tiers(hand), ["Cleared"])
 
     def test_going_out_without_wilds_and_fast_awards_all_four(self) -> None:
+        from ..data import TIERS
+
         s = session()
         hand = played(s, 5, state=HandState.WENT_OUT, wilds=0, draws=1)
-        self.assertEqual(s.earned_tiers(hand), ["Cleared", "Went Out", "No Wilds", "Under Par"])
+        # Compared against TIERS rather than a literal list: the order is a
+        # tuning decision that has changed once and may again, and what this
+        # pins is "a perfect hand earns every tier", not which order they sit in.
+        self.assertEqual(s.earned_tiers(hand), list(TIERS))
 
     def test_tiers_beyond_the_option_are_never_reported(self) -> None:
-        # Those locations do not exist on the server.
-        s = session(checks_per_phase=2)
-        hand = played(s, 5, state=HandState.WENT_OUT, wilds=0, draws=1)
-        self.assertEqual(s.earned_tiers(hand), ["Cleared", "Went Out"])
+        # Those locations do not exist on the server. checks_per_phase takes a
+        # prefix of TIERS, so a perfect hand earns exactly that prefix.
+        from ..data import TIERS
+
+        for count in range(1, len(TIERS) + 1):
+            s = session(checks_per_phase=count)
+            hand = played(s, 5, state=HandState.WENT_OUT, wilds=0, draws=1)
+            self.assertEqual(s.earned_tiers(hand), list(TIERS[:count]),
+                             f"checks_per_phase={count}")
 
     def test_awarded_ids_match_the_world_tables(self) -> None:
         s = session()

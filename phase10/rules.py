@@ -57,12 +57,16 @@ def difficulty_requirement(phase: int) -> Rule | None:
 #: Extra demands per check tier, on top of clearing the phase at all.
 TIER_REQUIREMENTS: dict[str, Rule | None] = {
     "Cleared": None,
-    # Shedding every remaining card after laying down takes more turns.
-    "Went Out": Has("Extra Draw", count=3),
+    # Speed comes from wilds collapsing a hand early, not from more draws.
+    # Two rather than four: this is the second tier now, so at the default of
+    # `checks_per_phase: 2` it gates every phase's other check -- and four is
+    # also the hard-phase gate, which would funnel most of the world through a
+    # single item threshold.
+    "Under Par": Has("Wild Card", count=2),
     # Without wilds to paper over gaps, only a deeper draw budget gets there.
     "No Wilds": Has("Extra Draw", count=5),
-    # Speed comes from wilds collapsing a hand early, not from more draws.
-    "Under Par": Has("Wild Card", count=4),
+    # Shedding every remaining card after laying down takes more turns.
+    "Went Out": Has("Extra Draw", count=3),
 }
 
 

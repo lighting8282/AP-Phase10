@@ -64,7 +64,21 @@ ITEM_NAME_TO_ID = {
 FIRST_FIXED_ITEM_ID = 50
 
 #: Check tiers in unlock order; `checks_per_phase` takes a prefix of this list.
-TIERS = ["Cleared", "Went Out", "No Wilds", "Under Par"]
+#: Ordered most earnable to least, because `checks_per_phase` takes a prefix:
+#: lowering it has to drop the hardest tiers, not the easiest. Measured per
+#: attempt across all twenty phases, with three opponents and solo:
+#:
+#:     mean rate      Cleared  Under Par  No Wilds  Went Out
+#:       3 opponents      57%        47%       23%       23%
+#:       solo             66%        39%       25%       17%
+#:     phases under 2%      0          0        0/1       0/8
+#:
+#: Went Out was second, and solo it is 0% on eight of twenty phases -- the
+#: small ones, which leave more cards in hand and fewer groups to hit onto. At
+#: the default of two checks that made a fifth of a solo world unreachable.
+#: It is also bimodal rather than merely low: 40-79% on phases 15-19. Last is
+#: where it belongs.
+TIERS = ["Cleared", "Under Par", "No Wilds", "Went Out"]
 
 #: Cumulative "just keep playing" checks. They gate on nothing, which is what
 #: gives a seed a workable opening.

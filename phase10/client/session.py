@@ -237,24 +237,26 @@ class Phase10Session:
         if hand.state not in (HandState.PHASE_LAID, HandState.WENT_OUT):
             return []
 
-        tiers = ["Cleared"]
-        if hand.state is HandState.WENT_OUT:
-            tiers.append("Went Out")
-        if hand.used_wilds_in_layout == 0:
-            tiers.append("No Wilds")
         # Measured at the lay-down, not at the end of the round: the round
         # carries on afterwards so the rest of the hand can be shed, and
-        # counting those draws would make this unearnable.
+        # counting those draws would make Under Par unearnable.
         spent = hand.draws_at_lay_down
         if spent is None:
             spent = hand.draws_used
-        if spent <= max(1, hand.config.max_draws // 2):
-            tiers.append("Under Par")
 
-        # Tiers the player's options did not create locations for must never be
-        # reported -- the IDs would not exist on the server.
-        allowed = set(TIERS[: self.checks_per_phase])
-        return [tier for tier in tiers if tier in allowed]
+        earned = {"Cleared"}
+        if hand.state is HandState.WENT_OUT:
+            earned.add("Went Out")
+        if hand.used_wilds_in_layout == 0:
+            earned.add("No Wilds")
+        if spent <= max(1, hand.config.max_draws // 2):
+            earned.add("Under Par")
+
+        # Walk TIERS rather than the order they were collected in, so the
+        # result follows the table and a reorder reaches here for free.
+        # `checks_per_phase` takes a prefix: tiers past it have no location on
+        # the server, so reporting one would check an ID that does not exist.
+        return [tier for tier in TIERS[: self.checks_per_phase] if tier in earned]
 
     def finish_hand(self, hand: PhaseHand) -> list[int]:
         """Settle a finished hand. Returns newly checked location IDs."""

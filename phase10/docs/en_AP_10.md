@@ -62,7 +62,9 @@ Traps, when enabled: Phase Lock pins you to the phase you just lost until you
 clear it, Lean Deal costs you two cards on one hand, and Wild Theft takes a wild
 out of the deck for one hand.
 
-Locations: each of the twenty phases is worth up to four checks -- clearing it, clearing it and
+Locations: each of the twenty phases is worth up to four checks -- clearing
+it, clearing it inside half your draw budget, clearing it without a wild, and
+shedding your whole hand to go out, in that order -- clearing it, clearing it and
 going out in the same hand, clearing it without using a wild, and clearing it
 inside half your draw budget.
 

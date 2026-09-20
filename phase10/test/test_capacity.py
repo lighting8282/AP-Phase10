@@ -115,3 +115,51 @@ class TestPoolStaysMeaningful(Phase10TestBase):
 
         counts = Counter(item.name for item in self.multiworld.itempool)
         self.assertLessEqual(counts["Mulligan"], 15)
+
+
+class TestTierOrder(Phase10TestBase):
+    """The order of TIERS is a tuning decision, so it needs its own guard.
+
+    checks_per_phase takes a prefix, so the order decides which tiers a low
+    setting keeps. Going out was second until it was measured: solo it is 0%
+    on eight of the twenty phases, which put a fifth of a solo world out of
+    reach at the default of two checks.
+    """
+
+    options = {"checks_per_phase": 2}
+
+    def test_the_default_prefix_avoids_the_tier_solo_cannot_earn(self) -> None:
+        from ..data import TIERS
+        from ..options import ChecksPerPhase
+
+        kept = TIERS[: ChecksPerPhase.default]
+        self.assertNotIn("Went Out", kept,
+                         "going out is unreachable solo on 8 of 20 phases, so "
+                         "it must not be in the prefix a default seed keeps")
+
+    def test_clearing_is_always_the_first_tier(self) -> None:
+        from ..data import TIERS
+
+        # Every other tier is a harder way of doing the same thing, so none of
+        # them can be earned without this one.
+        self.assertEqual(TIERS[0], "Cleared")
+
+    def test_no_tier_gate_asks_for_more_than_logic_guarantees(self) -> None:
+        """A gate beyond the item floors would be unreachable by construction.
+
+        The floors are what `build_power_item_counts` promises to place; a tier
+        asking for more than that is a check no seed can satisfy.
+        """
+        from ..rules import (MIN_EXTRA_DRAWS, MIN_WILD_CARDS,
+                             TIER_REQUIREMENTS)
+
+        floors = {"Wild Card": MIN_WILD_CARDS, "Extra Draw": MIN_EXTRA_DRAWS}
+        for tier, rule in TIER_REQUIREMENTS.items():
+            if rule is None:
+                continue
+            item = getattr(rule, "item_name", None) or getattr(rule, "item", None)
+            count = getattr(rule, "count", 1)
+            if item in floors:
+                self.assertLessEqual(
+                    count, floors[item],
+                    f"{tier} asks for {count} {item}, floor is {floors[item]}")

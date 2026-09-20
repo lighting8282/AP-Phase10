@@ -57,7 +57,13 @@ export const ITEM_NAME_TO_ID = (() => {
 })();
 
 /** Check tiers in unlock order; checksPerPhase takes a prefix of this list. */
-export const TIERS = Object.freeze(["Cleared", "Went Out", "No Wilds", "Under Par"]);
+/**
+ * Ordered most earnable to least, because checksPerPhase takes a prefix:
+ * lowering it has to drop the hardest tiers, not the easiest. Went Out is
+ * last because solo it is 0% on eight of the twenty phases. See data.py for
+ * the measurements.
+ */
+export const TIERS = Object.freeze(["Cleared", "Under Par", "No Wilds", "Went Out"]);
 
 /**
  * Cumulative "just keep playing" checks. They gate on nothing, which is what

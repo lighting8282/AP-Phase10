@@ -125,9 +125,13 @@ class ChecksPerPhase(Range):
     checks than more meaningful items.
 
     1: clear the phase.
-    2: also clear it and go out in the same hand.
+    2: also clear it inside half your draw budget.
     3: also clear it without using a single wild.
-    4: also clear it inside half your draw budget.
+    4: also shed your whole hand and go out.
+
+    In that order because it is a prefix, so a lower number drops the hardest
+    tiers rather than the easiest. Going out is last because solo it is
+    unreachable on eight of the twenty phases.
     """
     display_name = "Checks Per Phase"
     range_start = 1

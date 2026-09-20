@@ -239,22 +239,23 @@ export class Phase10Session {
       return [];
     }
 
-    const tiers = ["Cleared"];
-    if (hand.state === HAND_STATE.WENT_OUT) tiers.push("Went Out");
-    if (hand.usedWildsInLayout === 0) tiers.push("No Wilds");
-    
     // Measured at the lay-down, not at the end of the round: the round
     // carries on afterwards so the rest of the hand can be shed, and counting
-    // those draws would make this unearnable.
+    // those draws would make Under Par unearnable.
     const spent = hand.drawsAtLayDown ?? hand.drawsUsed;
+
+    const earned = new Set(["Cleared"]);
+    if (hand.state === HAND_STATE.WENT_OUT) earned.add("Went Out");
+    if (hand.usedWildsInLayout === 0) earned.add("No Wilds");
     if (spent <= Math.max(1, Math.floor(hand.config.maxDraws / 2))) {
-      tiers.push("Under Par");
+      earned.add("Under Par");
     }
 
-    // Tiers the options did not create locations for must never be reported --
-    // those IDs do not exist on the server.
-    const allowed = new Set(TIERS.slice(0, this.checksPerPhase));
-    return tiers.filter((tier) => allowed.has(tier));
+    // Walk TIERS rather than the order they were collected in, so the result
+    // follows the table and a reorder reaches here for free. checksPerPhase
+    // takes a prefix: tiers past it have no location on the server, so
+    // reporting one would check an ID that does not exist.
+    return TIERS.slice(0, this.checksPerPhase).filter((tier) => earned.has(tier));
   }
 
   /** Settle a finished hand. Returns newly checked location IDs. */
