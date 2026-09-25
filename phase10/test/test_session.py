@@ -5,9 +5,11 @@ import unittest
 
 from ..client.session import LEAN_DEAL_PENALTY, Phase10Session
 from ..data import (
+    AP_POINT,
     BASE_HAND_SIZE, EXTRA_DRAW, HAND_SIZE_UPGRADE, LEAN_DEAL, LOCATION_NAME_TO_ID,
     MAX_SKIPS, MULLIGAN, PHASE_COUNT, PHASE_LOCK, PHASE_UNLOCK, SCORE_REDUCTION,
     SCORE_REDUCTION_VALUE, SKIP_CARD, WILD_CARD, WILD_THEFT,
+    store_gate, store_location_name, store_points,
 )
 from ..game.cards import STOCK_WILDS, WILD, Color, number_card
 from ..game.engine import HandState
@@ -480,3 +482,104 @@ class TestOpponents(unittest.TestCase):
         self.assertEqual(hand.events[-1].detail["reason"], "opponent_out")
         self.assertEqual(hand.events[-1].detail["opponent"], s.seats[0].name)
         self.assertEqual(s.finish_hand(hand), [])
+
+
+class TestStore(unittest.TestCase):
+    """Buying a check instead of playing for it.
+
+    Two numbers, deliberately: a slot opens at a gate on points *received*,
+    which is what the seed's logic was generated against, and costs a price out
+    of points *unspent*. The gate is what keeps the client from reporting a
+    location the server thinks is unreachable; the price is what makes it a
+    store rather than a threshold.
+    """
+
+    def store(self, slots=6, points=0) -> Phase10Session:
+        s = session(store_slots=slots)
+        s.set_items([AP_POINT] * points)
+        return s
+
+    def test_no_points_buys_nothing(self) -> None:
+        s = self.store(points=0)
+        self.assertIn("opens at 1", s.can_buy(1))
+
+    def test_one_point_buys_the_first_slot(self) -> None:
+        s = self.store(points=1)
+        self.assertIsNone(s.can_buy(1))
+        location = s.buy_slot(1)
+        self.assertEqual(location, LOCATION_NAME_TO_ID[store_location_name(1)])
+        self.assertEqual(s.points_left, 0)
+
+    def test_a_slot_cannot_be_bought_twice(self) -> None:
+        s = self.store(points=4)
+        s.buy_slot(1)
+        self.assertIn("already bought", s.can_buy(1))
+        with self.assertRaises(RuntimeError):
+            s.buy_slot(1)
+
+    def test_the_gate_is_on_points_received_not_left(self) -> None:
+        """Spending does not close a slot you had already opened. The gate is
+        what the seed was generated against, and that never goes down."""
+        s = self.store(points=store_gate(2))
+        s.buy_slot(1)
+        self.assertEqual(s.points_left, store_gate(2) - s.store_price(1))
+        self.assertIsNone(s.can_buy(2))
+
+    def test_an_open_slot_is_always_affordable(self) -> None:
+        """The invariant the ladder exists for, checked exhaustively.
+
+        A slot's gate is the sum of the cheapest prices up to it, so any set of
+        slots whose gates you have met costs at most that gate -- which you
+        have, or the gate would not be met. So the price can never strand a
+        slot the gate has opened, whatever order you buy in. Every point count
+        against every purchase order:
+        """
+        from itertools import permutations
+
+        for points in range(store_points(6) + 1):
+            for order in permutations(range(1, 7)):
+                s = self.store(points=points)
+                for slot in order:
+                    refusal = s.can_buy(slot)
+                    if refusal is None:
+                        s.buy_slot(slot)
+                    else:
+                        self.assertNotIn(
+                            "costs", refusal,
+                            f"{points} points, order {order}: {refusal}",
+                        )
+
+    def test_every_order_is_affordable_with_a_full_purse(self) -> None:
+        """The property the ladder exists for. Buying the dearest slots first
+        must not strand the cheap ones."""
+        s = self.store(points=store_points(6))
+        for slot in (6, 5, 4, 3, 2, 1):
+            self.assertIsNone(s.can_buy(slot), slot)
+            s.buy_slot(slot)
+        self.assertEqual(len(s.bought_slots), 6)
+
+    def test_a_seed_without_a_store_refuses(self) -> None:
+        s = self.store(slots=0, points=10)
+        self.assertEqual(s.can_buy(1), "This seed has no store.")
+
+    def test_a_slot_past_the_end_refuses(self) -> None:
+        s = self.store(slots=4, points=10)
+        self.assertIn("slots 1 to 4", s.can_buy(5))
+
+    def test_purchases_survive_a_reconnect(self) -> None:
+        s = self.store(points=store_points(6))
+        s.buy_slot(1)
+        s.buy_slot(5)
+        fresh = session(store_slots=6)
+        fresh.set_items([AP_POINT] * store_points(6))
+        self.assertTrue(fresh.load_payload(s.to_payload()))
+        self.assertEqual(fresh.bought_slots, {1, 5})
+        self.assertEqual(fresh.points_left, s.points_left)
+
+    def test_a_save_without_purchases_still_loads(self) -> None:
+        s = self.store(points=4)
+        payload = s.to_payload()
+        del payload["bought_slots"]
+        fresh = session(store_slots=6)
+        self.assertTrue(fresh.load_payload(payload))
+        self.assertEqual(fresh.bought_slots, set())

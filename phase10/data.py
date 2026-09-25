@@ -35,6 +35,10 @@ WILD_THEFT = "Wild Theft"
 MULLIGAN = "Mulligan"
 SCORE_REDUCTION = "Score Reduction"
 
+#: Spent in the store, which is the one place a check can be bought rather
+#: than played for. Progression, not filler: it opens locations.
+AP_POINT = "AP Point"
+
 TRAPS = [PHASE_LOCK, LEAN_DEAL, WILD_THEFT]
 FILLERS = [MULLIGAN, SCORE_REDUCTION]
 
@@ -58,6 +62,7 @@ ITEM_NAME_TO_ID = {
     WILD_THEFT: 62,
     MULLIGAN: 70,
     SCORE_REDUCTION: 71,
+    AP_POINT: 72,
 }
 
 #: The lowest non-unlock item ID. Phase unlocks must stay clear of it.
@@ -84,6 +89,42 @@ TIERS = ["Cleared", "Under Par", "No Wilds", "Went Out"]
 #: gives a seed a workable opening.
 HANDS_WON_MILESTONES = [1, 2, 3, 5, 8, 12, 16, 20, 25, 30]
 
+#: What each store slot costs, cheapest first. Ascending on purpose: the gate
+#: on slot i is the sum of the i cheapest prices, so whichever order the player
+#: buys in, the logic the seed was generated under still holds.
+STORE_PRICES = [1, 1, 1, 1, 2, 2, 3, 3]
+
+#: The most slots `store_slots` will offer, and so the length of the ladder.
+MAX_STORE_SLOTS = len(STORE_PRICES)
+
+#: Points beyond the ladder's total. Without slack the last slot needs every
+#: single point in the seed, which makes it hostage to wherever the last one
+#: landed; two is enough to unstick that without making the store free.
+STORE_SLACK = 2
+
+
+def store_prices(slots: int) -> list[int]:
+    return STORE_PRICES[:slots]
+
+
+def store_gate(slot: int) -> int:
+    """Points needed before slot `slot` (1-based) may be bought at all.
+
+    The sum of the cheapest `slot` prices rather than this slot's own price:
+    that is what makes any purchase order legal, because a player holding this
+    many points could have bought the cheapest `slot` slots instead.
+    """
+    return sum(STORE_PRICES[:slot])
+
+
+def store_points(slots: int) -> int:
+    """How many points the pool carries for a store of this size."""
+    return sum(store_prices(slots)) + STORE_SLACK if slots else 0
+
+
+def store_location_name(slot: int) -> str:
+    return f"Store Slot {slot}"
+
 
 def phase_location_name(phase: int, tier: str) -> str:
     return f"Phase {phase} - {tier}"
@@ -107,6 +148,12 @@ LOCATION_NAME_TO_ID = {
     **{
         milestone_location_name(n): 400 + index
         for index, n in enumerate(HANDS_WON_MILESTONES)
+    },
+    # Milestones occupy 400..409. The store gets its own block rather than
+    # extending that one, so growing either list cannot reach the other.
+    **{
+        store_location_name(slot): 500 + slot
+        for slot in range(1, MAX_STORE_SLOTS + 1)
     },
 }
 

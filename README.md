@@ -540,6 +540,68 @@ it does not rewrite the history. The total is floored at zero.
 Nothing in logic depends on score, so this stays honest filler — it moves the
 number the player is judged on and nothing else.
 
+## The store
+
+**AP Point** is the one item that is not filler and not a power item: it buys a
+check outright. `store_slots` adds that many locations, each with a price, and
+the pool carries enough points to buy them all.
+
+The design question was whether points should buy *any* unearned check. They
+should not. The locations declare real rules — `Phase 7 - Under Par` needs the
+unlock and two wilds — and a store that bypassed them would make the declared
+logic fiction, with hints, the spoiler playthrough and progression balancing
+all reasoning from rules that no longer describe play. Worse, if points came
+from playing, the cheapest point would be the one from the easiest phase, and
+the optimal line would become replaying phase 11 (94%) forever instead of
+climbing toward phase 20 (11%). The store is its own locations instead, which
+is the ordinary Archipelago shop pattern and logically exact.
+
+### The gate is not the price
+
+A slot's *price* is what it costs. Its *gate* — the rule the seed is generated
+under — is the sum of the cheapest prices up to it, not its own. That is what
+makes buying in any order legal: holding enough points to meet slot 6's gate
+means you could have bought the six cheapest slots instead, so no purchase
+order can strand you.
+
+It also makes the affordability check unreachable by construction while the
+prices ascend, since any set of slots whose gates you have met costs at most
+the largest of those gates. The check stays anyway — it is what would catch a
+future ladder that stopped ascending — and both ports test the invariant
+exhaustively, over every point count against all 720 purchase orders.
+
+### Sizing it, measured
+
+A store of S slots brings S locations with it, so it only costs the pool once
+there are more points than slots:
+
+    filler' = filler + slots - points
+
+Six slots paid for with ten points costs **two** filler items, not ten. The
+binding constraint is `checks_per_phase`, not the store size: at one check a
+phase there are two filler items in the whole seed, and the store trims itself
+to what fits — slack first, then slots, landing on five slots there. Generated
+across every combination of `checks_per_phase` 1–4 and 0/4/6/8 slots: all fill,
+all beatable, every location reachable.
+
+The trap found while prototyping: the points have to be reserved *before* the
+power items are sized. Otherwise the store's own new locations are swallowed by
+power items that were previously being trimmed away, and the points have
+nowhere to go — the store silently pays for Wild Cards.
+
+### It runs alongside the phases
+
+Measured over fifteen seeds at the default, six slots and ten points:
+
+| | |
+|---|---|
+| mean seed depth | 11.5 spheres |
+| first slot opens at | sphere 2.1 |
+| last slot opens at | sphere 8.5 |
+
+So it opens early and finishes before the endgame, rather than being six checks
+that all come due at once.
+
 ## Game and scoring
 
 A `PhaseHand` is one attempt at one phase and knows nothing about what came

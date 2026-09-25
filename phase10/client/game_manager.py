@@ -207,6 +207,8 @@ class Phase10View(BoxLayout):
             str(hand.discard_top) if hand else None,
             hand.draws_left if hand else None,
             s.mulligans_left,
+            s.points_left,
+            tuple(sorted(s.bought_slots)),
             tuple((seat.name, seat.phase, len(seat.hand), seat.laid_down, seat.went_out,
                    tuple(tuple(str(c) for c in g) for g in seat.layout))
                   for seat in s.seats),
@@ -229,6 +231,15 @@ class Phase10View(BoxLayout):
             f"score [b]{s.total_score}[/b] (lower is better)    "
             f"won {s.hands_won}    cleared {len(s.cleared_phases)}/{PHASE_COUNT}"
         )
+        if s.store_slots:
+            # One line, like the table's: what you can spend and what is left
+            # to spend it on. Buying happens through /buy, which is where the
+            # refusals can be explained.
+            left = [n for n in range(1, s.store_slots + 1) if n not in s.bought_slots]
+            self.header.text += (
+                f"    [color=88cc88]{s.points_left} pts[/color]"
+                f" / {len(left)} slot(s) unbought"
+            )
         if s.score_reduction:
             self.header.text += f"    [color=88cc88]-{s.score_reduction} reduced[/color]"
 

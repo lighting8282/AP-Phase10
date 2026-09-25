@@ -22,7 +22,7 @@ from CommonClient import (
 )
 from NetUtils import ClientStatus
 
-from ..data import GAME_NAME, PHASE_COUNT
+from ..data import GAME_NAME, PHASE_COUNT, store_gate
 from ..game.autoplay import play_out
 from ..game.engine import HandState
 from ..game.phases import PHASES, phase_description
@@ -261,6 +261,41 @@ class Phase10CommandProcessor(ClientCommandProcessor):
             else:
                 state = f"building, {len(seat.hand)} cards"
             self.output(f"  {seat.name:<4} phase {seat.phase:>2}  {state}")
+
+    def _cmd_store(self) -> None:
+        """List the store: what each slot costs and whether you can buy it."""
+        s = self.ctx.session
+        if not s.store_slots:
+            self.output("This seed has no store.")
+            return
+        self.output(f"AP Points: {s.points_left} unspent of {s.points} received")
+        for slot in range(1, s.store_slots + 1):
+            price = s.store_price(slot)
+            if slot in s.bought_slots:
+                mark, why = "done", ""
+            else:
+                refusal = s.can_buy(slot)
+                mark = "  --" if refusal else " buy"
+                why = f"  ({refusal})" if refusal else ""
+            self.output(f"  {mark}  Slot {slot}: {price} point(s)"
+                        f"  opens at {store_gate(slot)}{why}")
+
+    def _cmd_buy(self, slot: str) -> None:
+        """Buy a store slot with AP Points. Usage: /buy <slot>"""
+        try:
+            number = int(slot)
+        except ValueError:
+            self.output("Usage: /buy <slot>")
+            return
+        session = self.ctx.session
+        try:
+            location = session.buy_slot(number)
+        except RuntimeError as err:
+            self.output(str(err))
+            return
+        self.ctx.pending_locations.append(location)
+        self.ctx.save_pending = True
+        self.output(f"Bought slot {number}. {session.points_left} point(s) left.")
 
     def _cmd_mulligan(self) -> None:
         """Throw back a dead opening hand and deal a fresh one."""

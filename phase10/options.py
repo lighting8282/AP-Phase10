@@ -2,6 +2,8 @@ from dataclasses import dataclass
 
 from Options import Choice, DeathLink, OptionGroup, PerGameCommonOptions, Range, Toggle
 
+from .data import MAX_STORE_SLOTS
+
 
 class Goal(Choice):
     """
@@ -178,6 +180,33 @@ class TrapChance(Range):
     default = 0
 
 
+class StoreSlots(Range):
+    """
+    How many checks the store sells for AP Points.
+
+    The store is a second track beside the phases: points arrive as items, and
+    a slot can be bought once you hold enough of them. Prices ascend (1, 1, 1,
+    1, 2, 2, 3, 3) and a slot's gate is the sum of the cheapest prices up to
+    it, so buying in any order is legal.
+
+    Measured at the default of two checks a phase, six slots with ten points:
+    the first slot opens around sphere 2 of an 11-sphere seed and the last
+    around sphere 8, so it runs alongside the phases rather than piling up at
+    the end. It costs two filler items -- the store brings its own locations,
+    so points only displace filler once there are more points than slots.
+
+    At `checks_per_phase: 1` there is almost no room: thirty locations carry
+    two filler items, and the store is trimmed to whatever still fits.
+
+    0 turns the store off.
+    """
+
+    display_name = "Store Slots"
+    range_start = 0
+    range_end = MAX_STORE_SLOTS
+    default = 6
+
+
 @dataclass
 class Phase10Options(PerGameCommonOptions):
     goal: Goal
@@ -188,13 +217,14 @@ class Phase10Options(PerGameCommonOptions):
     wild_card_items: WildCardItems
     hand_size_upgrades: HandSizeUpgrades
     checks_per_phase: ChecksPerPhase
+    store_slots: StoreSlots
     skip_card_items: SkipCardItems
     trap_chance: TrapChance
     death_link: Phase10DeathLink
 
 
 option_groups = [
-    OptionGroup("Goal", [Goal, ChecksPerPhase, StartingPhases]),
+    OptionGroup("Goal", [Goal, ChecksPerPhase, StoreSlots, StartingPhases]),
     OptionGroup("Difficulty", [Opponents, StartingDraws, ExtraDrawItems,
                                WildCardItems, HandSizeUpgrades, SkipCardItems]),
     OptionGroup("Deck", [TrapChance, Phase10DeathLink]),

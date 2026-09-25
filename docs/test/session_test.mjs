@@ -14,7 +14,8 @@ import { dirname, join } from "node:path";
 import { Phase10Session } from "../src/session.js";
 import { Phase10Game } from "../src/game.js";
 import {
-  MULLIGAN, PHASE_COUNT, SCORE_REDUCTION, SCORE_REDUCTION_VALUE, phaseUnlock,
+  AP_POINT, LOCATION_NAME_TO_ID, MULLIGAN, PHASE_COUNT, SCORE_REDUCTION,
+  SCORE_REDUCTION_VALUE, phaseUnlock, storeGate, storeLocationName,
 } from "../src/data.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -301,6 +302,86 @@ fixtures.sequences.forEach((script, index) => {
   last.markFailed("test");
   capped.finishHand(last);
   check("and stops at the last one", capped.opponentPhases, [PHASE_COUNT]);
+}
+
+// -- the store ---------------------------------------------------------------
+// The mirror of TestStore in phase10/test/test_session.py. Two numbers: a slot
+// opens at a gate on points received, and costs a price out of points unspent.
+{
+  const store = (slots, points) => {
+    const s = Phase10Session.fromSlotData(
+      { goal: 0, starting_draws: 4, checks_per_phase: 4, store_slots: slots },
+      new Phase10Game({ seed: 0 }),
+    );
+    s.setItems(Array(points).fill(AP_POINT));
+    return s;
+  };
+  const POINTS = 10;   // store_points(6): the ladder's 8 plus 2 slack
+
+  check("no points buys nothing", store(6, 0).canBuy(1).includes("opens at 1"), true);
+
+  // Guarded rather than chained: a buy that throws would take the whole suite
+  // down and hide every check after it, which is the opposite of what a
+  // failure should do.
+  const one = store(6, 1);
+  check("one point opens the first slot", one.canBuy(1), null);
+  if (one.canBuy(1) === null) {
+    check("buying returns its id", one.buySlot(1), LOCATION_NAME_TO_ID[storeLocationName(1)]);
+    check("and spends the point", one.pointsLeft, 0);
+  }
+
+  const twice = store(6, 4);
+  if (twice.canBuy(1) === null) twice.buySlot(1);
+  check("a slot cannot be bought twice", (twice.canBuy(1) ?? "").includes("already bought"), true);
+
+  // Spending does not close a slot the gate had already opened.
+  const gated = store(6, storeGate(2));
+  if (gated.canBuy(1) === null) gated.buySlot(1);
+  check("the gate is on points received, not points left", gated.canBuy(2), null);
+
+  // The invariant the ladder exists for, over every point count and order.
+  const orders = [];
+  const permute = (rest, acc) => {
+    if (!rest.length) { orders.push(acc); return; }
+    rest.forEach((v, i) => permute([...rest.slice(0, i), ...rest.slice(i + 1)], [...acc, v]));
+  };
+  permute([1, 2, 3, 4, 5, 6], []);
+  let stranded = null;
+  for (let points = 0; points <= POINTS && !stranded; points += 1) {
+    for (const order of orders) {
+      const s = store(6, points);
+      for (const slot of order) {
+        const refusal = s.canBuy(slot);
+        if (refusal === null) s.buySlot(slot);
+        else if (refusal.includes("costs")) { stranded = `${points}: ${refusal}`; break; }
+      }
+      if (stranded) break;
+    }
+  }
+  check("an open slot is always affordable, in any order", stranded, null);
+
+  const full = store(6, POINTS);
+  for (const slot of [6, 5, 4, 3, 2, 1]) {
+    if (full.canBuy(slot) === null) full.buySlot(slot);
+  }
+  check("a full purse buys every slot dearest-first", full.boughtSlots.size, 6);
+
+  check("no store refuses", store(0, 10).canBuy(1), "This seed has no store.");
+  check("a slot past the end refuses", (store(4, 10).canBuy(5) ?? "").includes("slots 1 to 4"), true);
+
+  const saved = store(6, POINTS);
+  if (saved.canBuy(1) === null) saved.buySlot(1);
+  if (saved.canBuy(5) === null) saved.buySlot(5);
+  const fresh = store(6, POINTS);
+  check("purchases survive a reconnect", fresh.loadPayload(saved.toPayload()), true);
+  check("with the same slots", [...fresh.boughtSlots].sort(), [1, 5]);
+  check("and the same balance", fresh.pointsLeft, saved.pointsLeft);
+
+  const older = saved.toPayload();
+  delete older.bought_slots;
+  const legacy = store(6, POINTS);
+  check("a save without purchases still loads", legacy.loadPayload(older), true);
+  check("with nothing bought", legacy.boughtSlots.size, 0);
 }
 
 for (const line of failures) console.log(`  FAIL ${line}`);

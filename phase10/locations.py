@@ -8,7 +8,7 @@ from . import items
 from .data import (
     GAME_NAME,
     HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, PHASE_COUNT, TIERS,
-    milestone_location_name, phase_location_name,
+    milestone_location_name, phase_location_name, store_location_name,
 )
 
 if TYPE_CHECKING:
@@ -26,6 +26,13 @@ def create_all_locations(world: Phase10World) -> None:
     table.add_locations(
         {name: LOCATION_NAME_TO_ID[name] for name in milestone_names}, Phase10Location
     )
+
+    slots = int(world.options.store_slots)
+    if slots:
+        store_names = [store_location_name(n) for n in range(1, slots + 1)]
+        world.get_region("Store").add_locations(
+            {name: LOCATION_NAME_TO_ID[name] for name in store_names}, Phase10Location
+        )
 
     for phase in range(1, PHASE_COUNT + 1):
         region = world.get_region(f"Phase {phase}")

@@ -160,6 +160,20 @@ export class Phase10Client {
     return hand;
   }
 
+  /**
+   * Buy a store slot: report the check and save what was spent.
+   *
+   * No goal test, unlike settling a hand: the goal is phases cleared, and no
+   * amount of buying clears one.
+   */
+  async buySlot(slot) {
+    const id = this.session.buySlot(slot);
+    if (this.connected) this.client.check(id);
+    await this.save();
+    this.onUpdate();
+    return id;
+  }
+
   /** Finish a hand: report its checks, save, and trip the goal if it is met. */
   async settle(hand, { sendDeath = true } = {}) {
     const died = hand.state === "failed";

@@ -12,7 +12,7 @@ const WILD_FACE = WILD;
 import { HAND_STATE } from "./engine.js";
 import {
   HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, milestoneLocationName,
-  phaseLocationName,
+  phaseLocationName, storeGate, storeLocationName,
 } from "./data.js";
 import { PHASE_COUNT, phaseDescription } from "./phases.js";
 import { Phase10Client } from "./client.js";
@@ -293,6 +293,7 @@ function render() {
   renderHand(hand);
   renderDig(hand);
   renderPhases(s);
+  renderStore(s);
   renderChecks(s);
 
   for (const button of document.querySelectorAll("#actions button")) {
@@ -465,6 +466,56 @@ function renderDig(hand) {
   });
 }
 
+// -- the store ---------------------------------------------------------------
+// The one place a check is bought rather than played for. A slot opens at a
+// gate on points received and costs a price out of points unspent -- both, so
+// that buying in any order stays inside the logic the seed was built on.
+
+async function buy(slot) {
+  try {
+    await app.buySlot(slot);
+  } catch (err) {
+    log(err.message);
+    return;
+  }
+  log(`Bought store slot ${slot}. ${app.session.pointsLeft} point(s) left.`);
+  render();
+}
+
+function renderStore(session) {
+  const box = el("store");
+  const summary = el("store-summary");
+  box.replaceChildren();
+
+  // A seed with no store loses the whole section rather than keeping a
+  // heading over an explanation of why there is nothing under it.
+  const slots = session.storeSlots;
+  el("store-wrap").hidden = !slots;
+  if (!slots) return;
+
+  summary.textContent =
+    `${session.pointsLeft} unspent of ${session.points} AP Points received`;
+
+  const done = checkedLocations(session);
+  for (let slot = 1; slot <= slots; slot += 1) {
+    const price = session.storePrice(slot);
+    const bought = session.boughtSlots.has(slot)
+      || done.has(LOCATION_NAME_TO_ID[storeLocationName(slot)]);
+    if (bought) {
+      box.append(checkPill(`✓ Slot ${slot}`, "done", `Store Slot ${slot} -- bought`));
+      continue;
+    }
+    const refusal = session.canBuy(slot);
+    const button = document.createElement("button");
+    button.className = `chk buy ${refusal ? "locked" : "open"}`;
+    button.textContent = `Slot ${slot} - ${price}`;
+    button.title = refusal ?? `Buy Store Slot ${slot} for ${price} point(s)`;
+    button.disabled = Boolean(refusal);
+    button.addEventListener("click", () => buy(slot));
+    box.append(button);
+  }
+}
+
 // -- the check list ----------------------------------------------------------
 // What a player asks between rounds is "what is left, and can I get it yet".
 // Answering it used to mean counting phases against the tier table in the
@@ -561,6 +612,16 @@ function renderChecks(session) {
       }
       box.append(checkPill(tier, state, why));
     }
+  }
+
+  // The store's own checks count toward the total: they are locations like
+  // any other, and leaving them out would make "x of y" disagree with the
+  // server.
+  for (let slot = 1; slot <= session.storeSlots; slot += 1) {
+    const id = LOCATION_NAME_TO_ID[storeLocationName(slot)];
+    if (inSeed && !inSeed.has(id)) continue;
+    total += 1;
+    if (done.has(id)) have += 1;
   }
 
   // The milestones gate on nothing but playing, so their state is a distance

@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 from BaseClasses import Item, ItemClassification
 
 from .data import (
-    FILLERS, GAME_NAME, ITEM_NAME_TO_ID, MULLIGAN, PHASE_COUNT, PHASE_UNLOCK,
-    SCORE_REDUCTION, SKIP_CARD, TRAPS,
+    AP_POINT, FILLERS, GAME_NAME, ITEM_NAME_TO_ID, MULLIGAN, PHASE_COUNT,
+    PHASE_UNLOCK, SCORE_REDUCTION, SKIP_CARD, STORE_PRICES, STORE_SLACK, TRAPS,
 )
 from .rules import MIN_EXTRA_DRAWS, MIN_WILD_CARDS
 
@@ -25,6 +25,9 @@ DEFAULT_ITEM_CLASSIFICATIONS = {
     "Wild Theft": ItemClassification.trap,
     MULLIGAN: ItemClassification.filler,
     SCORE_REDUCTION: ItemClassification.filler,
+    # Progression rather than filler: a point opens a store slot, so fill has
+    # to reason about where they land.
+    AP_POINT: ItemClassification.progression,
 }
 
 
@@ -104,6 +107,26 @@ def choose_starting_phases(world: Phase10World) -> list[int]:
     return (easy + rest)[: int(world.options.starting_phases)]
 
 
+def plan_store(base_locations: int, slots: int, floor: int) -> tuple[int, int]:
+    """The largest store that still fits, as (slots, points).
+
+    A store of S slots brings S locations with it, so it pays for itself up to
+    one point per slot; only the ladder's steeper end and the slack cost the
+    pool anything. When it does not fit, the slack goes first -- it is comfort
+    -- and only then does a slot come off.
+
+    Measured: at one check a phase there are thirty locations and a floor of
+    twenty-nine, so this lands on five slots with no slack. At two checks and
+    up nothing is trimmed.
+    """
+    for count in range(slots, 0, -1):
+        for slack in (STORE_SLACK, 0):
+            points = sum(STORE_PRICES[:count]) + slack
+            if floor + points <= base_locations + count:
+                return count, points
+    return 0, 0
+
+
 def create_all_items(world: Phase10World) -> None:
     capacity = len(world.multiworld.get_unfilled_locations(world.player))
 
@@ -117,9 +140,15 @@ def create_all_items(world: Phase10World) -> None:
         if p not in starting
     ]
 
+    # Points come off the top. They are required items, and the power items
+    # above their floors are not, so sizing power first would spend the
+    # store's own locations on Wild Cards and leave the points homeless.
+    points = world.store_points
+    itempool += [world.create_item(AP_POINT) for _ in range(points)]
+
     floors = {"Wild Card": MIN_WILD_CARDS, "Extra Draw": MIN_EXTRA_DRAWS,
               "Hand Size Upgrade": 0, SKIP_CARD: 0}
-    for name, count in build_power_item_counts(world, capacity).items():
+    for name, count in build_power_item_counts(world, capacity - points).items():
         required = min(count, floors[name])
         itempool += [world.create_item(name) for _ in range(required)]
         itempool += [create_surplus(world, name) for _ in range(count - required)]

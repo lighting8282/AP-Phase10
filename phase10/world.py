@@ -5,7 +5,7 @@ from worlds.AutoWorld import World
 
 from . import items, locations, regions, rules, web_world
 from . import options as phase10_options
-from .data import GAME_NAME
+from .data import GAME_NAME, HANDS_WON_MILESTONES, PHASE_COUNT
 
 
 class Phase10World(World):
@@ -25,6 +25,26 @@ class Phase10World(World):
 
     location_name_to_id = locations.LOCATION_NAME_TO_ID
     item_name_to_id = items.ITEM_NAME_TO_ID
+
+    #: Decided in generate_early, because the store's locations are built
+    #: before the item pool is and both have to agree on its size.
+    store_points: int = 0
+
+    def generate_early(self) -> None:
+        """Trim the store to what the location budget can carry.
+
+        The slot count is an option, but at one check a phase there are thirty
+        locations against a floor of twenty-nine required items, so a six-slot
+        store asks for points there is nowhere to put. Trimming here rather
+        than raising an error keeps a legal option combination generating.
+        """
+        from .rules import MIN_EXTRA_DRAWS, MIN_WILD_CARDS
+
+        base = PHASE_COUNT * int(self.options.checks_per_phase) + len(HANDS_WON_MILESTONES)
+        floor = PHASE_COUNT + MIN_WILD_CARDS + MIN_EXTRA_DRAWS
+        slots, points = items.plan_store(base, int(self.options.store_slots), floor)
+        self.options.store_slots.value = slots
+        self.store_points = points
 
     def create_regions(self) -> None:
         regions.create_and_connect_regions(self)
@@ -47,5 +67,5 @@ class Phase10World(World):
         # one-to-one onto the option names.
         return self.options.as_dict(
             "goal", "starting_draws", "checks_per_phase", "death_link",
-            "opponents",
+            "opponents", "store_slots",
         )

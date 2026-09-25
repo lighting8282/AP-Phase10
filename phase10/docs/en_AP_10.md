@@ -51,7 +51,7 @@ somebody else going out, ends the round but cannot take the clear back.
 ## What items and locations exist?
 
 Items: phase unlocks, Wild Card, Extra Draw, Hand Size Upgrade and Skip Card,
-plus filler and traps.
+plus AP Points, filler and traps.
 
 The two fillers both do something. A **Mulligan** throws back a dead opening
 hand and deals you a fresh one -- usable only before your first draw, and it
@@ -62,11 +62,21 @@ Traps, when enabled: Phase Lock pins you to the phase you just lost until you
 clear it, Lean Deal costs you two cards on one hand, and Wild Theft takes a wild
 out of the deck for one hand.
 
-Locations: each of the twenty phases is worth up to four checks -- clearing
-it, clearing it inside half your draw budget, clearing it without a wild, and
-shedding your whole hand to go out, in that order -- clearing it, clearing it and
-going out in the same hand, clearing it without using a wild, and clearing it
-inside half your draw budget.
+**AP Points** buy checks outright, in the store -- the one place a check is
+bought rather than played for. Each slot has a price, and a slot opens once you
+have received enough points to have afforded every cheaper slot, so you can buy
+them in whatever order you like. `store_slots` sets how many there are, or 0
+for none. In a very small seed the store trims itself to what the item pool can
+carry.
+
+Locations: each of the twenty phases is worth up to four checks -- clearing it,
+clearing it inside half your draw budget, clearing it without a wild, and
+shedding your whole hand to go out, in that order. `checks_per_phase` takes a
+prefix of that list, so lowering it drops the hardest tiers rather than the
+easiest.
+
+On top of those there are ten "hands won" milestones, which gate on nothing but
+playing, and one location per store slot.
 
 ## How many phases are there?
 

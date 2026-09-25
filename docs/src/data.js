@@ -28,6 +28,12 @@ export const WILD_THEFT = "Wild Theft";
 export const MULLIGAN = "Mulligan";
 export const SCORE_REDUCTION = "Score Reduction";
 
+/**
+ * Spent in the store, which is the one place a check can be bought rather
+ * than played for. Progression, not filler: it opens locations.
+ */
+export const AP_POINT = "AP Point";
+
 export const TRAPS = [PHASE_LOCK, LEAN_DEAL, WILD_THEFT];
 export const FILLERS = [MULLIGAN, SCORE_REDUCTION];
 
@@ -53,6 +59,7 @@ export const ITEM_NAME_TO_ID = (() => {
   table[WILD_THEFT] = 62;
   table[MULLIGAN] = 70;
   table[SCORE_REDUCTION] = 71;
+  table[AP_POINT] = 72;
   return Object.freeze(table);
 })();
 
@@ -71,8 +78,28 @@ export const TIERS = Object.freeze(["Cleared", "Under Par", "No Wilds", "Went Ou
  */
 export const HANDS_WON_MILESTONES = Object.freeze([1, 2, 3, 5, 8, 12, 16, 20, 25, 30]);
 
+/**
+ * What each store slot costs, cheapest first. Ascending on purpose: the gate
+ * on slot i is the sum of the i cheapest prices, so whichever order the
+ * player buys in, the logic the seed was generated under still holds.
+ */
+export const STORE_PRICES = Object.freeze([1, 1, 1, 1, 2, 2, 3, 3]);
+
+/** The most slots `store_slots` will offer, and so the ladder's length. */
+export const MAX_STORE_SLOTS = STORE_PRICES.length;
+
+/** Points beyond the ladder's total. See data.py for why it is two. */
+export const STORE_SLACK = 2;
+
+export const storePrices = (slots) => STORE_PRICES.slice(0, slots);
+
+/** Points needed before slot `slot` (1-based) may be bought at all. */
+export const storeGate = (slot) =>
+  STORE_PRICES.slice(0, slot).reduce((total, price) => total + price, 0);
+
 export const phaseLocationName = (phase, tier) => `Phase ${phase} - ${tier}`;
 export const milestoneLocationName = (hands) => `Hands Won: ${hands}`;
+export const storeLocationName = (slot) => `Store Slot ${slot}`;
 
 export const LOCATION_NAME_TO_ID = (() => {
   const table = {};
@@ -87,6 +114,11 @@ export const LOCATION_NAME_TO_ID = (() => {
   HANDS_WON_MILESTONES.forEach((n, index) => {
     table[milestoneLocationName(n)] = 400 + index;
   });
+  // The store gets its own block rather than extending the milestones', so
+  // growing either list cannot reach the other.
+  for (let slot = 1; slot <= MAX_STORE_SLOTS; slot += 1) {
+    table[storeLocationName(slot)] = 500 + slot;
+  }
   return Object.freeze(table);
 })();
 

@@ -125,6 +125,20 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
    the answer is a grid: a row per phase, a column per tier. */
 h3 { margin: 1rem 0 0.4rem; font-size: 0.85rem; color: var(--muted); font-weight: 600; }
 
+/* --- the store --------------------------------------------------------- */
+#store { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+#store-summary {
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 0.4rem;
+  font-variant-numeric: tabular-nums;
+}
+/* A slot you can afford is a button; one you cannot is the same shape,
+   greyed. The affordance is the whole point -- it answers "can I buy this"
+   without reading the price against your balance. */
+.chk.buy { cursor: pointer; font-size: 12px; line-height: 1.6; min-height: 0; }
+.chk.buy:hover:not(:disabled) { border-color: #6ee7a8; }
+.chk.buy:disabled { cursor: not-allowed; }
 #checks-summary {
   color: var(--muted);
   font-size: 13px;

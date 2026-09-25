@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 
 from rule_builder.rules import Has, HasAll, Rule
 
-from .data import PHASE_COUNT
+from .data import AP_POINT, PHASE_COUNT, store_gate, store_location_name
 from .options import Goal
 
 if TYPE_CHECKING:
@@ -73,7 +73,23 @@ TIER_REQUIREMENTS: dict[str, Rule | None] = {
 def set_all_rules(world: Phase10World) -> None:
     set_phase_entrance_rules(world)
     set_location_rules(world)
+    set_store_rules(world)
     set_completion_condition(world)
+
+
+def set_store_rules(world: Phase10World) -> None:
+    """Price each store slot.
+
+    The gate is the sum of the cheapest prices up to that slot, not the slot's
+    own price. A player holding that many points could have bought the cheapest
+    slots instead, so every purchase order is covered by the same rule and the
+    client never has to check a location the seed thinks is unreachable.
+    """
+    for slot in range(1, int(world.options.store_slots) + 1):
+        world.set_rule(
+            world.get_location(store_location_name(slot)),
+            Has(AP_POINT, count=store_gate(slot)),
+        )
 
 
 def set_phase_entrance_rules(world: Phase10World) -> None:

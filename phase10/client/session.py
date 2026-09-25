@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..data import (
+    AP_POINT,
     BASE_HAND_SIZE,
     EXTRA_DRAW,
     HAND_SIZE_UPGRADE,
@@ -20,6 +21,7 @@ from ..data import (
     LEAN_DEAL,
     LOCATION_NAME_TO_ID,
     MAX_SKIPS,
+    MAX_STORE_SLOTS,
     MULLIGAN,
     PHASE_COUNT,
     PHASE_LOCK,
@@ -32,6 +34,9 @@ from ..data import (
     WILD_THEFT,
     milestone_location_name,
     phase_location_name,
+    store_gate,
+    store_location_name,
+    store_prices,
 )
 from ..game.cards import STOCK_WILDS
 from ..game.engine import GameConfig, HandState, PhaseHand, Table
@@ -52,10 +57,14 @@ class Phase10Session:
     checks_per_phase: int = 4
     death_link: bool = False
     opponents: int = 3
+    store_slots: int = 0
 
     items: Counter = field(default_factory=Counter)
     consumed_traps: Counter = field(default_factory=Counter)
     mulligans_used: int = 0
+    #: Which store slots have been bought, so what has been spent is derived
+    #: rather than stored twice and left to disagree with itself.
+    bought_slots: set[int] = field(default_factory=set)
     _opponent_phases: list[int] = field(default_factory=list)
     _opponent_scores: list[int] = field(default_factory=list)
     checked_locations: set[int] = field(default_factory=set)
@@ -73,6 +82,7 @@ class Phase10Session:
             checks_per_phase=int(slot_data.get("checks_per_phase", 4)),
             death_link=bool(slot_data.get("death_link", False)),
             opponents=int(slot_data.get("opponents", 3)),
+            store_slots=int(slot_data.get("store_slots", 0)),
             game=Phase10Game(rng),
         )
 
@@ -190,6 +200,60 @@ class Phase10Session:
         for index, seat in enumerate(self.seats):
             if index < len(scores):
                 scores[index] += seat.score
+
+    # -- the store ---------------------------------------------------------
+    # Points arrive as items and buy a check outright. The seed priced each
+    # slot at generation, and the gate on a slot is the sum of the cheapest
+    # prices up to it -- so holding enough to reach a slot's gate means you
+    # could have bought the cheaper ones instead, and any order is legal.
+    @property
+    def points(self) -> int:
+        """Points received. Never goes down; spending is tracked separately."""
+        return self.items[AP_POINT]
+
+    @property
+    def points_spent(self) -> int:
+        return sum(store_prices(self.store_slots)[slot - 1]
+                   for slot in self.bought_slots
+                   if 1 <= slot <= self.store_slots)
+
+    @property
+    def points_left(self) -> int:
+        return max(0, self.points - self.points_spent)
+
+    def store_price(self, slot: int) -> int:
+        return store_prices(self.store_slots)[slot - 1]
+
+    def can_buy(self, slot: int) -> str | None:
+        """Returns None if the slot is buyable right now, else why not."""
+        if not self.store_slots:
+            return "This seed has no store."
+        if not 1 <= slot <= self.store_slots:
+            return f"The store has slots 1 to {self.store_slots}."
+        if slot in self.bought_slots:
+            return f"Slot {slot} is already bought."
+        gate = store_gate(slot)
+        if self.points < gate:
+            # The gate is on points received, not points left: it is what the
+            # seed's logic was built on, so checking it here is what keeps the
+            # client from reporting a location the server thinks is unreachable.
+            return f"Slot {slot} opens at {gate} points received; you have {self.points}."
+        price = self.store_price(slot)
+        # Unreachable while the prices ascend: any set of slots whose gates you
+        # have met costs at most the largest of those gates, which you have.
+        # Kept because it is what would catch a ladder that stopped ascending,
+        # and the tests pin the invariant rather than this branch.
+        if self.points_left < price:
+            return f"Slot {slot} costs {price}; you have {self.points_left} unspent."
+        return None
+
+    def buy_slot(self, slot: int) -> int:
+        """Buy a slot. Returns the location ID to check."""
+        refusal = self.can_buy(slot)
+        if refusal:
+            raise RuntimeError(refusal)
+        self.bought_slots.add(slot)
+        return LOCATION_NAME_TO_ID[store_location_name(slot)]
 
     # -- mulligans ---------------------------------------------------------
     @property
@@ -330,6 +394,7 @@ class Phase10Session:
             "mulligans_used": self.mulligans_used,
             "opponent_phases": list(self._opponent_phases),
             "opponent_scores": list(self._opponent_scores),
+            "bought_slots": sorted(self.bought_slots),
             "locked_phase": self.locked_phase,
         }
 
@@ -371,6 +436,14 @@ class Phase10Session:
             isinstance(v, int) and v >= 0 for v in scores
         ):
             self._opponent_scores = list(scores)
+
+        # Absent in saves written before the store existed, so a missing key
+        # restores as nothing bought rather than refusing the whole payload.
+        bought = payload.get("bought_slots")
+        if isinstance(bought, list) and all(
+            isinstance(v, int) and 1 <= v <= MAX_STORE_SLOTS for v in bought
+        ):
+            self.bought_slots = set(bought)
 
         locked = payload.get("locked_phase")
         self.locked_phase = (

@@ -12,10 +12,12 @@
 
 import {
   BASE_HAND_SIZE, EXTRA_DRAW, HANDS_WON_MILESTONES, HAND_SIZE_UPGRADE, LEAN_DEAL,
-  LOCATION_NAME_TO_ID, MAX_SKIPS, MULLIGAN, PHASE_COUNT, PHASE_LOCK,
+  AP_POINT, LOCATION_NAME_TO_ID, MAX_SKIPS, MAX_STORE_SLOTS, MULLIGAN,
+  PHASE_COUNT, PHASE_LOCK,
   SCORE_REDUCTION,
   SCORE_REDUCTION_VALUE, SKIP_CARD, TIERS, WILD_CARD,
   WILD_THEFT, milestoneLocationName, phaseLocationName, phaseUnlock,
+  storeGate, storeLocationName, storePrices,
 } from "./data.js";
 import { STOCK_WILDS } from "./cards.js";
 import { HAND_STATE, Table, gameConfig } from "./engine.js";
@@ -29,12 +31,16 @@ export class Phase10Session {
     this.goal = opts.goal ?? 0;
     this.startingDraws = opts.startingDraws ?? 4;
     this.checksPerPhase = opts.checksPerPhase ?? 4;
+    this.storeSlots = opts.storeSlots ?? 0;
     this.deathLink = opts.deathLink ?? false;
     this.opponents = opts.opponents ?? 3;
 
     this.items = new Map();
     this.consumedTraps = new Map();
     this.mulligansUsed = 0;
+    //: Which store slots have been bought, so what has been spent is derived
+    //: rather than stored twice and left to disagree with itself.
+    this.boughtSlots = new Set();
     this._opponentPhases = [];
     this._opponentScores = [];
     //: The table the current hand is being played at, opponents included.
@@ -50,6 +56,7 @@ export class Phase10Session {
       goal: Number(slotData.goal ?? 0),
       startingDraws: Number(slotData.starting_draws ?? 4),
       checksPerPhase: Number(slotData.checks_per_phase ?? 4),
+      storeSlots: Number(slotData.store_slots ?? 0),
       deathLink: Boolean(slotData.death_link ?? false),
       opponents: Number(slotData.opponents ?? 3),
       game: game ?? new Phase10Game(),
@@ -141,6 +148,69 @@ export class Phase10Session {
       return `A Phase Lock trap is forcing you to replay Phase ${this.lockedPhase}.`;
     }
     return null;
+  }
+
+  // -- the store -----------------------------------------------------------
+  // Points arrive as items and buy a check outright. The seed priced each slot
+  // at generation, and the gate on a slot is the sum of the cheapest prices up
+  // to it -- so holding enough to reach a slot's gate means you could have
+  // bought the cheaper ones instead, and any order is legal.
+
+  /** Points received. Never goes down; spending is tracked separately. */
+  get points() {
+    return this.count(AP_POINT);
+  }
+
+  get pointsSpent() {
+    const prices = storePrices(this.storeSlots);
+    let spent = 0;
+    for (const slot of this.boughtSlots) {
+      if (slot >= 1 && slot <= this.storeSlots) spent += prices[slot - 1];
+    }
+    return spent;
+  }
+
+  get pointsLeft() {
+    return Math.max(0, this.points - this.pointsSpent);
+  }
+
+  storePrice(slot) {
+    return storePrices(this.storeSlots)[slot - 1];
+  }
+
+  /** Returns null if the slot is buyable right now, else why not. */
+  canBuy(slot) {
+    if (!this.storeSlots) return "This seed has no store.";
+    if (!(slot >= 1 && slot <= this.storeSlots)) {
+      return `The store has slots 1 to ${this.storeSlots}.`;
+    }
+    if (this.boughtSlots.has(slot)) return `Slot ${slot} is already bought.`;
+    const gate = storeGate(slot);
+    if (this.points < gate) {
+      // The gate is on points received, not points left: it is what the seed's
+      // logic was built on, so checking it here is what keeps the client from
+      // reporting a location the server thinks is unreachable.
+      return `Slot ${slot} opens at ${gate} points received; you have ${this.points}.`;
+    }
+    const price = this.storePrice(slot);
+    // Unreachable while the prices ascend: any set of slots whose gates you
+    // have met costs at most the largest of those gates, which you have. Kept
+    // because it is what would catch a ladder that stopped ascending, and the
+    // tests pin the invariant rather than this branch.
+    if (this.pointsLeft < price) {
+      return `Slot ${slot} costs ${price}; you have ${this.pointsLeft} unspent.`;
+    }
+    return null;
+  }
+
+  /** Buy a slot. Returns the location ID to check. */
+  buySlot(slot) {
+    const refusal = this.canBuy(slot);
+    if (refusal) throw new Error(refusal);
+    this.boughtSlots.add(slot);
+    const id = LOCATION_NAME_TO_ID[storeLocationName(slot)];
+    this.checkedLocations.add(id);
+    return id;
   }
 
   // -- mulligans -----------------------------------------------------------
@@ -340,6 +410,7 @@ export class Phase10Session {
       mulligans_used: this.mulligansUsed,
       opponent_phases: [...this._opponentPhases],
       opponent_scores: [...this._opponentScores],
+      bought_slots: [...this.boughtSlots].sort((a, b) => a - b),
       locked_phase: this.lockedPhase,
     };
   }
@@ -381,6 +452,14 @@ export class Phase10Session {
     if (Array.isArray(scores)
         && scores.every((v) => Number.isInteger(v) && v >= 0)) {
       this._opponentScores = [...scores];
+    }
+
+    // Absent in saves written before the store existed, so a missing key
+    // restores as nothing bought rather than refusing the whole payload.
+    const bought = payload.bought_slots;
+    if (Array.isArray(bought)
+        && bought.every((v) => Number.isInteger(v) && v >= 1 && v <= MAX_STORE_SLOTS)) {
+      this.boughtSlots = new Set(bought);
     }
 
     const locked = payload.locked_phase;
