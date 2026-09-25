@@ -199,6 +199,18 @@ pre {
 .seat .who { font-weight: 600; }
 .seat .seat-phase { font-weight: normal; color: var(--muted); font-size: 13px; }
 .seat .what { color: var(--muted); font-size: 13px; }
+/* Flex rather than a float: floated, the score dropped out of the line box
+   and collided with the line beneath it as soon as the seat got narrow --
+   "building20 pts - 10 cards" at 375px. Wrapping puts it on its own line
+   there instead. */
+.seat .who { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.35rem; }
+.seat .seat-score {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: normal;
+  font-variant-numeric: tabular-nums;
+}
 
 /* Their hand, face down. Overlapped like a real fan so a big hand still fits
    the seat rather than wrapping into a wall of backs. */

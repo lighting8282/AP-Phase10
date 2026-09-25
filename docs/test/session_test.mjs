@@ -240,6 +240,69 @@ fixtures.sequences.forEach((script, index) => {
   check("floored at zero", scored(10, 4).totalScore, 0);
 }
 
+// -- what the seats are caught holding ---------------------------------------
+// The mirror of test_session.py's block of the same name. The numbers are the
+// ones the Python suite pins, so a port that drifts here shows up as a
+// different score rather than as a crash.
+{
+  const seated = (opponents) => {
+    const s = Phase10Session.fromSlotData(
+      { goal: 0, starting_draws: 4, checks_per_phase: 4, opponents },
+      new Phase10Game({ seed: 0 }),
+    );
+    s.setItems([phaseUnlock(1)]);
+    return s;
+  };
+
+  const s = seated(3);
+  const hand = s.startHand(1);
+  s.seats[0].hand = [
+    { kind: "number", rank: 12, color: "red" },
+    { kind: "number", rank: 5, color: "blue" },
+  ];
+  s.seats[1].hand = [];
+  hand.markFailed("test");
+  s.finishHand(hand);
+  check("a seat scores what it is caught holding", s.opponentScores[0], 15);
+  check("and going out scores nothing", s.opponentScores[1], 0);
+
+  const run = seated(1);
+  for (let i = 0; i < 2; i += 1) {
+    const h = run.startHand(1);
+    run.seats[0].hand = [{ kind: "number", rank: 3, color: "green" }];
+    h.markFailed("test");
+    run.finishHand(h);
+  }
+  check("seat scores accumulate across rounds", run.opponentScores, [10]);
+
+  const fresh = seated(1);
+  check("they survive a reconnect", fresh.loadPayload(run.toPayload()), true);
+  check("with the same totals", fresh.opponentScores, run.opponentScores);
+
+  const older = run.toPayload();
+  delete older.opponent_scores;
+  const legacy = seated(1);
+  check("a save without them still loads", legacy.loadPayload(older), true);
+  check("and starts them at zero", legacy.opponentScores, [0]);
+
+  // The cap was hardcoded to 10 and stayed there when the phases went to 20.
+  const top = seated(1);
+  top._opponentPhases = [PHASE_COUNT - 1];
+  const climbing = top.startHand(1);
+  top.seats[0].laidDown = true;
+  climbing.markFailed("test");
+  top.finishHand(climbing);
+  check("a seat below the last phase still climbs", top.opponentPhases, [PHASE_COUNT]);
+
+  const capped = seated(1);
+  capped._opponentPhases = [PHASE_COUNT];
+  const last = capped.startHand(1);
+  capped.seats[0].laidDown = true;
+  last.markFailed("test");
+  capped.finishHand(last);
+  check("and stops at the last one", capped.opponentPhases, [PHASE_COUNT]);
+}
+
 for (const line of failures) console.log(`  FAIL ${line}`);
 console.log(`\n${passed} passed, ${failures.length} failed`);
 process.exit(failures.length ? 1 : 0);

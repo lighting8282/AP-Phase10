@@ -57,6 +57,7 @@ class Phase10Session:
     consumed_traps: Counter = field(default_factory=Counter)
     mulligans_used: int = 0
     _opponent_phases: list[int] = field(default_factory=list)
+    _opponent_scores: list[int] = field(default_factory=list)
     checked_locations: set[int] = field(default_factory=set)
     locked_phase: int | None = None
     last_result: RoundResult | None = None
@@ -154,6 +155,17 @@ class Phase10Session:
         return self._opponent_phases
 
     @property
+    def opponent_scores(self) -> list[int]:
+        """Each seat's running total, the way the pad on the table works.
+
+        Kept on the session rather than on the seat because the seats are
+        rebuilt from scratch every round, exactly like `opponent_phases`.
+        """
+        if not self._opponent_scores:
+            self._opponent_scores = [0] * self.opponents
+        return self._opponent_scores
+
+    @property
     def seats(self) -> list:
         return self.table.seats if self.table else []
 
@@ -162,9 +174,22 @@ class Phase10Session:
         moved = []
         for index, seat in enumerate(self.seats):
             if seat.laid_down and index < len(self.opponent_phases):
-                self._opponent_phases[index] = min(10, seat.phase + 1)
+                self._opponent_phases[index] = min(PHASE_COUNT, seat.phase + 1)
                 moved.append(seat.name)
         return moved
+
+    def tally_opponents(self) -> None:
+        """Score every seat on what it is caught holding.
+
+        Must run before the round is finished, while the seats still hold the
+        hands they ended with. Lower is better here as it is for you: the seat
+        that went out scores nothing, and the one still sitting on a Wild pays
+        twenty-five for it.
+        """
+        scores = self.opponent_scores
+        for index, seat in enumerate(self.seats):
+            if index < len(scores):
+                scores[index] += seat.score
 
     # -- mulligans ---------------------------------------------------------
     @property
@@ -261,6 +286,9 @@ class Phase10Session:
     def finish_hand(self, hand: PhaseHand) -> list[int]:
         """Settle a finished hand. Returns newly checked location IDs."""
         tiers = self.earned_tiers(hand)
+        # Both read the seats as they ended the round, so they come before
+        # the round is finished and the table is torn down.
+        self.tally_opponents()
         self.advance_opponents()
         result = self.game.finish_round(hand)
         self.last_result = result
@@ -301,6 +329,7 @@ class Phase10Session:
             "consumed_traps": {k: int(v) for k, v in self.consumed_traps.items() if v},
             "mulligans_used": self.mulligans_used,
             "opponent_phases": list(self._opponent_phases),
+            "opponent_scores": list(self._opponent_scores),
             "locked_phase": self.locked_phase,
         }
 
@@ -334,6 +363,14 @@ class Phase10Session:
             isinstance(v, int) and 1 <= v <= PHASE_COUNT for v in phases
         ):
             self._opponent_phases = list(phases)
+
+        # Absent in saves written before the seats kept score, so a missing
+        # key restores as zero rather than refusing the whole payload.
+        scores = payload.get("opponent_scores")
+        if isinstance(scores, list) and all(
+            isinstance(v, int) and v >= 0 for v in scores
+        ):
+            self._opponent_scores = list(scores)
 
         locked = payload.get("locked_phase")
         self.locked_phase = (

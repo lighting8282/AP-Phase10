@@ -210,6 +210,7 @@ class Phase10View(BoxLayout):
             tuple((seat.name, seat.phase, len(seat.hand), seat.laid_down, seat.went_out,
                    tuple(tuple(str(c) for c in g) for g in seat.layout))
                   for seat in s.seats),
+            tuple(s.opponent_scores),
             hand.state.value if hand else None,
             tuple(str(c) for c in (hand.dig_options or ())) if hand else (),
         )
@@ -263,16 +264,24 @@ class Phase10View(BoxLayout):
             self.seats.text = ""
             return
         parts = []
-        for seat in seats:
+        scores = session.opponent_scores
+        for index, seat in enumerate(seats):
+            # The running total, the way the pad on the table works: what it
+            # has been caught holding so far, lower being better as it is for
+            # you. Without it a seat's phase says how well it is doing this
+            # round and nothing says how the run has gone.
+            score = scores[index] if index < len(scores) else 0
             if seat.went_out:
-                parts.append(f"[color=ff8888]{seat.name} out[/color]")
+                parts.append(f"[color=ff8888]{seat.name} out, {score} pts[/color]")
             elif seat.laid_down:
                 parts.append(
                     f"[color=ffd479]{seat.name} p{seat.phase} down, "
-                    f"{len(seat.hand)} left[/color]"
+                    f"{len(seat.hand)} left, {score} pts[/color]"
                 )
             else:
-                parts.append(f"{seat.name} p{seat.phase} ({len(seat.hand)})")
+                parts.append(
+                    f"{seat.name} p{seat.phase} ({len(seat.hand)}) {score} pts"
+                )
         self.seats.text = "table:  " + "    ".join(parts)
 
     def _render_melds(self, session) -> None:

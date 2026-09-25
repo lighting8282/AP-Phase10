@@ -279,6 +279,9 @@ function render() {
   renderStats(s, hand);
 
   el("you-phase").textContent = hand ? `phase ${hand.phase}` : "";
+  // Your own total in the same place as theirs: a scoreboard split across two
+  // parts of the page is one you have to assemble before you can read it.
+  el("you-score").textContent = `${s.totalScore} pts`;
 
   renderTable(s);
   renderMiddle(hand);
@@ -331,7 +334,7 @@ function renderTable(session) {
   // Solo seeds have no table at all. An empty row collapses on its own, so
   // there is nothing to hide.
   box.replaceChildren();
-  for (const seat of seats) {
+  seats.forEach((seat, index) => {
     const div = document.createElement("div");
     div.className = "seat";
     if (seat.wentOut) div.classList.add("out");
@@ -345,6 +348,16 @@ function renderTable(session) {
     tag.textContent = `phase ${seat.phase}`;
     tag.title = phaseDescription(seat.phase);
     who.append(tag);
+
+    // The running total, the way the pad on the table works: what the seat
+    // has been caught holding so far, lower being better as it is for you.
+    // The phase says how it is doing this round; nothing said how the run had
+    // gone, which is the half you play against.
+    const score = document.createElement("span");
+    score.className = "seat-score";
+    score.textContent = `${session.opponentScores[index] ?? 0} pts`;
+    score.title = "points it has been caught holding so far";
+    who.append(score);
 
     const what = document.createElement("div");
     what.className = "what";
@@ -380,7 +393,7 @@ function renderTable(session) {
     }
 
     box.append(div);
-  }
+  });
 }
 
 function renderOwnMelds(hand) {

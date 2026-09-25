@@ -6,10 +6,10 @@ import unittest
 from ..client.session import LEAN_DEAL_PENALTY, Phase10Session
 from ..data import (
     BASE_HAND_SIZE, EXTRA_DRAW, HAND_SIZE_UPGRADE, LEAN_DEAL, LOCATION_NAME_TO_ID,
-    MAX_SKIPS, MULLIGAN, PHASE_LOCK, PHASE_UNLOCK, SCORE_REDUCTION,
+    MAX_SKIPS, MULLIGAN, PHASE_COUNT, PHASE_LOCK, PHASE_UNLOCK, SCORE_REDUCTION,
     SCORE_REDUCTION_VALUE, SKIP_CARD, WILD_CARD, WILD_THEFT,
 )
-from ..game.cards import STOCK_WILDS, Color, number_card
+from ..game.cards import STOCK_WILDS, WILD, Color, number_card
 from ..game.engine import HandState
 
 
@@ -377,19 +377,82 @@ class TestOpponents(unittest.TestCase):
         self.assertEqual(s.opponent_phases[0], 2)
         self.assertEqual(s.opponent_phases[1], 1)
 
-    def test_progress_stops_at_ten(self) -> None:
-        # Seated on 10 from the start: seats are built from opponent_phases,
-        # so setting it after start_hand would only desync the two.
+    def test_progress_stops_at_the_last_phase(self) -> None:
+        # Against PHASE_COUNT, not a literal: this was hardcoded to 10 and
+        # stayed there when the phases went to 20, so every seat stalled
+        # halfway up the ladder while the player kept climbing.
+        last = PHASE_COUNT
+        # Seated on the last phase from the start: seats are built from
+        # opponent_phases, so setting it after start_hand would only desync
+        # the two.
         s = session(opponents=3)
-        s._opponent_phases = [10, 10, 10]
+        s._opponent_phases = [last] * 3
         s.set_items([PHASE_UNLOCK.format(1)])
         hand = s.start_hand(1)
-        self.assertEqual([seat.phase for seat in s.seats], [10, 10, 10])
+        self.assertEqual([seat.phase for seat in s.seats], [last] * 3)
         for seat in s.seats:
             seat.laid_down = True
         hand.mark_failed("test")
         s.finish_hand(hand)
-        self.assertEqual(s.opponent_phases, [10, 10, 10])
+        self.assertEqual(s.opponent_phases, [last] * 3)
+
+    def test_a_seat_below_the_last_phase_still_climbs(self) -> None:
+        """The cap has to stop the top seat without pinning the rest -- a
+        `min` that fired one phase early would pass the test above."""
+        s = session(opponents=1)
+        s._opponent_phases = [PHASE_COUNT - 1]
+        s.set_items([PHASE_UNLOCK.format(1)])
+        hand = s.start_hand(1)
+        s.seats[0].laid_down = True
+        hand.mark_failed("test")
+        s.finish_hand(hand)
+        self.assertEqual(s.opponent_phases, [PHASE_COUNT])
+
+    # -- what the seats are caught holding ---------------------------------
+    def test_a_seat_scores_what_it_is_caught_holding(self) -> None:
+        s, hand = self.opened()
+        s.seats[0].hand = [number_card(12, Color.RED), number_card(5, Color.BLUE)]
+        s.seats[1].hand = []
+        hand.mark_failed("test")
+        s.finish_hand(hand)
+        self.assertEqual(s.opponent_scores[0], 10 + 5)
+        self.assertEqual(s.opponent_scores[1], 0)
+
+    def test_seat_scores_accumulate_across_rounds(self) -> None:
+        """A per-round number would read as a scoreboard and not be one."""
+        s = session(opponents=1)
+        s.set_items([PHASE_UNLOCK.format(1)])
+        for _ in range(2):
+            hand = s.start_hand(1)
+            s.seats[0].hand = [number_card(3, Color.GREEN)]
+            hand.mark_failed("test")
+            s.finish_hand(hand)
+        self.assertEqual(s.opponent_scores, [10])
+
+    def test_seat_scores_survive_a_reconnect(self) -> None:
+        s = session(opponents=2)
+        s.set_items([PHASE_UNLOCK.format(1)])
+        hand = s.start_hand(1)
+        s.seats[0].hand = [WILD]
+        s.seats[1].hand = []
+        hand.mark_failed("test")
+        s.finish_hand(hand)
+        self.assertEqual(s.opponent_scores, [25, 0])
+
+        fresh = session(opponents=2)
+        self.assertTrue(fresh.load_payload(s.to_payload()))
+        self.assertEqual(fresh.opponent_scores, s.opponent_scores)
+
+    def test_a_save_without_seat_scores_still_loads(self) -> None:
+        """Saves written before the seats kept score are the common case on
+        the first connect after an update, and refusing one would throw away
+        a run rather than a field."""
+        s = session(opponents=2)
+        payload = s.to_payload()
+        del payload["opponent_scores"]
+        fresh = session(opponents=2)
+        self.assertTrue(fresh.load_payload(payload))
+        self.assertEqual(fresh.opponent_scores, [0, 0])
 
     def test_progress_survives_a_reconnect(self) -> None:
         """Without this a reconnect reseats everyone on phase 1, which quietly

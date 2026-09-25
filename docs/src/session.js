@@ -36,6 +36,7 @@ export class Phase10Session {
     this.consumedTraps = new Map();
     this.mulligansUsed = 0;
     this._opponentPhases = [];
+    this._opponentScores = [];
     //: The table the current hand is being played at, opponents included.
     this.table = null;
     this.checkedLocations = new Set();
@@ -179,6 +180,19 @@ export class Phase10Session {
     return this._opponentPhases;
   }
 
+  /**
+   * Each seat's running total, the way the pad on the table works.
+   *
+   * Kept on the session rather than on the seat because the seats are rebuilt
+   * from scratch every round, exactly like opponentPhases.
+   */
+  get opponentScores() {
+    if (!this._opponentScores.length) {
+      this._opponentScores = new Array(this.opponents).fill(0);
+    }
+    return this._opponentScores;
+  }
+
   get seats() {
     return this.table ? this.table.seats : [];
   }
@@ -188,11 +202,26 @@ export class Phase10Session {
     const moved = [];
     this.seats.forEach((seat, index) => {
       if (seat.laidDown && index < this.opponentPhases.length) {
-        this._opponentPhases[index] = Math.min(10, seat.phase + 1);
+        this._opponentPhases[index] = Math.min(PHASE_COUNT, seat.phase + 1);
         moved.push(seat.name);
       }
     });
     return moved;
+  }
+
+  /**
+   * Score every seat on what it is caught holding.
+   *
+   * Must run before the round is finished, while the seats still hold the
+   * hands they ended with. Lower is better here as it is for you: the seat
+   * that went out scores nothing, and the one still sitting on a Wild pays
+   * twenty-five for it.
+   */
+  tallyOpponents() {
+    const scores = this.opponentScores;
+    this.seats.forEach((seat, index) => {
+      if (index < scores.length) scores[index] += seat.score;
+    });
   }
 
   startHand(phase, opts = {}) {
@@ -262,6 +291,9 @@ export class Phase10Session {
   finishHand(hand) {
     // Computed first: finishing the round takes the hand off the game.
     const tiers = this.earnedTiers(hand);
+    // Both read the seats as they ended the round, so they come before the
+    // round is finished and the table is torn down.
+    this.tallyOpponents();
     this.advanceOpponents();
     const result = this.game.finishRound(hand);
     this.lastResult = result;
@@ -307,6 +339,7 @@ export class Phase10Session {
       consumed_traps: traps,
       mulligans_used: this.mulligansUsed,
       opponent_phases: [...this._opponentPhases],
+      opponent_scores: [...this._opponentScores],
       locked_phase: this.lockedPhase,
     };
   }
@@ -340,6 +373,14 @@ export class Phase10Session {
     if (Array.isArray(phases)
         && phases.every((v) => Number.isInteger(v) && v >= 1 && v <= PHASE_COUNT)) {
       this._opponentPhases = [...phases];
+    }
+
+    // Absent in saves written before the seats kept score, so a missing key
+    // restores as zero rather than refusing the whole payload.
+    const scores = payload.opponent_scores;
+    if (Array.isArray(scores)
+        && scores.every((v) => Number.isInteger(v) && v >= 0)) {
+      this._opponentScores = [...scores];
     }
 
     const locked = payload.locked_phase;
