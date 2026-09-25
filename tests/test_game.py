@@ -147,6 +147,18 @@ def test_scorecard_reports_totals():
     assert any(line.startswith("best:") for line in card)
 
 
+def test_scorecard_names_the_round_in_full():
+    """Not "r2". The two ports print this same line to two different
+    clients, so the wording is shared and worth pinning on both sides --
+    docs/test/game_test.mjs has the mirror of this."""
+    g = Phase10Game(random.Random(1))
+    finished(g, 1, HandState.WENT_OUT, [])
+    finished(g, 2, HandState.FAILED, [WILD])
+    rounds = [l for l in g.scorecard() if l.startswith("round")]
+    assert len(rounds) == 2, g.scorecard()
+    assert rounds[1].startswith("round 2   phase 2 "), rounds[1]
+
+
 def test_scorecard_elides_old_rounds():
     g = Phase10Game(random.Random(1))
     for _ in range(15):

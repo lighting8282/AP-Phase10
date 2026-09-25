@@ -10,6 +10,10 @@ import { SKIP, WILD, cardFilename, isWild, points } from "./cards.js";
 const SKIP_FACE = SKIP;
 const WILD_FACE = WILD;
 import { HAND_STATE } from "./engine.js";
+import {
+  HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, milestoneLocationName,
+  phaseLocationName,
+} from "./data.js";
 import { PHASE_COUNT, phaseDescription } from "./phases.js";
 import { Phase10Client } from "./client.js";
 
@@ -289,6 +293,7 @@ function render() {
   renderHand(hand);
   renderDig(hand);
   renderPhases(s);
+  renderChecks(s);
 
   for (const button of document.querySelectorAll("#actions button")) {
     button.disabled = !hand || hand.state !== HAND_STATE.IN_PROGRESS;
@@ -458,6 +463,129 @@ function renderDig(hand) {
   hand.digOptions.forEach((card, index) => {
     box.append(cardButton(card, () => withHand((h) => h.takeDug(index))));
   });
+}
+
+// -- the check list ----------------------------------------------------------
+// What a player asks between rounds is "what is left, and can I get it yet".
+// Answering it used to mean counting phases against the tier table in the
+// README, so this is that table with the seed's own state written onto it.
+
+/**
+ * The checks this seed actually has, from the server when connected.
+ *
+ * `checks_per_phase` is in slot data, so the tier prefix is known offline
+ * too -- but the room knows for certain, and a list that disagrees with the
+ * server about what exists is worse than no list.
+ */
+function seedLocations() {
+  const all = app.client?.room?.allLocations;
+  return Array.isArray(all) && all.length ? new Set(all) : null;
+}
+
+/**
+ * Locations already checked.
+ *
+ * The session's own set is deliberately not persisted -- the server is the
+ * authority -- so on a reconnect it is empty while the room still knows. Both
+ * are merged: the session covers checks made this session before the room
+ * echoes them back.
+ */
+function checkedLocations(session) {
+  const ids = new Set(session.checkedLocations);
+  for (const id of app.client?.room?.checkedLocations ?? []) ids.add(id);
+  return ids;
+}
+
+function checkPill(label, state, title) {
+  const pill = document.createElement("span");
+  pill.className = `chk ${state}`;
+  pill.textContent = label;
+  pill.title = title;
+  return pill;
+}
+
+function renderChecks(session) {
+  const box = el("checks");
+  const mile = el("milestones");
+  box.replaceChildren();
+  mile.replaceChildren();
+
+  const inSeed = seedLocations();
+  const done = checkedLocations(session);
+  const tiers = TIERS.slice(0, session.checksPerPhase);
+  const unlocked = session.unlockedPhases;
+  const cleared = session.clearedPhases;
+
+  // Exactly one cell per column per row, or the next row's label would flow
+  // into whatever space the last one left.
+  // Capped rather than fixed: four tiers at a fixed 7.5rem overflow a phone
+  // sideways, and minmax lets them shrink to fit instead.
+  box.style.gridTemplateColumns =
+    `max-content repeat(${tiers.length}, minmax(0, 7.5rem))`;
+
+  let have = 0;
+  let total = 0;
+
+  for (let phase = 1; phase <= PHASE_COUNT; phase += 1) {
+    const label = document.createElement("span");
+    label.className = "chk-row-label";
+    label.textContent = `Phase ${phase}`;
+    if (cleared.has(phase)) label.classList.add("cleared");
+    else if (!unlocked.has(phase)) label.classList.add("locked");
+    box.append(label);
+
+    for (const tier of tiers) {
+      const name = phaseLocationName(phase, tier);
+      const id = LOCATION_NAME_TO_ID[name];
+      if (inSeed && !inSeed.has(id)) {
+        // Not in this seed at all: a blank keeps the grid aligned without
+        // claiming there is something there to get.
+        box.append(checkPill("", "absent", `${name} is not in this seed`));
+        continue;
+      }
+      total += 1;
+      let state;
+      let why;
+      if (done.has(id)) {
+        state = "done";
+        why = `${name} -- checked`;
+        have += 1;
+        box.append(checkPill(`✓ ${tier}`, state, why));
+        continue;
+      } else if (unlocked.has(phase)) {
+        state = "open";
+        why = `${name} -- playable now`;
+      } else {
+        state = "locked";
+        why = `${name} -- needs Phase ${phase} Unlocked`;
+      }
+      box.append(checkPill(tier, state, why));
+    }
+  }
+
+  // The milestones gate on nothing but playing, so their state is a distance
+  // rather than a lock: how many more hands you have to win.
+  for (const hands of HANDS_WON_MILESTONES) {
+    const name = milestoneLocationName(hands);
+    const id = LOCATION_NAME_TO_ID[name];
+    if (inSeed && !inSeed.has(id)) continue;
+    total += 1;
+    let state;
+    let why;
+    if (done.has(id)) {
+      state = "done";
+      why = `${name} -- checked`;
+      have += 1;
+      mile.append(checkPill(`✓ ${hands}`, state, why));
+      continue;
+    }
+    state = "open";
+    why = `${name} -- ${hands - session.handsWon} more hand(s) to win`;
+    mile.append(checkPill(String(hands), state, why));
+  }
+
+  el("checks-summary").textContent =
+    `${have} of ${total} checked` + (inSeed ? "" : " (not connected -- from your options)");
 }
 
 function renderPhases(session) {

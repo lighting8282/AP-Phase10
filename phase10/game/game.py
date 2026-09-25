@@ -53,7 +53,9 @@ class RoundResult:
             outcome = "cleared"
         else:
             outcome = "failed"
-        return (f"r{self.number:<3} phase {self.phase:<2} {outcome:<9} "
+        # Spelled out rather than "r4": the scorecard is read at a glance and
+        # a one-letter prefix is one more thing to decode.
+        return (f"round {self.number:<3} phase {self.phase:<2} {outcome:<9} "
                 f"{self.score:>4} pts  {self.draws_used} draws")
 
 

@@ -89,7 +89,15 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 #status.live { color: #6ee7a8; }
 #status.error { color: #ff9a9a; }
 
-#summary { font-size: 1.05rem; margin-top: 1rem; }
+#summary {
+  font-size: 1.05rem;
+  margin-top: 1rem;
+  /* Shouted deliberately: it is the one line that says where the whole run
+     stands, and it sat in the same weight as everything around it. */
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
 #objective { margin-top: 0.3rem; }
 #stats { color: var(--muted); margin-top: 0.3rem; }
 
@@ -111,6 +119,49 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 #phases button { min-width: 3rem; }
 #phases button.open { background: var(--accent); }
 #phases button.cleared { background: var(--cleared); }
+
+/* --- the check list ---------------------------------------------------- */
+/* The question between rounds is "what is left, and can I get it yet", and
+   the answer is a grid: a row per phase, a column per tier. */
+h3 { margin: 1rem 0 0.4rem; font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+
+#checks-summary {
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 0.4rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Columns sized to the widest tier name rather than stretched to the
+   container: full-bleed pills made a 20-row grid read as a wall of bars. */
+#checks { display: grid; gap: 0.25rem; align-items: center; justify-content: start; }
+#milestones { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+
+.chk-row-label { font-size: 12px; color: var(--muted); padding-right: 0.4rem; }
+.chk-row-label.cleared { color: var(--ink); }
+.chk-row-label.locked { opacity: 0.45; }
+
+.chk {
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 0 0.4rem;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Taken, available, and not yet reachable. Three states want three weights,
+   not three hues of the same one -- the point is which ones you can go and
+   get right now. */
+.chk.done { background: var(--cleared); border-color: var(--cleared); color: #eafff2; }
+.chk.open { border-color: var(--accent); color: var(--ink); }
+.chk.locked { color: var(--muted); opacity: 0.5; }
+/* A tier this seed does not have: a gap, not a thing you have missed. */
+.chk.absent { border-color: transparent; }
+
+#milestones .chk { min-width: 2.2rem; font-variant-numeric: tabular-nums; }
 
 pre {
   background: var(--panel);

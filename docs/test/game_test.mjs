@@ -143,5 +143,17 @@ many.loadPayload({
 });
 check(many.scorecard(10)[0].includes("4 earlier round(s)"), "scorecard elides old rounds");
 
+// Not "r2". The mirror of test_scorecard_names_the_round_in_full in
+// tests/test_game.py: both ports print this line to their own client, so the
+// wording is shared and pinned on both sides.
+{
+  const rounds = game.scorecard().filter((l) => l.startsWith("round"));
+  eq(rounds.length, 3, "every round is named in full");
+  // Defaulted rather than indexed blind: when the prefix is wrong the filter
+  // comes back empty, and a crash here would take the rest of the suite with
+  // it instead of reporting the one failure.
+  check((rounds[1] ?? "").startsWith("round 2   phase "), "the round number is spelled out");
+}
+
 console.log(`\n${passed} passed, ${failures.length} failed`);
 process.exit(failures.length ? 1 : 0);

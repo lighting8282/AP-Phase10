@@ -39,7 +39,9 @@ export function roundWentOut(result) {
 export function roundToString(r) {
   const outcome = roundWentOut(r) ? "went out" : roundCleared(r) ? "cleared" : "failed";
   return (
-    `r${String(r.number).padEnd(3)} phase ${String(r.phase).padEnd(2)} ` +
+    // Spelled out rather than "r4": the scorecard is read at a glance and a
+    // one-letter prefix is one more thing to decode.
+    `round ${String(r.number).padEnd(3)} phase ${String(r.phase).padEnd(2)} ` +
     `${outcome.padEnd(9)} ${String(r.score).padStart(4)} pts  ${r.drawsUsed} draws`
   );
 }
