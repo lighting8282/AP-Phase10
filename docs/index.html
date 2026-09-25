@@ -32,23 +32,36 @@
     <div id="log" class="log" aria-live="polite"></div>
   </aside>
 
-  <!-- Everything you actually touch. -->
+  <!-- Everything you actually touch, laid out as the table it is: the others
+       across from you, the piles in the middle, your own cards in front. -->
   <section id="center">
     <div id="summary" aria-live="polite"></div>
     <div id="objective"></div>
 
-    <div id="table-wrap" hidden>
-      <h2>The table <small>they race you to go out</small></h2>
-      <div id="table"></div>
-    </div>
+    <div class="felt">
+      <!-- Across the table. -->
+      <div id="table" class="seats"></div>
 
-    <div id="mine-wrap" hidden>
-      <h2>Your phase <small>click a group to play onto it</small></h2>
-      <div id="mine"></div>
-    </div>
+      <!-- The middle of the table: the two piles, and what to do with them. -->
+      <div class="middle">
+        <p id="prompt" aria-live="polite"></p>
+        <button id="stock-pile" class="pile" data-action="draw">
+          <img src="assets/cards/back.png" alt="">
+          <span class="pile-label">Draw <b id="stock-count"></b></span>
+        </button>
+        <button id="discard-pile" class="pile" data-action="draw-discard">
+          <img id="discard-face" src="assets/cards/back.png" alt="">
+          <span class="pile-label">Take discard</span>
+        </button>
+      </div>
 
-    <h2>Your hand <small>click a card to discard it</small></h2>
-    <div id="hand" class="cards"></div>
+      <!-- Your side of it. -->
+      <div class="you seat self">
+        <div class="who">You <span id="you-phase" class="seat-phase"></span></div>
+        <div id="mine" class="melds"></div>
+        <div id="hand" class="cards"></div>
+      </div>
+    </div>
 
     <div id="dig" hidden>
       <h2>Keep one</h2>
@@ -56,8 +69,6 @@
     </div>
 
     <div id="actions">
-      <button data-action="draw">Draw</button>
-      <button data-action="draw-discard">Take discard</button>
       <button data-action="lay">Lay down</button>
       <button data-action="skip">Dig (Skip)</button>
       <button data-action="mulligan" id="mulligan-button">Mulligan</button>

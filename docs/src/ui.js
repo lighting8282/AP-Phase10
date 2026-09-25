@@ -278,7 +278,10 @@ function render() {
   }
   renderStats(s, hand);
 
+  el("you-phase").textContent = hand ? `phase ${hand.phase}` : "";
+
   renderTable(s);
+  renderMiddle(hand);
   renderOwnMelds(hand);
   renderHand(hand);
   renderDig(hand);
@@ -323,17 +326,11 @@ function meldNode(meld) {
 }
 
 function renderTable(session) {
-  const wrap = el("table-wrap");
   const box = el("table");
   const seats = session.seats;
+  // Solo seeds have no table at all. An empty row collapses on its own, so
+  // there is nothing to hide.
   box.replaceChildren();
-  if (!seats.length) {
-    // Solo seeds have no table at all, so the whole block goes away rather
-    // than leaving an empty heading behind.
-    wrap.hidden = true;
-    return;
-  }
-  wrap.hidden = false;
   for (const seat of seats) {
     const div = document.createElement("div");
     div.className = "seat";
@@ -387,15 +384,44 @@ function renderTable(session) {
 }
 
 function renderOwnMelds(hand) {
-  const wrap = el("mine-wrap");
   const box = el("mine");
   box.replaceChildren();
-  if (!hand || !hand.melds.length) {
-    wrap.hidden = true;
-    return;
-  }
-  wrap.hidden = false;
+  if (!hand) return;
   for (const meld of hand.melds) box.append(meldNode(meld));
+}
+
+/**
+ * The middle of the table: the two piles, and what to do with them.
+ *
+ * The piles are the controls. A separate row of Draw / Take discard buttons
+ * asked the player to look away from the card they were deciding about.
+ */
+function renderMiddle(hand) {
+  const stock = el("stock-pile");
+  const discard = el("discard-pile");
+  const face = el("discard-face");
+  const live = Boolean(hand) && hand.state === HAND_STATE.IN_PROGRESS;
+  const drawn = live && hand.drewThisTurn;
+
+  el("stock-count").textContent = hand ? String(hand.stock.length) : "";
+  stock.disabled = !live || drawn || hand.digPending;
+
+  const top = hand ? hand.discardTop : null;
+  discard.classList.toggle("empty", !top);
+  face.src = top ? `assets/cards/${cardFilename(top)}` : "assets/cards/back.png";
+  face.alt = top ? describe(top) : "";
+  discard.title = top ? describe(top) : "the discard pile is empty";
+  discard.disabled = !live || drawn || !top || hand.digPending;
+
+  el("prompt").textContent = promptFor(hand, live, drawn);
+}
+
+function promptFor(hand, live, drawn) {
+  if (!hand) return "* Pick a phase below to start a round *";
+  if (!live) return "* The round is over *";
+  if (hand.digPending) return "* Keep one of the dug cards *";
+  if (!drawn) return "* Draw or pick up a card *";
+  return "* Play what you can, then discard a card *";
 }
 
 function renderHand(hand) {
@@ -438,7 +464,9 @@ function renderPhases(session) {
 }
 
 // -- wiring ------------------------------------------------------------------
-for (const button of document.querySelectorAll("#actions button")) {
+// The piles carry the same data-action attributes the buttons do, so drawing
+// from the table and drawing from a button are the one code path.
+for (const button of document.querySelectorAll("#actions button, .pile")) {
   button.addEventListener("click", () => ACTIONS[button.dataset.action]());
 }
 

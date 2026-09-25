@@ -168,7 +168,25 @@ pre {
 .c-bold { font-weight: 700; }   .c-underline { text-decoration: underline; }
 
 /* --- the table ------------------------------------------------------- */
-#table { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: flex-start; }
+/* Laid out as the table it is: the others across from you, the two piles in
+   the middle, your own cards in front of you. Reading who is close to going
+   out is then a matter of looking across rather than of parsing a list. */
+.felt {
+  margin-top: 1rem;
+  padding: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background:
+    radial-gradient(ellipse at 50% 45%, #15543d 0%, #103c2c 58%, #0c2a20 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+/* Stretch, not flex-start: seats of different heights read as a ragged list
+   rather than as places at one table. */
+.seats { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: stretch; }
+.seats:empty { display: none; }
 
 .seat {
   flex: 1 1 11rem;
@@ -210,7 +228,64 @@ pre {
    threat -- worth reading at a glance rather than from the text. */
 .seat.laid { border-color: var(--accent); }
 .seat.out { border-color: #ff9a9a; }
+
+/* A colour per seat, so "who just laid down" is answered by where you are
+   looking rather than by re-reading names. Yours is the accent blue. */
+.seat { border-top: 3px solid var(--seat, var(--line)); }
+.seats .seat:nth-child(1) { --seat: #55b976; }
+.seats .seat:nth-child(2) { --seat: #d9695f; }
+.seats .seat:nth-child(3) { --seat: #d6b348; }
+.seats .seat:nth-child(4) { --seat: #b07fd0; }
+.seats .seat:nth-child(1) .who { color: #8ade9b; }
+.seats .seat:nth-child(2) .who { color: #ff9a9a; }
+.seats .seat:nth-child(3) .who { color: #ffd479; }
+.seats .seat:nth-child(4) .who { color: #dcb6f5; }
 .seat.out .who { color: #ff9a9a; }
+
+/* --- the middle of the table ------------------------------------------ */
+.middle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+#prompt {
+  margin: 0;
+  flex: 0 1 13rem;
+  text-align: right;
+  color: var(--ink);
+}
+#prompt:empty { display: none; }
+
+/* The piles are the draw and the take: they are the control, not a picture
+   of one, because that is the thing on the table you reach for. */
+.pile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.28);
+}
+.pile img { width: 76px; height: 114px; border-radius: 8px; display: block; }
+.pile:hover:not(:disabled) img { outline: 2px solid var(--accent); }
+.pile-label { font-size: 12px; color: var(--muted); }
+.pile-label b { color: var(--ink); font-variant-numeric: tabular-nums; }
+/* An empty discard is a slot, not a card. */
+.pile.empty img { visibility: hidden; }
+.pile.empty { border-style: dashed; }
+
+/* --- your own side ----------------------------------------------------- */
+/* In a column the seat's flex basis would become a height; it is a block
+   here, sized by its cards. */
+.you { flex: 0 0 auto; --seat: var(--accent); }
+.you .who { color: #8ab4ff; }
+.you .cards { margin-top: 0.5rem; }
+.you .melds:empty { display: none; }
 
 /* --- your own groups, and hittable ones ------------------------------- */
 #mine { display: flex; flex-wrap: wrap; gap: 0.45rem; }
@@ -304,6 +379,15 @@ button.meld::after {
   /* A meld is a row of small cards; the row is the target, so give it the
      same floor rather than enlarging the cards themselves. */
   button.meld { min-height: 44px; }
+
+  /* Three seats at 11rem stack on a phone, and the piles and your own cards
+     -- the parts you touch -- end up two screens down. They stay a row: the
+     seat shrinks, and the fan of backs overlaps harder to fit it. */
+  .seats .seat { flex: 1 1 6rem; min-width: 0; padding: 0.4rem; font-size: 13px; }
+  .seats .seat-hand { padding-left: 12px; }
+  .seats .seat-hand img { width: 18px; height: 27px; margin-left: -12px; }
+  .seats .melds { gap: 0.3rem; }
+  #prompt { flex: 1 1 100%; text-align: center; }
 
   /* Rem heights are a large slice of a phone screen. Cap by viewport so the
      log and scorecard stay panels rather than pages. */
