@@ -85,7 +85,12 @@ button { cursor: pointer; background: #22304d; }
 button:hover:not(:disabled) { background: #2c3e63; }
 button:disabled { opacity: 0.4; cursor: not-allowed; }
 
+#free-play-offer { margin: 0.5rem 0 0; color: var(--muted); font-size: 13px; }
+header.slim #free-play-offer { display: none; }
+#free-play-controls { margin-top: 0.6rem; }
+
 #status { color: var(--muted); }
+#status.free { color: #8ab4ff; }
 #status.live { color: #6ee7a8; }
 #status.error { color: #ff9a9a; }
 

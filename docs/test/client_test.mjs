@@ -63,6 +63,41 @@ const packet = { cmd: "PrintJSON", data: [{ text: "one line, one packet" }] };
   check("three connects redraw once per item batch", renders, 1);
 }
 
+// -- free play ---------------------------------------------------------------
+// The mode for someone who has never heard of Archipelago: no socket is
+// touched at all, so none of it is stubbed here. What matters is that the run
+// is playable, that the phases open one at a time, and that nothing tries to
+// reach a server.
+{
+  const logs = [];
+  const app = new Phase10Client({ onLog: (line) => logs.push(line) });
+  // Any call on the socket would throw, which is the point: free play must
+  // not reach for one.
+  app.client.login = () => { throw new Error("free play must not log in"); };
+  app.client.check = () => { throw new Error("free play must not send checks"); };
+
+  await app.startFreePlay({ fresh: true });
+  check("free play is offline", app.offline, true);
+  check("and not connected", app.connected, false);
+  check("phase 1 is open", [...app.session.unlockedPhases], [1]);
+  check("with the full deck of wilds", app.session.count("Wild Card"), 8);
+  check("and eight draws in total", app.session.config.maxDraws, 8);
+  check("three opponents", app.session.opponents, 3);
+  check("no store", app.session.storeSlots, 0);
+
+  // Clearing a phase opens the next one, which is how the printed game goes.
+  const hand = app.startHand(1);
+  hand.layDown = () => {};
+  hand.state = "went_out";
+  await app.settle(hand);
+  check("clearing phase 1 opens phase 2", [...app.session.unlockedPhases].sort((a, b) => a - b), [1, 2]);
+  check("and says so", logs.some((l) => l.includes("Phase 2 is open")), true);
+
+  // Saving must not throw where there is no localStorage, which is Node, and
+  // is also a private window.
+  check("a round was recorded", app.session.game.rounds.length, 1);
+}
+
 for (const line of failures) console.log(`  FAIL ${line}`);
 console.log(`\n${passed} passed, ${failures.length} failed`);
 process.exit(failures.length ? 1 : 0);

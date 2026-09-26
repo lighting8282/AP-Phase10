@@ -482,6 +482,16 @@ async function buy(slot) {
   render();
 }
 
+/**
+ * Free play has no server, so it has no checks and no store.
+ *
+ * Both panels would otherwise sit there listing things that can never be
+ * taken -- a check list where nothing is checkable is worse than no list.
+ */
+function apPanelsVisible() {
+  return !app.offline;
+}
+
 function renderStore(session) {
   const box = el("store");
   const summary = el("store-summary");
@@ -490,8 +500,8 @@ function renderStore(session) {
   // A seed with no store loses the whole section rather than keeping a
   // heading over an explanation of why there is nothing under it.
   const slots = session.storeSlots;
-  el("store-wrap").hidden = !slots;
-  if (!slots) return;
+  el("store-wrap").hidden = !slots || !apPanelsVisible();
+  if (el("store-wrap").hidden) return;
 
   summary.textContent =
     `${session.pointsLeft} unspent of ${session.points} AP Points received`;
@@ -560,6 +570,9 @@ function renderChecks(session) {
   const mile = el("milestones");
   box.replaceChildren();
   mile.replaceChildren();
+
+  el("checks-wrap").hidden = !apPanelsVisible();
+  if (!apPanelsVisible()) return;
 
   const inSeed = seedLocations();
   const done = checkedLocations(session);
@@ -687,6 +700,25 @@ function setConnectionFormOpen(open) {
 
 el("edit-connection").addEventListener("click", () => setConnectionFormOpen(true));
 
+// -- free play ---------------------------------------------------------------
+async function startFreePlay(fresh) {
+  const status = el("status");
+  await app.startFreePlay({ fresh });
+  status.className = "free";
+  status.textContent = "free play - no server";
+  setConnectionFormOpen(false);
+  el("free-play-controls").hidden = false;
+  render();
+}
+
+el("free-play").addEventListener("click", () => startFreePlay(false));
+el("free-play-reset").addEventListener("click", () => {
+  // Deliberately confirmed: it throws away a scorecard that only exists here,
+  // with nothing on a server to restore it from.
+  if (!globalThis.confirm?.("Start a new run? The current scorecard is lost.")) return;
+  startFreePlay(true);
+});
+
 el("connect").addEventListener("submit", async (event) => {
   event.preventDefault();
   const status = el("status");
@@ -698,6 +730,8 @@ el("connect").addEventListener("submit", async (event) => {
     await app.connect(el("url").value.trim(), el("slot").value.trim(), el("password").value);
     status.className = "live";
     status.textContent = `connected as ${el("slot").value.trim()}`;
+    // Connecting after a free-play run takes its controls away with it.
+    el("free-play-controls").hidden = true;
     // The form is used once. On a phone it was eating a fifth of the screen
     // for the rest of the session, permanently, above everything you play
     // with -- so it folds away and leaves the one line worth keeping.

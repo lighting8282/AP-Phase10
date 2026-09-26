@@ -20,6 +20,10 @@
     <input id="password" type="password" placeholder="Password" size="12" aria-label="Password">
     <button type="submit" id="connect-button">Connect</button>
   </form>
+  <!-- The way in for anyone without a slot: the same game, no server. -->
+  <p id="free-play-offer">
+    No Archipelago room? <button type="button" id="free-play">Just play</button>
+  </p>
 </header>
 
 <main class="board">
@@ -76,6 +80,9 @@
 
     <h2>Phases</h2>
     <div id="phases"></div>
+    <div id="free-play-controls" hidden>
+      <button type="button" id="free-play-reset">Start a new run</button>
+    </div>
 
     <div id="store-wrap" hidden>
       <h2>Store <small>buy a check with AP Points</small></h2>
@@ -83,11 +90,13 @@
       <div id="store"></div>
     </div>
 
-    <h2>Checks <small>every one this seed has, and where you are</small></h2>
-    <div id="checks-summary"></div>
-    <div id="checks"></div>
-    <h3>Hands won</h3>
-    <div id="milestones"></div>
+    <div id="checks-wrap">
+      <h2>Checks <small>every one this seed has, and where you are</small></h2>
+      <div id="checks-summary"></div>
+      <div id="checks"></div>
+      <h3>Hands won</h3>
+      <div id="milestones"></div>
+    </div>
   </section>
 
   <!-- What you are working with right now: glanced at constantly. -->

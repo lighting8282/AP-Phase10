@@ -48,6 +48,7 @@ on their own.
   - [Checking it](#checking-it)
 - [Persistence](#persistence)
 - [Browser version](#browser-version)
+  - [Free play, with no server](#free-play-with-no-server)
   - [Verified against a live server](#verified-against-a-live-server-1)
   - [One bug that only a browser could have found](#one-bug-that-only-a-browser-could-have-found)
   - [Serving it on Pages](#serving-it-on-pages)
@@ -797,6 +798,34 @@ The card faces exist twice, under `phase10/` and under `docs/`, because the
 apworld ships as a zip of `phase10/` and Pages cannot reach above `docs/`. One
 run of `tools/generate_cards.py` writes both rather than leaving the second to
 be remembered.
+
+### Free play, with no server
+
+The page opens on a connection form, which is a wall for anyone who has never
+heard of Archipelago — and the game underneath it is a perfectly good game of
+Phase 10 on its own. **Just play** starts a run with no room, no slot and no
+login.
+
+It is the printed game rather than a sandbox: the full eight wilds, eight total
+draws (the point past which more were measured to buy nothing), two Skips,
+three Mulligans, three opponents — and **the phases open one at a time as they
+are cleared**. Archipelago's out-of-order unlocking is the thing being replaced
+here, so handing over all twenty at once would miss the point.
+
+The unlocks are recomputed from the scorecard rather than accumulated, so they
+are right after a restore without ever having been saved, and replaying a
+cleared phase cannot open two.
+
+The run is kept in `localStorage`, so it survives a reload but lives only in
+that browser: no server holds it, and clearing site data ends it. Every read
+and write is wrapped, because storage can be absent, full, or refuse outright
+in a private window, and none of those is a reason to stop playing. Free play
+touches no socket at all — the test asserts that by making `login` and `check`
+throw.
+
+The store and the check list are hidden in free play. Both would otherwise list
+things that can never be taken, and a check list where nothing is checkable is
+worse than no list.
 
 ### Verified against a live server
 

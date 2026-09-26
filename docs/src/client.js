@@ -11,9 +11,39 @@
 
 import { Client } from "../node_modules/archipelago.js/dist/index.js";
 
-import { GAME_NAME } from "./data.js";
+import { EXTRA_DRAW, GAME_NAME, MULLIGAN, PHASE_COUNT, SKIP_CARD, WILD_CARD, phaseUnlock }
+  from "./data.js";
 import { Phase10Game, roundToString } from "./game.js";
 import { Phase10Session } from "./session.js";
+
+/**
+ * The deck a free-play run is dealt, with no Archipelago to hand items out.
+ *
+ * Chosen to be the printed game rather than a sandbox: the full eight wilds,
+ * and four Extra Draws on top of the four a hand starts with -- eight total,
+ * which is the point past which more draws were measured to buy nothing. Two
+ * Skips and three Mulligans because they are the parts of this world that a
+ * player who never touches Archipelago would otherwise never see.
+ */
+const FREE_PLAY_DECK = [
+  ...Array(8).fill(WILD_CARD),
+  ...Array(4).fill(EXTRA_DRAW),
+  ...Array(2).fill(SKIP_CARD),
+  ...Array(3).fill(MULLIGAN),
+];
+
+/** Slot data for a run with no slot. Twenty phases, three opponents. */
+const FREE_PLAY_SLOT = Object.freeze({
+  goal: 0,
+  starting_draws: 4,
+  checks_per_phase: 0,
+  opponents: 3,
+  death_link: false,
+  store_slots: 0,
+});
+
+/** Where a free-play run is kept. Per browser, per device, and nowhere else. */
+const FREE_PLAY_KEY = "ap10_free_play";
 
 export class Phase10Client {
   constructor({ onUpdate = () => {}, onLog = () => {}, onMessage = () => {} } = {}) {
@@ -27,6 +57,9 @@ export class Phase10Client {
     this.onMessage = onMessage;
 
     this.connected = false;
+    //: Playing with no server at all. Not the same as disconnected: a
+    //: free-play run has its own items, its own saves, and no checks.
+    this.offline = false;
     this.restoreState = "needed";
     this.goalSent = false;
 
@@ -73,6 +106,81 @@ export class Phase10Client {
     return `phase10_game_${self?.team ?? 0}_${self?.slot ?? 0}`;
   }
 
+  // -- free play -----------------------------------------------------------
+
+  /**
+   * Start a run with no server, no slot and no login.
+   *
+   * The phases open one at a time as they are cleared, which is how the
+   * printed game is played -- Archipelago's out-of-order unlocking is the
+   * thing being replaced here, so restoring it as "everything at once" would
+   * miss the point. Nothing is checked and nothing is sent; the run lives in
+   * this browser.
+   */
+  async startFreePlay({ fresh = false } = {}) {
+    this.connected = false;
+    this.offline = true;
+    this.goalSent = false;
+    this.session = Phase10Session.fromSlotData(FREE_PLAY_SLOT, new Phase10Game());
+    this.restoreState = "needed";
+
+    if (fresh) this.#writeLocal(null);
+    this.#restoreLocal();
+    this.restoreState = "done";
+    this.#grantFreePlayItems();
+    this.onLog(
+      fresh
+        ? "New free-play run. Phase 1 is open; clear it to open the next."
+        : "Free play -- no server. Phase 1 is open; clear it to open the next.",
+    );
+    this.onUpdate();
+    return this.session;
+  }
+
+  /**
+   * Hand out the free-play deck, plus one phase unlock per phase cleared.
+   *
+   * Recomputed from the scorecard rather than accumulated, so it is right
+   * after a restore without the unlocks having been saved -- and a replayed
+   * phase cannot open two.
+   */
+  #grantFreePlayItems() {
+    const open = Math.min(this.session.clearedPhases.size + 1, PHASE_COUNT);
+    const items = [...FREE_PLAY_DECK];
+    for (let phase = 1; phase <= open; phase += 1) items.push(phaseUnlock(phase));
+    this.session.setItems(items);
+  }
+
+  #writeLocal(payload) {
+    // Storage can be absent, full, or refuse outright in a private window, and
+    // none of those is a reason to stop playing.
+    try {
+      if (typeof localStorage === "undefined") return;
+      if (payload === null) localStorage.removeItem(FREE_PLAY_KEY);
+      else localStorage.setItem(FREE_PLAY_KEY, JSON.stringify(payload));
+    } catch {
+      /* not worth telling the player about */
+    }
+  }
+
+  #restoreLocal() {
+    let stored = null;
+    try {
+      if (typeof localStorage === "undefined") return;
+      const raw = localStorage.getItem(FREE_PLAY_KEY);
+      stored = raw === null ? null : JSON.parse(raw);
+    } catch {
+      return;
+    }
+    if (stored === null) return;
+    if (this.session.loadPayload(stored)) {
+      const game = this.session.game;
+      this.onLog(`Restored ${game.rounds.length} round(s), ${game.totalScore} points.`);
+    } else {
+      this.onLog("The saved run could not be read; starting a fresh one.");
+    }
+  }
+
   // -- connection ----------------------------------------------------------
   async connect(url, slotName, password = "") {
     // Omit the key entirely when there is no password. archipelago.js spreads
@@ -84,6 +192,8 @@ export class Phase10Client {
     if (password) options.password = password;
 
     const slotData = await this.client.login(url, slotName, GAME_NAME, options);
+    // A connect after free play must not leave the local-save path armed.
+    this.offline = false;
 
     this.session = Phase10Session.fromSlotData(slotData, new Phase10Game());
     this.goalSent = false;
@@ -137,7 +247,12 @@ export class Phase10Client {
   }
 
   async save() {
-    if (!this.connected || this.restoreState !== "done") return;
+    if (this.restoreState !== "done") return;
+    if (this.offline) {
+      this.#writeLocal(this.session.toPayload());
+      return;
+    }
+    if (!this.connected) return;
     try {
       await this.client.storage
         .prepare(this.saveKey, {})
@@ -183,6 +298,12 @@ export class Phase10Client {
 
     if (fresh.length && this.connected) {
       this.client.check(...fresh);
+    }
+    if (this.offline) {
+      const before = this.session.unlockedPhases.size;
+      this.#grantFreePlayItems();
+      const after = this.session.unlockedPhases.size;
+      if (after > before) this.onLog(`Phase ${after} is open.`);
     }
     await this.save();
 
