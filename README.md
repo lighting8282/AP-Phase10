@@ -7,20 +7,101 @@ and Archipelago world in one package, no mod loader, no IPC. Structured after
 The engine has no Archipelago dependency, so the rules can be tested and tuned
 on their own.
 
+## Contents
+
+<!-- toc -->
+
+- [Layout](#layout)
+- [Run](#run)
+- [Apworld](#apworld)
+  - [Two fill failures worth remembering](#two-fill-failures-worth-remembering)
+- [Solo model](#solo-model)
+- [Measured difficulty](#measured-difficulty)
+  - [Findings](#findings)
+  - [Logic requirements implied by the data](#logic-requirements-implied-by-the-data)
+- [Open design questions](#open-design-questions)
+- [Client](#client)
+  - [The log](#the-log)
+  - [Verified against a live server](#verified-against-a-live-server)
+- [Environment](#environment)
+- [Skips](#skips)
+- [Twenty phases](#twenty-phases)
+  - [A ceiling you cannot design past](#a-ceiling-you-cannot-design-past)
+  - [Anchored groups](#anchored-groups)
+  - [Two ID collisions, one caught and one nearly missed](#two-id-collisions-one-caught-and-one-nearly-missed)
+  - [The pool could not absorb the locations](#the-pool-could-not-absorb-the-locations)
+- [Opponents](#opponents)
+  - [The two clocks do not layer](#the-two-clocks-do-not-layer)
+  - [A latent bug the trim uncovered](#a-latent-bug-the-trim-uncovered)
+  - [Hitting](#hitting)
+  - [What the tiers are worth now](#what-the-tiers-are-worth-now)
+  - [The tier order is a tuning decision](#the-tier-order-is-a-tuning-decision)
+  - [Still not built](#still-not-built)
+  - [Keeping the two ports honest](#keeping-the-two-ports-honest)
+- [Fillers](#fillers)
+- [The store](#the-store)
+  - [The gate is not the price](#the-gate-is-not-the-price)
+  - [Sizing it, measured](#sizing-it-measured)
+  - [It runs alongside the phases](#it-runs-alongside-the-phases)
+- [Game and scoring](#game-and-scoring)
+- [UI](#ui)
+  - [Checking it](#checking-it)
+- [Persistence](#persistence)
+- [Browser version](#browser-version)
+  - [Verified against a live server](#verified-against-a-live-server-1)
+  - [One bug that only a browser could have found](#one-bug-that-only-a-browser-could-have-found)
+  - [Serving it on Pages](#serving-it-on-pages)
+- [Multiworld](#multiworld)
+- [DeathLink](#deathlink)
+- [A word on the version floor](#a-word-on-the-version-floor)
+- [Packaging](#packaging)
+  - [Two things packaging broke that source never would](#two-things-packaging-broke-that-source-never-would)
+- [Not built yet](#not-built-yet)
+- [Naming](#naming)
+
+<!-- /toc -->
+
 ## Layout
 
     phase10/                     the apworld package
-      world.py options.py items.py locations.py regions.py rules.py
-      test/                      37 world tests, run inside an AP checkout
+      world.py                   the World subclass
+      options.py items.py locations.py regions.py rules.py data.py
+      client/                    the in-process client
+        context.py               CommonContext, commands, the AP loop
+        session.py               items and slot data -> a playable run
+        game_manager.py          the Kivy tab
       game/                      the engine, no Archipelago dependency
         cards.py                 card model, deck construction, scoring
-        phases.py                phase specs + the solver
-        engine.py                solo hand: deal, draw, discard, lay down
+        phases.py                phase specs, the solver, melds
+        engine.py                one hand: deal, draw, discard, lay down, hit
+        opponents.py             the computer seats
+        game.py                  many hands, one scorecard
         autoplay.py              greedy autoplayer (difficulty measurement)
         play_in_console.py       headless runner and difficulty sweeps
+      test/                      world and session tests, run in an AP checkout
+      docs/                      the setup and game-info pages AP ships
+
+    docs/                        the browser client, served by GitHub Pages
+      src/                       a port of game/ and client/ to JavaScript
+      test/                      its own tests, plus the differential fixtures
+
     tests/test_phases.py         engine tests, no dependencies
+    tests/test_game.py           game, opponents and scorecard tests
+    tests/ui_check.py            drives the Kivy tab and screenshots it
     tests/yaml/solo/             single-slot generation smoke test
     tests/yaml/multi/            four-slot multiworld, two of them this game
+
+    tools/                       build, export and check scripts
+      build_apworld.py           package phase10/ as an installable .apworld
+      check_js_tables.py         diff data.js against data.py
+      check_multiworld.py        generate the four-slot multiworld
+      check_store_balance.py     generate across the store's option grid
+      update_toc.py              rewrite this file's contents list
+      export_*.py                record fixtures for the JS port to replay
+
+The two ports are kept honest by differential fixtures: Python records concrete
+decks and traces, and the JavaScript replays them and must reach the same
+state. See [Keeping the two ports honest](#keeping-the-two-ports-honest).
 
 ## Run
 
