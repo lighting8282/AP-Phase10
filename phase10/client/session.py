@@ -143,7 +143,9 @@ class Phase10Session:
         return GameConfig(
             hand_size=max(4, hand_size),
             wilds_in_deck=max(0, min(wilds, STOCK_WILDS)),
-            max_draws=max(1, draws),
+            # Zero starting draws means no budget at all, which only free
+            # play asks for: the Archipelago option starts at 2.
+            max_draws=0 if self.starting_draws <= 0 else max(1, draws),
             starting_skips=min(self.items[SKIP_CARD], MAX_SKIPS),
         )
 

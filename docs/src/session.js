@@ -133,7 +133,9 @@ export class Phase10Session {
     return gameConfig({
       handSize: Math.max(4, handSize),
       wildsInDeck: Math.max(0, Math.min(wilds, STOCK_WILDS)),
-      maxDraws: Math.max(1, draws),
+      // Zero starting draws means no budget at all, which only free play
+      // asks for: the Archipelago option starts at 2.
+      maxDraws: this.startingDraws <= 0 ? 0 : Math.max(1, draws),
       startingSkips: Math.min(this.count(SKIP_CARD), MAX_SKIPS),
     });
   }

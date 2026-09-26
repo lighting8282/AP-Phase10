@@ -167,6 +167,112 @@ def test_scorecard_elides_old_rounds():
     assert any("10 earlier round(s)" in line for line in card)
 
 
+# -- no draw budget -----------------------------------------------------------
+# Free play takes the budget away entirely: a round ends when somebody empties
+# their hand, the way the printed game does. Archipelago never asks for this --
+# starting_draws starts at 2 -- so these guard the free-play path.
+
+
+def test_zero_max_draws_is_unlimited():
+    h = PhaseHand(1, GameConfig(wilds_in_deck=0, max_draws=0), random.Random(1),
+                  table=Table())
+    assert h.unlimited_draws
+    assert h.draws_left is None
+
+
+def test_a_budget_still_reports_a_number():
+    h = PhaseHand(1, GameConfig(wilds_in_deck=0, max_draws=6), random.Random(1),
+                  table=Table())
+    assert not h.unlimited_draws
+    assert h.draws_left == 6
+
+
+def test_no_budget_never_runs_out_of_road():
+    """The failure mode this replaces: with a budget, twenty turns of drawing
+    and discarding ends the hand. Without one it must not."""
+    h = PhaseHand(1, GameConfig(wilds_in_deck=0, max_draws=0), random.Random(3),
+                  table=Table())
+    for _ in range(20):
+        if h.state is not HandState.IN_PROGRESS:
+            break
+        h.draw()
+        h.discard_card(h.hand[-1])
+    assert h.state is HandState.IN_PROGRESS
+    assert h.draws_used == 20
+
+
+def test_an_empty_stock_is_refilled_from_the_discard():
+    """Without a budget a long round drains the stock, and treating that as a
+    lost hand is a way to lose that is in no version of the rules."""
+    h = PhaseHand(1, GameConfig(wilds_in_deck=0, max_draws=0), random.Random(5),
+                  table=Table())
+    # Move the whole stock to the discard, which is what a long round does.
+    h.discard.extend(h.table.stock)
+    h.table.stock.clear()
+    top = h.discard[-1]
+    before = len(h.discard)
+
+    card = h.draw()
+    assert h.state is HandState.IN_PROGRESS
+    assert card is not None
+    # The face-up card stays face up; everything under it is back in the stock.
+    assert h.discard == [top]
+    assert len(h.table.stock) == before - 2  # minus the top, minus the draw
+    assert any(e.kind == "stock_refilled" for e in h.events)
+
+
+def test_the_refilled_stock_is_shuffled():
+    """Not which order -- that would be testing the RNG -- but that it is not
+    the order they were thrown in. A refill that kept it would deal the cards
+    just discarded straight back, in sequence."""
+    h = PhaseHand(1, GameConfig(wilds_in_deck=0, max_draws=0), random.Random(11),
+                  table=Table())
+    h.discard.extend(h.table.stock)
+    h.table.stock.clear()
+    thrown = [str(c) for c in h.discard[:-1]]
+
+    h.draw()
+    refilled = [str(c) for c in h.table.stock]
+    assert sorted(refilled + [str(h.hand[-1])]) == sorted(thrown)
+    # An unshuffled refill leaves exactly the thrown order with the drawn card
+    # taken off the front, so that is the sequence to rule out.
+    assert refilled != thrown[1:]
+
+
+def test_an_empty_discard_is_not_reshuffled():
+    """The guard is for length zero, not length one.
+
+    A player can draw the last card off the discard, so an empty one is
+    reachable -- and reshuffling it pops from an empty list. This has to be the
+    ordinary end of the hand, not an IndexError out of the engine.
+    """
+    h = PhaseHand(1, GameConfig(wilds_in_deck=0, max_draws=0), random.Random(5),
+                  table=Table())
+    h.table.stock.clear()
+    h.discard.clear()
+    try:
+        h.draw()
+    except RuntimeError as err:
+        assert "stock is empty" in str(err)
+    else:
+        raise AssertionError("drawing from nothing should have failed")
+    assert h.state is HandState.FAILED
+
+
+def test_a_stock_and_discard_both_empty_still_fails():
+    """The refill is not a promise of infinite cards. With nothing to shuffle
+    back, an empty stock is still the end of the hand."""
+    h = PhaseHand(1, GameConfig(wilds_in_deck=0, max_draws=0), random.Random(5),
+                  table=Table())
+    h.table.stock.clear()
+    del h.discard[:-1]
+    try:
+        h.draw()
+    except RuntimeError:
+        pass
+    assert h.state is HandState.FAILED
+
+
 # -- Mulligan (engine level) --------------------------------------------------
 # The session carries its own copy of these guards so it can explain a refusal
 # in words. These test the engine's, which is what protects any other driver --

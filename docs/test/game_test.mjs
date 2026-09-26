@@ -11,7 +11,7 @@
  */
 
 import { SKIP, WILD, numberCard } from "../src/cards.js";
-import { HAND_STATE, gameConfig, mulberry32 } from "../src/engine.js";
+import { HAND_STATE, PhaseHand, Table, gameConfig, mulberry32 } from "../src/engine.js";
 import { Phase10Game, SAVE_VERSION, roundToString } from "../src/game.js";
 
 let passed = 0;
@@ -153,6 +153,53 @@ check(many.scorecard(10)[0].includes("4 earlier round(s)"), "scorecard elides ol
   // comes back empty, and a crash here would take the rest of the suite with
   // it instead of reporting the one failure.
   check((rounds[1] ?? "").startsWith("round 2   phase "), "the round number is spelled out");
+}
+
+
+// -- no draw budget ---------------------------------------------------------
+// The mirror of the block of the same name in tests/test_game.py. Free play
+// takes the budget away entirely; Archipelago never asks for it, because the
+// starting_draws option starts at 2.
+{
+  const bare = (maxDraws) =>
+    new PhaseHand(1, gameConfig({ wildsInDeck: 0, maxDraws }),
+      { random: mulberry32(9), table: new Table() });
+
+  const free = bare(0);
+  check(free.unlimitedDraws === true, "zero maxDraws is unlimited");
+  check(free.drawsLeft === null, "and reports no number of draws left");
+
+  const budgeted = bare(6);
+  check(budgeted.unlimitedDraws === false, "a budget is not unlimited");
+  eq(budgeted.drawsLeft, 6, "and still reports a number");
+
+  // With a budget, twenty turns ends the hand. Without one it must not.
+  const long = bare(0);
+  for (let i = 0; i < 20 && long.state === HAND_STATE.IN_PROGRESS; i += 1) {
+    long.draw();
+    long.discardCard(long.hand[long.hand.length - 1]);
+  }
+  check(long.state === HAND_STATE.IN_PROGRESS, "no budget never runs out of road");
+  eq(long.drawsUsed, 20, "and every draw was taken");
+
+  // A drained stock comes back from the discard rather than losing the hand.
+  const drained = bare(0);
+  drained.discard.push(...drained.table.stock);
+  drained.table.stock.length = 0;
+  const top = drained.discard[drained.discard.length - 1];
+  const before = drained.discard.length;
+  drained.draw();
+  check(drained.state === HAND_STATE.IN_PROGRESS, "an empty stock is refilled");
+  eq(drained.discard.length, 1, "leaving just the face-up card");
+  eq(drained.discard[0], top, "which is the one that was face up");
+  eq(drained.table.stock.length, before - 2, "and the rest back in the stock");
+
+  // The refill is not a promise of infinite cards.
+  const spent = bare(0);
+  spent.table.stock.length = 0;
+  spent.discard.splice(0, spent.discard.length - 1);
+  try { spent.draw(); } catch { /* expected */ }
+  check(spent.state === HAND_STATE.FAILED, "nothing to shuffle back still fails");
 }
 
 console.log(`\n${passed} passed, ${failures.length} failed`);

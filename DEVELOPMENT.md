@@ -764,11 +764,31 @@ heard of Archipelago — and the game underneath it is a perfectly good game of
 Phase 10 on its own. **Just play** starts a run with no room, no slot and no
 login.
 
-It is the printed game rather than a sandbox: the full eight wilds, eight total
-draws (the point past which more were measured to buy nothing), two Skips,
+It is the printed game rather than a sandbox: the full eight wilds, two Skips,
 three Mulligans, three opponents — and **the phases open one at a time as they
 are cleared**. Archipelago's out-of-order unlocking is the thing being replaced
 here, so handing over all twenty at once would miss the point.
+
+**There is no draw budget.** The budget is the solo model's replacement for the
+race to go out, and free play has the race — three seats at the table — so
+keeping both would be a clock the box has never heard of. `max_draws` of zero
+means unlimited, which only free play asks for: the `starting_draws` option
+starts at 2, so Archipelago cannot reach it and no measured rate moves.
+
+`draws_left` returns `None` rather than a large number, so a caller that
+forgets the unlimited case fails loudly instead of quietly comparing against
+something arbitrary.
+
+Measured over 1200 autoplayed rounds with no budget: with three opponents a
+round ends after a median of 3 draws and at most 15, because the race is a real
+clock. With one opponent, 5 and 32. **With none it never ends at all** — which
+is why free play seats three and does not offer a choice.
+
+Taking the budget away exposed the other clock: this engine treated an empty
+stock as a lost hand, which is a way to lose that is in no version of the
+rules. The stock now refills from the discard, top card left face up, the rest
+shuffled back. With a budget it is unreachable in practice — four players at
+eight draws take 32 of about 60 cards — so it changes nothing about a seed.
 
 The unlocks are recomputed from the scorecard rather than accumulated, so they
 are right after a restore without ever having been saved, and replaying a

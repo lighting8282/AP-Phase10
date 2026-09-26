@@ -147,8 +147,12 @@ function renderStats(session, hand) {
   box.replaceChildren();
 
   if (hand) {
-    box.append(iconTile(ICON_DRAW, hand.drawsLeft, "draws left",
-      hand.drawsLeft === 0 ? "spent" : ""));
+    // null is "no budget", which is free play. A number here would be a
+    // lie, and a large one would look like a countdown that never moves.
+    box.append(hand.drawsLeft === null
+      ? iconTile(ICON_DRAW, "∞", "draws -- no limit")
+      : iconTile(ICON_DRAW, hand.drawsLeft, "draws left",
+        hand.drawsLeft === 0 ? "spent" : ""));
     box.append(iconTile(ICON_STOCK, hand.stock.length, "in the stock"));
     // The discard's icon is the card itself: what is on top is the whole
     // point of looking, and a generic pile symbol would say nothing.
@@ -158,7 +162,9 @@ function renderStats(session, hand) {
     box.append(cardTile(WILD_FACE, hand.config.wildsInDeck, "wilds in the deck"));
   } else {
     const c = session.config;
-    box.append(iconTile(ICON_DRAW, c.maxDraws, "draws per hand"));
+    box.append(c.maxDraws <= 0
+      ? iconTile(ICON_DRAW, "∞", "draws -- no limit")
+      : iconTile(ICON_DRAW, c.maxDraws, "draws per hand"));
     box.append(iconTile(ICON_STOCK, c.handSize, "cards dealt"));
     box.append(cardTile(SKIP_FACE, c.startingSkips, "skips per hand"));
     box.append(cardTile(WILD_FACE, c.wildsInDeck, "wilds in the deck"));

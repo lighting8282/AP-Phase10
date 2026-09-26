@@ -11,7 +11,7 @@
 
 import { Client } from "../node_modules/archipelago.js/dist/index.js";
 
-import { EXTRA_DRAW, GAME_NAME, MULLIGAN, PHASE_COUNT, SKIP_CARD, WILD_CARD, phaseUnlock }
+import { GAME_NAME, MULLIGAN, PHASE_COUNT, SKIP_CARD, WILD_CARD, phaseUnlock }
   from "./data.js";
 import { Phase10Game, roundToString } from "./game.js";
 import { Phase10Session } from "./session.js";
@@ -19,15 +19,13 @@ import { Phase10Session } from "./session.js";
 /**
  * The deck a free-play run is dealt, with no Archipelago to hand items out.
  *
- * Chosen to be the printed game rather than a sandbox: the full eight wilds,
- * and four Extra Draws on top of the four a hand starts with -- eight total,
- * which is the point past which more draws were measured to buy nothing. Two
- * Skips and three Mulligans because they are the parts of this world that a
- * player who never touches Archipelago would otherwise never see.
+ * The printed game rather than a sandbox: the full eight wilds, two Skips and
+ * three Mulligans -- the last two because they are the parts of this world a
+ * player who never touches Archipelago would otherwise never see. No Extra
+ * Draws, because free play has no draw budget for them to extend.
  */
 const FREE_PLAY_DECK = [
   ...Array(8).fill(WILD_CARD),
-  ...Array(4).fill(EXTRA_DRAW),
   ...Array(2).fill(SKIP_CARD),
   ...Array(3).fill(MULLIGAN),
 ];
@@ -35,7 +33,10 @@ const FREE_PLAY_DECK = [
 /** Slot data for a run with no slot. Twenty phases, three opponents. */
 const FREE_PLAY_SLOT = Object.freeze({
   goal: 0,
-  starting_draws: 4,
+  // No budget: a round ends when somebody empties their hand, the way the
+  // printed game does, rather than when a clock the box has never heard of
+  // runs down.
+  starting_draws: 0,
   checks_per_phase: 0,
   opponents: 3,
   death_link: false,

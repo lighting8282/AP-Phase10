@@ -81,11 +81,28 @@ const packet = { cmd: "PrintJSON", data: [{ text: "one line, one packet" }] };
   check("and not connected", app.connected, false);
   check("phase 1 is open", [...app.session.unlockedPhases], [1]);
   check("with the full deck of wilds", app.session.count("Wild Card"), 8);
-  check("and eight draws in total", app.session.config.maxDraws, 8);
+  // No budget at all: a free-play round ends when somebody empties their hand,
+  // the way the printed game does.
+  check("no draw budget", app.session.config.maxDraws, 0);
+  const free = app.startHand(1);
+  check("which the hand reports as unlimited", free.unlimitedDraws, true);
+  check("and as no number of draws left", free.drawsLeft, null);
+  // Drawing past what would have been the budget must not end anything.
+  for (let i = 0; i < 12; i += 1) {
+    if (!free.drewThisTurn) free.draw(false);
+    if (free.hand.length) free.discardCard(free.hand[free.hand.length - 1]);
+    if (free.state !== "in_progress") break;
+  }
+  check("twelve draws in, still no budget failure",
+    free.events.some((e) => e.detail?.reason === "out_of_draws"), false);
+
+  // Three opponents is what makes the round end at all: with none, and no
+  // budget, nothing would ever stop it.
   check("three opponents", app.session.opponents, 3);
   check("no store", app.session.storeSlots, 0);
 
   // Clearing a phase opens the next one, which is how the printed game goes.
+  await app.startFreePlay({ fresh: true });
   const hand = app.startHand(1);
   hand.layDown = () => {};
   hand.state = "went_out";

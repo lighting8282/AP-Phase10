@@ -39,6 +39,9 @@ export function gameConfig(overrides = {}) {
   return {
     handSize: 10,          // "Hand Size +1" items
     wildsInDeck: 8,        // "Wild Card" items
+    // Zero or less means no budget at all, which is how the printed game
+    // plays: the round ends when somebody goes out, not when a clock runs
+    // down. Archipelago never sets it there, so this is the free-play path.
     maxDraws: 20,          // "Extra Draw" items
     startingSkips: 0,      // "Skip Card" items
     // Skips shuffled into the draw pile, for fidelity to the physical deck.
@@ -260,7 +263,19 @@ export class PhaseHand {
     return this.table.discard;
   }
 
+  get unlimitedDraws() {
+    return this.config.maxDraws <= 0;
+  }
+
+  /**
+   * Draws remaining, or null when there is no budget.
+   *
+   * null rather than a large number, so a caller that forgets to handle the
+   * unlimited case fails loudly instead of quietly comparing against
+   * something arbitrary.
+   */
   get drawsLeft() {
+    if (this.unlimitedDraws) return null;
     return Math.max(0, this.config.maxDraws - this.drawsUsed);
   }
 
@@ -296,6 +311,7 @@ export class PhaseHand {
       }
       card = this.discard.pop();
     } else {
+      if (!this.stock.length) this._refillStock();
       if (!this.stock.length) {
         this.markFailed("stock_empty");
         throw new Error("stock is empty");
@@ -306,6 +322,30 @@ export class PhaseHand {
     this.drawsUsed += 1;
     this.drewThisTurn = true;
     return card;
+  }
+
+  /**
+   * Turn the discard pile back into a stock, the way the box says.
+   *
+   * Without a draw budget a long round drains the stock, and the engine
+   * treated that as a lost hand -- a way to lose that is in no version of the
+   * rules. The top card stays face up; the rest is shuffled back.
+   *
+   * With a budget this is unreachable in practice (four players at eight draws
+   * take 32 of about 60 cards), so it changes no measured rate.
+   */
+  _refillStock() {
+    if (this.discard.length <= 1) return;
+    const top = this.discard.pop();
+    const stock = this.table.stock;
+    stock.push(...this.discard);
+    this.discard.length = 0;
+    this.discard.push(top);
+    for (let i = stock.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(this._random() * (i + 1));
+      [stock[i], stock[j]] = [stock[j], stock[i]];
+    }
+    this._emit("stock_refilled", { cards: stock.length });
   }
 
   discardCard(card) {

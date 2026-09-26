@@ -29,9 +29,10 @@ second process.
 **<https://lighting8282.github.io/AP-Phase10/>** → **Just play**.
 
 That is the whole game with no room, no slot and no login: the full eight
-wilds, eight draws a hand, three computer opponents, and twenty phases that
-open one at a time as you clear them. The run is saved in your browser, so a
-reload picks up where you left off — but it lives only on that device.
+wilds, three computer opponents, and twenty phases that open one at a time as
+you clear them. **No draw budget** — a round runs until somebody empties their
+hand, the way the printed game does. The run is saved in your browser, so a
+reload picks up where you left off, but it lives only on that device.
 
 ### In a browser, connected to a room
 

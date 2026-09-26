@@ -45,6 +45,10 @@ class GameConfig:
 
     hand_size: int = 10           # "Hand Size +1" items
     wilds_in_deck: int = 8        # "Wild Card" items
+    #: Draws allowed per hand. Zero or less means no budget at all, which
+    #: is how the printed game plays: the round ends when somebody goes
+    #: out, not when a clock runs down. Archipelago never sets it there --
+    #: `starting_draws` starts at 2 -- so this is the free-play path.
     max_draws: int = 20           # "Extra Draw" items
     starting_skips: int = 0       # "Skip Card" items
 
@@ -213,8 +217,20 @@ class PhaseHand:
         return self.table.discard
 
     @property
-    def draws_left(self) -> int:
+    def draws_left(self) -> int | None:
+        """Draws remaining, or None when there is no budget.
+
+        None rather than a large number, so a caller that forgets to handle
+        the unlimited case fails loudly instead of quietly comparing against
+        something arbitrary.
+        """
+        if self.unlimited_draws:
+            return None
         return max(0, self.config.max_draws - self.draws_used)
+
+    @property
+    def unlimited_draws(self) -> bool:
+        return self.config.max_draws <= 0
 
     @property
     def discard_top(self) -> Card | None:
@@ -247,6 +263,8 @@ class PhaseHand:
             card = self.discard.pop()
         else:
             if not self.stock:
+                self._refill_stock()
+            if not self.stock:
                 self.mark_failed("stock_empty")
                 raise RuntimeError("stock is empty")
             card = self.stock.pop(0)
@@ -254,6 +272,25 @@ class PhaseHand:
         self.draws_used += 1
         self.drew_this_turn = True
         return card
+
+    def _refill_stock(self) -> None:
+        """Turn the discard pile back into a stock, the way the box says.
+
+        Without a draw budget a long round drains the stock, and the engine
+        treated that as a lost hand -- a way to lose that is in no version of
+        the rules. The top card stays face up; the rest is shuffled back.
+
+        With a budget this is unreachable in practice (four players at eight
+        draws take 32 of about 60 cards), so it changes no measured rate.
+        """
+        if len(self.discard) <= 1:
+            return
+        top = self.discard.pop()
+        self.table.stock.extend(self.discard)
+        self.discard.clear()
+        self.discard.append(top)
+        self.rng.shuffle(self.table.stock)
+        self._emit("stock_refilled", cards=len(self.table.stock))
 
     def discard_card(self, card: Card) -> None:
         if self.state is not HandState.IN_PROGRESS:
