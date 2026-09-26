@@ -3,3 +3,6 @@ __pycache__/
 *.apworld
 output/
 dist/
+
+# Editor and tooling scratch, not part of the world
+.claude/
