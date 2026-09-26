@@ -1,24 +1,28 @@
-"""Rewrite the README's table of contents from its own headings.
+"""Rewrite each contents list from the headings of its own file.
 
 A hand-written contents list is wrong the first time a heading moves, and
-nothing notices. This generates it, and `--check` fails when the file on disk
-disagrees -- so the list is either correct or the check is red.
+nothing notices. This generates them, and `--check` fails when a file on disk
+disagrees -- so a list is either correct or the check is red.
 
     python tools/update_toc.py
     python tools/update_toc.py --check
 
 Anchors follow GitHub's rule: lower-cased, punctuation dropped, spaces to
-hyphens, and a repeated heading gets `-1`, `-2` and so on. Two headings in this
-file really are identical, so that last part is not hypothetical.
+hyphens, and a repeated heading gets `-1`, `-2` and so on. Two headings in
+DEVELOPMENT.md really are identical, so that last part is not hypothetical --
+it was checked against GitHub's own markdown API rather than assumed.
 """
 
 from __future__ import annotations
 
 import pathlib
-import re
 import sys
+import re
 
-README = pathlib.Path(__file__).resolve().parent.parent / "README.md"
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+#: Every file that carries a generated contents list.
+FILES = [ROOT / "README.md", ROOT / "DEVELOPMENT.md"]
 
 START = "<!-- toc -->"
 END = "<!-- /toc -->"
@@ -56,40 +60,46 @@ def build(text: str) -> str:
     lines = []
     for depth, title in headings(text):
         indent = "  " * (depth - 2)
-        # Strip the inline formatting from the link text; a link whose label
-        # carries backticks or asterisks renders as literal punctuation here.
+        # Strip the inline formatting from the link text; a label carrying
+        # backticks or asterisks renders as literal punctuation here.
         label = re.sub(r"[`*_]", "", title)
         lines.append(f"{indent}- [{label}](#{anchor(title, seen)})")
     return "\n".join(lines)
 
 
-def main() -> int:
-    text = README.read_text(encoding="utf-8")
+def update(path: pathlib.Path, check: bool) -> int:
+    text = path.read_text(encoding="utf-8")
     if START not in text or END not in text:
-        print(f"README.md has no {START} / {END} markers", file=sys.stderr)
+        print(f"{path.name} has no {START} / {END} markers", file=sys.stderr)
         return 2
 
     before, rest = text.split(START, 1)
     _, after = rest.split(END, 1)
-    # Built from the body below the markers, so the contents cannot list
-    # itself and a heading inside the old block cannot survive a rewrite.
+    # Built from the body below the markers, so the contents cannot list itself
+    # and a heading inside the old block cannot survive a rewrite.
     toc = build(after)
-    fresh = f"{before}{START}\n\n{toc}\n\n{END}{after}"
+    fresh = before + START + "\n\n" + toc + "\n\n" + END + after
+    entries = len(toc.splitlines())
 
-    if "--check" in sys.argv:
+    if check:
         if fresh != text:
-            print("README.md's table of contents is out of date; "
+            print(f"{path.name}'s table of contents is out of date; "
                   "run python tools/update_toc.py", file=sys.stderr)
             return 1
-        print(f"table of contents matches ({len(toc.splitlines())} entries)")
+        print(f"{path.name}: matches ({entries} entries)")
         return 0
 
     if fresh == text:
-        print(f"table of contents already current ({len(toc.splitlines())} entries)")
+        print(f"{path.name}: already current ({entries} entries)")
         return 0
-    README.write_text(fresh, encoding="utf-8")
-    print(f"table of contents rewritten ({len(toc.splitlines())} entries)")
+    path.write_text(fresh, encoding="utf-8")
+    print(f"{path.name}: rewritten ({entries} entries)")
     return 0
+
+
+def main() -> int:
+    check = "--check" in sys.argv
+    return max(update(path, check) for path in FILES)
 
 
 if __name__ == "__main__":
