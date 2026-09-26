@@ -62,6 +62,9 @@
       <!-- Your side of it. -->
       <div class="you seat self">
         <div class="who">You <span id="you-phase" class="seat-phase"></span><span id="you-score" class="seat-score"></span></div>
+        <!-- What you are building, next to the cards you are building it
+             from. The line at the top of the page is a long way from here. -->
+        <div id="you-needs" class="needs"></div>
         <div id="mine" class="melds"></div>
         <div id="hand" class="cards"></div>
       </div>
@@ -80,6 +83,12 @@
 
     <h2>Phases</h2>
     <div id="phases"></div>
+    <!-- The reference card. A title attribute never appears on a phone, so
+         what each phase needs has to be readable without hovering. -->
+    <details id="phase-help">
+      <summary>What every phase needs</summary>
+      <div id="phase-help-list"></div>
+    </details>
     <div id="free-play-controls" hidden>
       <button type="button" id="free-play-reset">Start a new run</button>
     </div>

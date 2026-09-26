@@ -286,6 +286,8 @@ function render() {
   // Your own total in the same place as theirs: a scoreboard split across two
   // parts of the page is one you have to assemble before you can read it.
   el("you-score").textContent = `${s.totalScore} pts`;
+  // What you are building, beside the cards you are building it from.
+  el("you-needs").textContent = hand ? phaseDescription(hand.phase) : "";
 
   renderTable(s);
   renderMiddle(hand);
@@ -293,6 +295,7 @@ function render() {
   renderHand(hand);
   renderDig(hand);
   renderPhases(s);
+  renderPhaseHelp(s);
   renderStore(s);
   renderChecks(s);
 
@@ -365,13 +368,17 @@ function renderTable(session) {
     score.title = "points it has been caught holding so far";
     who.append(score);
 
+    const needs = document.createElement("div");
+    needs.className = "needs";
+    needs.textContent = phaseDescription(seat.phase);
+
     const what = document.createElement("div");
     what.className = "what";
     if (seat.wentOut) what.textContent = "went out";
     else if (seat.laidDown) what.textContent = `down - ${seat.hand.length} left to shed`;
     else what.textContent = `building - ${seat.hand.length} cards`;
 
-    div.append(who, what);
+    div.append(who, needs, what);
 
     // Their hand, face down. A count is information; a row of backs is the
     // table, and it reads at a glance how close somebody is to going out.
@@ -662,6 +669,42 @@ function renderChecks(session) {
     `${have} of ${total} checked` + (inSeed ? "" : " (not connected -- from your options)");
 }
 
+/**
+ * Every phase and what it needs, without hovering anything.
+ *
+ * The phase buttons carry a `title`, which is invisible on a touch screen --
+ * so on a phone there was no way at all to find out what phase 14 wanted
+ * before committing to it. Collapsed by default because it is twenty rows;
+ * the open/closed choice is remembered per browser.
+ */
+const PHASE_HELP_KEY = "ap10_phase_help_open";
+
+function renderPhaseHelp(session) {
+  const box = el("phase-help-list");
+  box.replaceChildren();
+  const unlocked = session.unlockedPhases;
+  const playing = session.hand ? session.hand.phase : null;
+
+  for (let phase = 1; phase <= PHASE_COUNT; phase += 1) {
+    const state = phase === playing ? "now"
+      : session.clearedPhases.has(phase) ? "done"
+      : unlocked.has(phase) ? "open" : "";
+    const n = document.createElement("span");
+    n.className = `ph-n ${state}`.trim();
+    n.textContent = `${phase}.`;
+    const w = document.createElement("span");
+    w.className = `ph-w ${state}`.trim();
+    w.textContent = phaseDescription(phase);
+    // The state is a colour, so it needs saying as well as showing.
+    const why = phase === playing ? " -- playing now"
+      : session.clearedPhases.has(phase) ? " -- cleared"
+      : unlocked.has(phase) ? " -- open" : " -- locked";
+    n.title = `Phase ${phase}${why}`;
+    w.title = n.title;
+    box.append(n, w);
+  }
+}
+
 function renderPhases(session) {
   const box = el("phases");
   box.replaceChildren();
@@ -699,6 +742,22 @@ function setConnectionFormOpen(open) {
 }
 
 el("edit-connection").addEventListener("click", () => setConnectionFormOpen(true));
+
+{
+  const help = el("phase-help");
+  try {
+    help.open = localStorage.getItem(PHASE_HELP_KEY) === "1";
+  } catch {
+    /* a private window is not a reason to fail to draw the page */
+  }
+  help.addEventListener("toggle", () => {
+    try {
+      localStorage.setItem(PHASE_HELP_KEY, help.open ? "1" : "0");
+    } catch {
+      /* nothing to do about it */
+    }
+  });
+}
 
 // -- free play ---------------------------------------------------------------
 async function startFreePlay(fresh) {

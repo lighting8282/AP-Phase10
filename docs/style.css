@@ -118,6 +118,38 @@ header.slim #free-play-offer { display: none; }
 .card img { width: 76px; height: 114px; border-radius: 8px; display: block; }
 .card:hover img { outline: 2px solid var(--accent); }
 
+/* --- what a phase needs ------------------------------------------------ */
+.needs { color: var(--muted); font-size: 13px; margin-top: 0.15rem; }
+.needs:empty { display: none; }
+.you .needs { color: #b9cdf0; }
+
+#phase-help { margin-top: 0.6rem; }
+#phase-help summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 0.35rem 0;
+}
+#phase-help summary:hover { color: var(--ink); }
+
+#phase-help-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.15rem 0.6rem;
+  margin-top: 0.3rem;
+  font-size: 13px;
+}
+#phase-help-list .ph-n { color: var(--muted); text-align: right; }
+#phase-help-list .ph-w { color: var(--muted); }
+/* Cleared, open, and the one being played. Locked phases stay legible --
+   this is a reference card, and what is coming is the useful part. */
+#phase-help-list .done .ph-n, #phase-help-list .done .ph-w { color: #8ade9b; }
+#phase-help-list .open .ph-w { color: var(--ink); }
+#phase-help-list .now .ph-n, #phase-help-list .now .ph-w {
+  color: #ffd479;
+  font-weight: 600;
+}
+
 #actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
 
 #phases { display: flex; gap: 0.4rem; flex-wrap: wrap; }
