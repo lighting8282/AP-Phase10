@@ -10,7 +10,7 @@
  *     node docs/test/game_test.mjs
  */
 
-import { SKIP, WILD, numberCard } from "../src/cards.js";
+import { SKIP, WILD, cardToString, numberCard } from "../src/cards.js";
 import { HAND_STATE, PhaseHand, Table, gameConfig, mulberry32 } from "../src/engine.js";
 import { Phase10Game, SAVE_VERSION, roundToString } from "../src/game.js";
 
@@ -200,6 +200,34 @@ check(many.scorecard(10)[0].includes("4 earlier round(s)"), "scorecard elides ol
   spent.discard.splice(0, spent.discard.length - 1);
   try { spent.draw(); } catch { /* expected */ }
   check(spent.state === HAND_STATE.FAILED, "nothing to shuffle back still fails");
+}
+
+
+// -- groups read in order ---------------------------------------------------
+// The mirror of test_a_run_stays_in_rank_order in tests/test_phases.py. Both
+// clients render meld.cards directly, so the order is the model's job.
+{
+  const h = new PhaseHand(4, gameConfig({ wildsInDeck: 0, maxDraws: 0 }),
+    { random: mulberry32(1), table: new Table() });
+  h.spec = [{ kind: "run", size: 4, rank: null, color: null }];
+  h.hand = [numberCard(8, "yellow"), numberCard(9, "blue"), numberCard(10, "blue"),
+    WILD, numberCard(6, "yellow"), numberCard(4, "yellow")];
+  const option = h.layDownOptions().find((o) => o.description === "run 7-10, wild as 7");
+  h.layDown(option);
+  const meld = h.melds[0];
+  eq(meld.cards.map(cardToString), ["W", "8Y", "9B", "10B"], "a run lays in rank order");
+  h.hit(numberCard(6, "yellow"), meld);
+  eq(meld.cards.map(cardToString), ["6Y", "W", "8Y", "9B", "10B"],
+    "and a hit lands in its place, not on the end");
+
+  // Not merely sorted to the front: a wild belongs in its own gap.
+  const g = new PhaseHand(4, gameConfig({ wildsInDeck: 0, maxDraws: 0 }),
+    { random: mulberry32(1), table: new Table() });
+  g.spec = [{ kind: "run", size: 4, rank: null, color: null }];
+  g.hand = [numberCard(8, "yellow"), WILD, numberCard(10, "blue"), numberCard(11, "blue")];
+  g.layDown();
+  eq(g.melds[0].cards.map(cardToString), ["8Y", "W", "10B", "11B"],
+    "a wild sits in the gap it stands for");
 }
 
 console.log(`\n${passed} passed, ${failures.length} failed`);

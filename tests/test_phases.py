@@ -15,7 +15,8 @@ from game.cards import (
     Color, Kind, Card, SKIP, WILD, build_deck, number_card, shuffled_deck, hand_score,
 )
 from game.phases import (
-    PHASES, SET, RUN, COLOR, solve_lay_options, solve_phase, can_complete,
+    PHASES, SET, RUN, COLOR, GroupKind, Meld, solve_lay_options, solve_phase,
+    can_complete,
     phase_card_count, phase_description,
 )
 
@@ -301,6 +302,97 @@ def test_two_layouts_that_leave_the_same_table_are_one_choice():
     options = solve_lay_options(hand, (SET(3), RUN(4)))
     spans = [(o.melds[1].lo, o.melds[1].hi) for o in options]
     assert spans == [(3, 6), (4, 7)]
+
+
+def test_a_run_stays_in_rank_order():
+    """Reported from a screenshot: a run laid as 7-10 with the wild standing
+    for the 7 was drawn `8 9 10 W`, and hitting a 6 onto it made `8 9 10 W 6`.
+    A run is only legible in rank order, and the wild belongs in the gap it is
+    standing in for."""
+    import random as _random
+
+    from game.engine import GameConfig, PhaseHand, Table
+
+    hand = PhaseHand(4, GameConfig(wilds_in_deck=0, max_draws=0),
+                     _random.Random(1), table=Table())
+    hand.spec = (RUN(4),)
+    hand.hand = [n(8, Y), n(9, B), n(10, B), WILD, n(6, Y), n(4, Y)]
+    option = next(o for o in hand.lay_down_options()
+                  if o.description == "run 7-10, wild as 7")
+    hand.lay_down(option)
+    meld = hand.melds[0]
+    assert [str(c) for c in meld.cards] == ["W", "8Y", "9B", "10B"]
+
+    hand.hit(n(6, Y), meld)
+    assert [str(c) for c in meld.cards] == ["6Y", "W", "8Y", "9B", "10B"]
+    assert (meld.lo, meld.hi) == (6, 10)
+
+
+def test_a_wild_sits_in_its_own_gap():
+    """Not merely sorted to the front: a wild standing for the 9 of 8-11 goes
+    between the 8 and the 10."""
+    import random as _random
+
+    from game.engine import GameConfig, PhaseHand, Table
+
+    hand = PhaseHand(4, GameConfig(wilds_in_deck=0, max_draws=0),
+                     _random.Random(1), table=Table())
+    hand.spec = (RUN(4),)
+    hand.hand = [n(8, Y), WILD, n(10, B), n(11, B)]
+    hand.lay_down()
+    assert [str(c) for c in hand.melds[0].cards] == ["8Y", "W", "10B", "11B"]
+
+
+def test_a_set_puts_its_wilds_last():
+    import random as _random
+
+    from game.engine import GameConfig, PhaseHand, Table
+
+    hand = PhaseHand(1, GameConfig(wilds_in_deck=0, max_draws=0),
+                     _random.Random(1), table=Table())
+    hand.spec = (SET(3),)
+    hand.hand = [WILD, n(7, R), n(7, B)]
+    hand.lay_down()
+    cards = [str(c) for c in hand.melds[0].cards]
+    # Which of two 7s comes first is not a fact about anything, so only the
+    # wild's place is asserted.
+    assert cards[-1] == "W"
+    assert sorted(cards[:-1]) == ["7B", "7R"]
+
+
+def test_a_set_keeps_its_wild_last_after_a_hit():
+    """Where the ordering earns its keep for a set: the solver already emits
+    wilds last, so only a card hit on afterwards can land behind one."""
+    # Built directly: a hand holding three 7s lays them without spending the
+    # wild, so the case only exists on a meld that already has one.
+    meld = Meld(SET(3), [n(7, R), n(7, B), WILD], GroupKind.SET, rank=7)
+    meld.order()
+    meld.add(n(7, G))
+    cards = [str(c) for c in meld.cards]
+    assert cards[-1] == "W", cards
+    assert sorted(cards[:-1]) == ["7B", "7G", "7R"], cards
+
+
+def test_ordering_never_loses_a_card():
+    """A display fix must not eat a card. Every option of every phase, checked
+    against what went into it."""
+    import random as _random
+
+    from game.engine import GameConfig, PhaseHand, Table
+
+    rng = _random.Random(8)
+    for _ in range(120):
+        deck = shuffled_deck(rng, 8, 0)
+        for phase in (1, 2, 4, 8, 15):
+            hand = PhaseHand(phase, GameConfig(wilds_in_deck=8, max_draws=0),
+                             rng, table=Table())
+            hand.hand = deck[:12]
+            for option in hand.lay_down_options():
+                before = sorted(str(c) for m in option.melds for c in m.cards)
+                for meld in option.melds:
+                    meld.order()
+                after = sorted(str(c) for m in option.melds for c in m.cards)
+                assert before == after
 
 
 def test_an_option_from_another_hand_is_refused():

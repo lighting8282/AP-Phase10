@@ -309,6 +309,51 @@ export class Meld {
   }
 
   /** Lay `card` on, widening a run's span. Callers check accepts() first. */
+  /**
+   * Put the cards in the order the group reads in.
+   *
+   * A run is only legible in rank order, and it is laid and hit in neither --
+   * the solver emits naturals then wilds, and a hit lands at whichever end it
+   * extends, so `8 9 10 W 6` was a real way for a run of 6-10 to be drawn.
+   * Wilds sit in the gaps they are standing in for.
+   *
+   * Called after every change rather than left to the clients, so all three of
+   * them show the same thing and none has to know what a wild means.
+   */
+  order() {
+    if (this.kind === GROUP.RUN && this.lo !== null && this.lo !== undefined) {
+      const byRank = new Map();
+      const wilds = [];
+      for (const card of this.cards) {
+        if (isWild(card)) {
+          wilds.push(card);
+        } else {
+          if (!byRank.has(card.rank)) byRank.set(card.rank, []);
+          byRank.get(card.rank).push(card);
+        }
+      }
+      const ordered = [];
+      for (let rank = this.lo; rank <= this.hi; rank += 1) {
+        const at = byRank.get(rank);
+        if (at && at.length) ordered.push(at.shift());
+        else if (wilds.length) ordered.push(wilds.shift());
+      }
+      // Anything the span does not account for keeps its place at the end
+      // rather than being dropped: a display bug must not eat a card.
+      const leftover = [...[...byRank.values()].flat(), ...wilds];
+      this.cards = [...ordered, ...leftover];
+      return;
+    }
+    // A set is all one rank, so only the wilds have anywhere to go; a colour
+    // group reads best by rank. Both put their wilds last.
+    this.cards.sort((a, b) => {
+      const aw = isWild(a) ? 1 : 0;
+      const bw = isWild(b) ? 1 : 0;
+      if (aw !== bw) return aw - bw;
+      return (isNumber(a) ? a.rank : 0) - (isNumber(b) ? b.rank : 0);
+    });
+  }
+
   add(card) {
     if (this.kind === GROUP.RUN) {
       let target;
@@ -326,6 +371,7 @@ export class Meld {
       }
     }
     this.cards.push(card);
+    this.order();
   }
 }
 
@@ -349,7 +395,9 @@ export function solveMelds(hand, spec, minNaturalsPerGroup = DEFAULT_MIN_NATURAL
     if (groups === null) return null;
     const natural = groups[0].find((c) => isNumber(c));
     const color = spec[0].color ?? (natural ? natural.color : null);
-    return [new Meld(spec[0], [...groups[0]], GROUP.COLOR, { color })];
+    const meld = new Meld(spec[0], [...groups[0]], GROUP.COLOR, { color });
+    meld.order();
+    return [meld];
   }
 
   const wilds = hand.filter(isWild).length;
@@ -359,11 +407,12 @@ export function solveMelds(hand, spec, minNaturalsPerGroup = DEFAULT_MIN_NATURAL
   const groups = materialize(hand, plans);
   return spec.map((groupSpec, i) => {
     const [kind, value] = plans[i][2];
-    if (kind === "set") {
-      return new Meld(groupSpec, [...groups[i]], GROUP.SET, { rank: value });
-    }
-    return new Meld(groupSpec, [...groups[i]], GROUP.RUN,
-      { lo: value, hi: value + groupSpec.size - 1 });
+    const meld = kind === "set"
+      ? new Meld(groupSpec, [...groups[i]], GROUP.SET, { rank: value })
+      : new Meld(groupSpec, [...groups[i]], GROUP.RUN,
+        { lo: value, hi: value + groupSpec.size - 1 });
+    meld.order();
+    return meld;
   });
 }
 
@@ -474,6 +523,7 @@ export function solveLayOptions(hand, spec, minNaturalsPerGroup = DEFAULT_MIN_NA
         ? new Meld(groupSpec, [...groups[i]], GROUP.SET, { rank: value })
         : new Meld(groupSpec, [...groups[i]], GROUP.RUN,
           { lo: value, hi: value + groupSpec.size - 1 });
+      meld.order();
       melds.push(meld);
       parts.push(describeMeld(meld, wildValues(plans[i], groupSpec.size)));
     });

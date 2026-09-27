@@ -320,6 +320,40 @@ class Meld:
             ends.add(self.hi + 1)
         return ends
 
+    def order(self) -> None:
+        """Put the cards in the order the group reads in.
+
+        A run is only legible in rank order, and it is laid and hit in neither
+        -- the solver emits naturals then wilds, and a hit lands at whichever
+        end it extends, so `8 9 10 W 6` was a real way for a run of 6-10 to be
+        drawn. Wilds sit in the gaps they are standing in for.
+
+        Called after every change rather than left to the clients, so all three
+        of them show the same thing and none has to know what a wild means.
+        """
+        if self.kind is GroupKind.RUN and self.lo is not None:
+            by_rank: dict[int, list[Card]] = {}
+            wilds: list[Card] = []
+            for card in self.cards:
+                if card.is_wild:
+                    wilds.append(card)
+                else:
+                    by_rank.setdefault(card.rank, []).append(card)
+            ordered: list[Card] = []
+            for rank in range(self.lo, self.hi + 1):
+                if by_rank.get(rank):
+                    ordered.append(by_rank[rank].pop(0))
+                elif wilds:
+                    ordered.append(wilds.pop(0))
+            # Anything the span does not account for keeps its place at the
+            # end rather than being dropped: a display bug must not eat a card.
+            leftover = [c for cards in by_rank.values() for c in cards] + wilds
+            self.cards = ordered + leftover
+            return
+        # A set is all one rank, so only the wilds have anywhere to go; a
+        # colour group reads best by rank. Both put their wilds last.
+        self.cards.sort(key=lambda c: (c.is_wild, c.rank if c.is_number else 0))
+
     def add(self, card: Card) -> None:
         """Lay `card` onto this group, widening a run's span.
 
@@ -339,6 +373,7 @@ class Meld:
                 if self.hi is None or target > self.hi:
                     self.hi = target
         self.cards.append(card)
+        self.order()
 
 
 def _search_all(specs: tuple[GroupSpec, ...], pool: Counter, wilds: int,
@@ -473,6 +508,7 @@ def solve_lay_options(
             else:
                 meld = Meld(group_spec, list(cards), GroupKind.RUN,
                             lo=value, hi=value + group_spec.size - 1)
+            meld.order()
             melds.append(meld)
             parts.append(_describe(meld, _wild_values(plan, group_spec.size)))
         options.append(LayOption(tuple(melds), " + ".join(parts)))
@@ -505,7 +541,9 @@ def solve_melds(
             return None
         natural = next((c for c in groups[0] if c.is_number), None)
         color = spec[0].color or (natural.color if natural else None)
-        return [Meld(spec[0], list(groups[0]), GroupKind.COLOR, color=color)]
+        meld = Meld(spec[0], list(groups[0]), GroupKind.COLOR, color=color)
+        meld.order()
+        return [meld]
 
     wilds = sum(1 for c in hand if c.is_wild)
     pool = Counter(c.rank for c in hand if c.is_number)
@@ -518,10 +556,12 @@ def solve_melds(
     for group_spec, cards, plan in zip(spec, groups, plans):
         kind, value = plan[2]
         if kind == "set":
-            melds.append(Meld(group_spec, list(cards), GroupKind.SET, rank=value))
+            meld = Meld(group_spec, list(cards), GroupKind.SET, rank=value)
         else:
-            melds.append(Meld(group_spec, list(cards), GroupKind.RUN,
-                              lo=value, hi=value + group_spec.size - 1))
+            meld = Meld(group_spec, list(cards), GroupKind.RUN,
+                        lo=value, hi=value + group_spec.size - 1)
+        meld.order()
+        melds.append(meld)
     return melds
 
 

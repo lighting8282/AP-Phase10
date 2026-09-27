@@ -166,6 +166,24 @@ header.slim #free-play-offer { display: none; }
 #phases button.open { background: var(--accent); }
 #phases button.cleared { background: var(--cleared); }
 
+/* --- the rules, on the game screen -------------------------------------- */
+#how-to-play { margin-top: 1.4rem; }
+#how-to-play summary {
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 0.35rem 0;
+}
+#how-to-play summary:hover { color: var(--accent); }
+.help {
+  max-width: 44rem;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.help p { margin: 0 0 0.6rem; }
+.help b { color: var(--ink); }
+
 /* --- the check list ---------------------------------------------------- */
 /* The question between rounds is "what is left, and can I get it yet", and
    the answer is a grid: a row per phase, a column per tier. */

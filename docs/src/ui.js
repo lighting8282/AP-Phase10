@@ -739,6 +739,7 @@ function renderChecks(session) {
  * the open/closed choice is remembered per browser.
  */
 const PHASE_HELP_KEY = "ap10_phase_help_open";
+const RULES_KEY = "ap10_rules_open";
 
 function renderPhaseHelp(session) {
   const box = el("phase-help-list");
@@ -803,6 +804,24 @@ function setConnectionFormOpen(open) {
 }
 
 el("edit-connection").addEventListener("click", () => setConnectionFormOpen(true));
+
+{
+  const rules = el("how-to-play");
+  try {
+    // Open the first time: somebody who has just clicked "Just play" is
+    // exactly who needs it, and they have no way to know it is there.
+    rules.open = localStorage.getItem(RULES_KEY) !== "0";
+  } catch {
+    rules.open = false;
+  }
+  rules.addEventListener("toggle", () => {
+    try {
+      localStorage.setItem(RULES_KEY, rules.open ? "1" : "0");
+    } catch {
+      /* nothing to do about it */
+    }
+  });
+}
 
 {
   const help = el("phase-help");
