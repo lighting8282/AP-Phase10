@@ -303,6 +303,14 @@ which sends no cache headers and will serve you the previous build:
     python tools/serve_docs.py
     cd docs && node test/session_test.mjs
 
+Pages serves each file with its own ten-minute cache, so a visitor can end up
+holding a new module beside an old one — a build that never existed. Every
+module URL carries a hash of the sources, so a change moves all of them at
+once:
+
+    python tools/stamp_build.py            # after changing anything in docs/src
+    python tools/stamp_build.py --check    # fails if a stamp is stale
+
 The world's own tests need an Archipelago **source** checkout with this package
 linked into `worlds/`, and run from its root:
 
