@@ -137,6 +137,12 @@ So *set of 3 + set of 3* wants six cards in two groups of matching ranks, and
 Wilds fill any gap, but **every group needs at least one real card** — you
 cannot lay a group made entirely of Wilds.
 
+**You choose what your wild is.** A run of 4 from `W 4 5 6` can be laid as
+3-4-5-6 or as 4-5-6-7, and that decides what the group will take afterwards —
+a 2 or a 7 in the first case, a 3 or an 8 in the second. When a wild could mean
+more than one thing, the game lists the choices and asks. When it could only
+mean one (`4 W 6 7` is a 5 and nothing else) it just lays it down.
+
 ### Hitting
 
 Once your own phase is down, you can play spare cards onto any group on the

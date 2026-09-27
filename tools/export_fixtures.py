@@ -40,7 +40,9 @@ from worlds.phase10.game.cards import (  # noqa: E402
     build_deck,
     number_card,
 )
-from worlds.phase10.game.phases import PHASE_COUNT, PHASES, solve_phase  # noqa: E402
+from worlds.phase10.game.phases import (  # noqa: E402
+    PHASE_COUNT, PHASES, solve_lay_options, solve_phase,
+)
 
 MIN_NATURAL_VARIANTS = (0, 1)
 
@@ -107,7 +109,19 @@ def main() -> int:
                 solve_phase(hand, PHASES[p], min_naturals_per_group=min_nat) is not None
                 for p in range(1, PHASE_COUNT + 1)
             ]
-        cases.append({"hand": [card_key(c) for c in hand], "verdicts": verdicts})
+        # What the wilds could stand for, which is what the lay-down chooser
+        # offers. Recorded as the rendered descriptions: they are what a player
+        # reads, so the two ports have to agree on the wording as well as on
+        # the set of choices.
+        options = {
+            str(p): [o.description
+                     for o in solve_lay_options(hand, PHASES[p])]
+            for p in range(1, PHASE_COUNT + 1)
+        }
+        options = {k: v for k, v in options.items() if v}
+        cases.append({"hand": [card_key(c) for c in hand],
+                      "verdicts": verdicts,
+                      "lay_options": options})
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(

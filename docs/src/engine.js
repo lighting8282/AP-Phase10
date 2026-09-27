@@ -22,7 +22,9 @@ import {
   numberCard,
   COLORS,
 } from "./cards.js";
-import { GROUP, PHASES, phaseCardCount, solveMelds, solvePhase } from "./phases.js";
+import {
+  GROUP, PHASES, phaseCardCount, solveLayOptions, solveMelds, solvePhase,
+} from "./phases.js";
 
 /** How deep into the stock a played Skip lets you look. */
 export const SKIP_DIG_DEPTH = 3;
@@ -449,9 +451,39 @@ export class PhaseHand {
   }
 
 
-  layDown() {
+  /**
+   * Every distinct way this hand could lay the phase down.
+   *
+   * More than one only when a wild could stand for more than one thing -- and
+   * then the choice is worth making, because it decides what can be hit onto
+   * the group afterwards. A run of 4 from `W 4 5 6` is 3-4-5-6 or 4-5-6-7,
+   * which take a 2 or a 7 and a 3 or an 8 respectively.
+   */
+  layDownOptions() {
+    if (this.laid || this.state !== HAND_STATE.IN_PROGRESS) return [];
+    return solveLayOptions(this.hand, this.spec, this.config.minNaturalsPerGroup);
+  }
+
+  /**
+   * Lay the phase down, optionally choosing what the wilds stand for.
+   *
+   * With no option this keeps taking the solver's first answer, which is what
+   * every caller that does not care about wilds already relied on.
+   */
+  layDown(option = null) {
     if (this.laid) throw new Error("phase is already down");
-    const melds = solveMelds(this.hand, this.spec, this.config.minNaturalsPerGroup);
+    let melds;
+    if (option) {
+      melds = [...option.melds];
+      const held = [...this.hand];
+      for (const card of melds.flatMap((m) => m.cards)) {
+        const at = held.indexOf(card);
+        if (at === -1) throw new Error("that lay-down is not from this hand");
+        held.splice(at, 1);
+      }
+    } else {
+      melds = solveMelds(this.hand, this.spec, this.config.minNaturalsPerGroup);
+    }
     if (melds === null) throw new Error(`phase ${this.phase} not satisfiable from hand`);
     // The layout is built out of the melds, so what you can see and what the
     // group means cannot drift apart.

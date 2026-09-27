@@ -15,7 +15,8 @@ from game.cards import (
     Color, Kind, Card, SKIP, WILD, build_deck, number_card, shuffled_deck, hand_score,
 )
 from game.phases import (
-    PHASES, SET, RUN, COLOR, solve_phase, can_complete, phase_card_count, phase_description,
+    PHASES, SET, RUN, COLOR, solve_lay_options, solve_phase, can_complete,
+    phase_card_count, phase_description,
 )
 
 R, B, G, Y = Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW
@@ -238,6 +239,119 @@ def test_solver_is_fast_on_random_hands():
     elapsed = time.perf_counter() - start
     assert elapsed < 10.0, f"solver too slow: {elapsed:.2f}s for {trials} solves"
     print(f"    [perf] {trials} solves in {elapsed:.2f}s, {solved} satisfiable")
+
+
+
+# -- choosing what a wild is --------------------------------------------------
+# A wild in a run is a specific rank, and which rank decides what can be hit
+# onto the group afterwards. The solver used to pick whichever it reached
+# first; these pin that the player is offered the real alternatives instead.
+
+def test_a_wild_in_a_run_offers_both_ends():
+    """The example this was built for: need a run of 4, hold W 4 5 6."""
+    hand = [WILD, number_card(4, Color.RED), number_card(5, Color.BLUE),
+            number_card(6, Color.GREEN)]
+    options = solve_lay_options(hand, (RUN(4),))
+    assert [o.description for o in options] == [
+        "run 3-6, wild as 3",
+        "run 4-7, wild as 7",
+    ]
+
+
+def test_the_choice_changes_what_the_group_takes():
+    """Which is the whole reason to ask. 3-6 takes a 2 or a 7; 4-7 takes a 3
+    or an 8."""
+    hand = [WILD, number_card(4, Color.RED), number_card(5, Color.BLUE),
+            number_card(6, Color.GREEN)]
+    low, high = solve_lay_options(hand, (RUN(4),))
+    assert low.melds[0].accepts(number_card(2, Color.RED))
+    assert not low.melds[0].accepts(number_card(8, Color.RED))
+    assert high.melds[0].accepts(number_card(8, Color.RED))
+    assert not high.melds[0].accepts(number_card(2, Color.RED))
+
+
+def test_a_wild_in_the_middle_has_only_one_meaning():
+    """Nothing to ask when the gap decides it: 4 _ 6 7 is a 5 and nothing
+    else, so the chooser must not offer a choice that is not there."""
+    hand = [number_card(4, Color.RED), WILD, number_card(6, Color.BLUE),
+            number_card(7, Color.GREEN)]
+    options = solve_lay_options(hand, (RUN(4),))
+    assert [o.description for o in options] == ["run 4-7, wild as 5"]
+
+
+def test_no_wild_means_no_question():
+    hand = [number_card(r, Color.RED) for r in (4, 5, 6, 7)]
+    options = solve_lay_options(hand, (RUN(4),))
+    assert len(options) == 1
+    assert options[0].description == "run 4-7"
+    assert not options[0].uses_wild
+
+
+def test_an_unsatisfiable_phase_offers_nothing():
+    assert solve_lay_options([WILD], (RUN(4),)) == []
+
+
+def test_two_layouts_that_leave_the_same_table_are_one_choice():
+    """`3 3 W` + `3 4 5 6` and `3 3 3` + `W 4 5 6` put the same set of 3s and
+    the same run of 3-6 down. A player choosing between them is choosing
+    nothing."""
+    hand = [number_card(3, c) for c in (Color.RED, Color.BLUE, Color.GREEN)]
+    hand += [WILD, number_card(4, Color.RED), number_card(5, Color.BLUE),
+             number_card(6, Color.GREEN)]
+    options = solve_lay_options(hand, (SET(3), RUN(4)))
+    spans = [(o.melds[1].lo, o.melds[1].hi) for o in options]
+    assert spans == [(3, 6), (4, 7)]
+
+
+def test_an_option_from_another_hand_is_refused():
+    """The chooser hands back concrete cards, so the engine has to check they
+    are yours. Without it a client could lay cards it never held."""
+    import random as _random
+
+    from game.engine import GameConfig, PhaseHand, Table
+
+    cfg = GameConfig(wilds_in_deck=0, max_draws=0)
+    mine = PhaseHand(4, cfg, _random.Random(1), table=Table())
+    mine.hand = [number_card(r, Color.RED) for r in range(1, 8)]
+
+    theirs = PhaseHand(4, cfg, _random.Random(1), table=Table())
+    theirs.hand = [number_card(r, Color.BLUE) for r in range(4, 11)]
+    stolen = theirs.lay_down_options()[0]
+
+    try:
+        mine.lay_down(stolen)
+    except RuntimeError as err:
+        assert "not from this hand" in str(err)
+    else:
+        raise AssertionError("laying another hand's cards should have been refused")
+    assert not mine.laid
+
+
+def test_every_offered_option_can_actually_be_laid():
+    """The chooser must not offer a layout the engine would then refuse."""
+    import random as _random
+
+    from game.engine import GameConfig, PhaseHand, Table
+
+    rng = _random.Random(3)
+    checked = 0
+    for _ in range(300):
+        deck = shuffled_deck(rng, 8, 0)
+        for phase in (1, 2, 4, 8):
+            hand = PhaseHand(phase, GameConfig(wilds_in_deck=8, max_draws=0),
+                             rng, table=Table())
+            hand.hand = deck[:12]
+            for option in hand.lay_down_options():
+                fresh = PhaseHand(phase, GameConfig(wilds_in_deck=8, max_draws=0),
+                                  rng, table=Table())
+                fresh.hand = list(hand.hand)
+                # Same cards, same identities: the option came from this hand.
+                chosen = next(o for o in fresh.lay_down_options()
+                              if o.description == option.description)
+                fresh.lay_down(chosen)
+                assert fresh.laid
+                checked += 1
+    assert checked > 100, checked
 
 
 if __name__ == "__main__":

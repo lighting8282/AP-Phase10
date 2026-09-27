@@ -367,6 +367,126 @@ export function solveMelds(hand, spec, minNaturalsPerGroup = DEFAULT_MIN_NATURAL
   });
 }
 
+/**
+ * Every plan `search` could have returned, not just the first.
+ *
+ * `search` commits to the first candidate that works, which is what makes it
+ * fast and what makes the wild's meaning arbitrary: a lone 5 with a wild is
+ * 3-4-5, 4-5-6 or 5-6-7 and the solver takes whichever it reached first. This
+ * yields all of them so the player can be asked.
+ */
+function* searchAll(specs, pool, wilds, minNat) {
+  if (specs.length === 0) {
+    yield [];
+    return;
+  }
+  const [head, ...tail] = specs;
+  for (const [used, usedWilds, meaning] of candidates(head, pool, wilds, minNat)) {
+    for (const sub of searchAll(tail, subtract(pool, used), wilds - usedWilds, minNat)) {
+      yield [[used, usedWilds, meaning], ...sub];
+    }
+  }
+}
+
+/**
+ * What the wilds in one group are standing in for.
+ *
+ * The whole point of offering the choice: in a run a wild is a specific rank,
+ * and which rank decides what can be hit onto the group afterwards.
+ */
+function wildValues(plan, size) {
+  const [used, usedWilds, [kind, value]] = plan;
+  if (!usedWilds) return [];
+  if (kind === "run") {
+    const remaining = new Map(used);
+    const gaps = [];
+    for (let rank = value; rank < value + size; rank += 1) {
+      const have = remaining.get(rank) ?? 0;
+      if (have > 0) remaining.set(rank, have - 1);
+      else gaps.push(String(rank));
+    }
+    return gaps;
+  }
+  if (kind === "set") {
+    return Array(usedWilds).fill(value === null ? "any rank" : String(value));
+  }
+  return Array(usedWilds).fill("any card of the colour");
+}
+
+function describeMeld(meld, values) {
+  let head;
+  if (meld.kind === GROUP.RUN) head = `run ${meld.lo}-${meld.hi}`;
+  else if (meld.kind === GROUP.SET) head = `set of ${meld.rank}s`;
+  else head = `${meld.color ?? "colour"} group`;
+  if (!values.length) return head;
+  const joined = values.join(" and ");
+  return values.length === 1 ? `${head}, wild as ${joined}` : `${head}, wilds as ${joined}`;
+}
+
+/**
+ * A hand with several wilds can spell the same phase many ways. The chooser is
+ * a list a player reads, so it is capped; the cap has never been reached by a
+ * real hand in the sweeps.
+ */
+export const MAX_LAY_OPTIONS = 24;
+
+/**
+ * Every distinct way this hand can lay this phase down.
+ *
+ * Distinct by *meaning*, not by which physical card went where: two layouts
+ * that differ only in which of your two 7s is in the set are one choice to a
+ * player, and only one of them is offered.
+ */
+export function solveLayOptions(hand, spec, minNaturalsPerGroup = DEFAULT_MIN_NATURALS_PER_GROUP) {
+  const kinds = new Set(spec.map((g) => g.kind));
+  if (kinds.has(GROUP.COLOR)) {
+    // A colour group's only choice is its colour, which solveColor already
+    // decides from the naturals. Offer the one it found.
+    const melds = solveMelds(hand, spec, minNaturalsPerGroup);
+    if (melds === null) return [];
+    const wilds = melds[0].cards.filter(isWild).length;
+    return [{
+      melds,
+      description: describeMeld(melds[0], Array(wilds).fill("any card of the colour")),
+      usesWild: wilds > 0,
+    }];
+  }
+
+  const wilds = hand.filter(isWild).length;
+  const options = [];
+  const seen = new Set();
+  for (const plans of searchAll(spec, poolFromHand(hand), wilds, minNaturalsPerGroup)) {
+    // Keyed on what the table ends up being, not on which group the wild
+    // physically sits in: `3 3 W` + `3 4 5 6` and `3 3 3` + `W 4 5 6` leave the
+    // same set of 3s and the same run of 3-6, so they are one choice.
+    const signature = plans
+      .map((plan, i) => `${plan[2][0]}:${plan[2][1]}:${spec[i].size}`)
+      .join("|");
+    if (seen.has(signature)) continue;
+    seen.add(signature);
+
+    const groups = materialize(hand, plans);
+    const melds = [];
+    const parts = [];
+    spec.forEach((groupSpec, i) => {
+      const [kind, value] = plans[i][2];
+      const meld = kind === "set"
+        ? new Meld(groupSpec, [...groups[i]], GROUP.SET, { rank: value })
+        : new Meld(groupSpec, [...groups[i]], GROUP.RUN,
+          { lo: value, hi: value + groupSpec.size - 1 });
+      melds.push(meld);
+      parts.push(describeMeld(meld, wildValues(plans[i], groupSpec.size)));
+    });
+    options.push({
+      melds,
+      description: parts.join(" + "),
+      usesWild: melds.some((m) => m.cards.some(isWild)),
+    });
+    if (options.length >= MAX_LAY_OPTIONS) break;
+  }
+  return options;
+}
+
 export function canComplete(hand, phase, minNaturalsPerGroup = DEFAULT_MIN_NATURALS_PER_GROUP) {
   return solvePhase(hand, PHASES[phase], minNaturalsPerGroup) !== null;
 }

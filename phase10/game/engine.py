@@ -24,7 +24,7 @@ from enum import Enum
 from .cards import SKIP, WILD, Card, Color, hand_score, number_card, shuffled_deck
 from .phases import (
     PHASES, GroupKind, GroupSpec, Layout, Meld, PhaseSpec, phase_card_count,
-    solve_melds, solve_phase,
+    solve_lay_options, solve_melds, solve_phase,
 )
 
 
@@ -395,11 +395,39 @@ class PhaseHand:
         elif not self.can_lay_down():
             self.mark_failed("out_of_draws")
 
-    def lay_down(self) -> Layout:
+    def lay_down_options(self) -> list:
+        """Every distinct way this hand could lay the phase down.
+
+        More than one only when a wild could stand for more than one thing --
+        and then the choice is worth making, because it decides what can be hit
+        onto the group afterwards. A run of 4 from `W 4 5 6` is 3-4-5-6 or
+        4-5-6-7, which take a 2 or a 7 and a 3 or an 8 respectively.
+        """
+        if self.laid or self.state is not HandState.IN_PROGRESS:
+            return []
+        return solve_lay_options(
+            self.hand, self.spec,
+            min_naturals_per_group=self.config.min_naturals_per_group,
+        )
+
+    def lay_down(self, option=None) -> Layout:
+        """Lay the phase down, optionally choosing what the wilds stand for.
+
+        With no option this keeps taking the solver's first answer, which is
+        what every caller that does not care about wilds already relied on.
+        """
         if self.laid:
             raise RuntimeError("phase is already down")
-        melds = solve_melds(self.hand, self.spec,
-                            min_naturals_per_group=self.config.min_naturals_per_group)
+        if option is not None:
+            melds = list(option.melds)
+            held = list(self.hand)
+            for card in (c for m in melds for c in m.cards):
+                if card not in held:
+                    raise RuntimeError("that lay-down is not from this hand")
+                held.remove(card)
+        else:
+            melds = solve_melds(self.hand, self.spec,
+                                min_naturals_per_group=self.config.min_naturals_per_group)
         if melds is None:
             raise RuntimeError(f"phase {self.phase} not satisfiable from hand")
         # The layout is built out of the melds, so what you can see and what

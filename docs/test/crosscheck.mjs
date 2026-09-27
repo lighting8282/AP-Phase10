@@ -19,7 +19,7 @@ import { fileURLToPath } from "node:url";
 
 import { MAX_RANK, MIN_RANK, cardFromString, cardToString, isNumber, isSkip, isWild }
   from "../src/cards.js";
-import { GROUP, PHASES, solvePhase } from "../src/phases.js";
+import { GROUP, PHASES, solveLayOptions, solvePhase } from "../src/phases.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const fixtures = JSON.parse(readFileSync(join(HERE, "fixtures.json"), "utf8"));
@@ -90,6 +90,31 @@ function validateLayout(hand, spec, layout, minNat) {
 
 let checked = 0;
 let mismatches = 0;
+
+// ---------------------------------------------------------------------------
+// The lay-down chooser: both ports must offer the same choices, in the same
+// order, worded the same way -- a player picks from this list by number.
+// ---------------------------------------------------------------------------
+let optionCases = 0;
+let optionMismatches = 0;
+for (const fixture of fixtures.cases) {
+  if (!fixture.lay_options) continue;
+  const hand = fixture.hand.map(cardFromString);
+  for (const [phase, expected] of Object.entries(fixture.lay_options)) {
+    const actual = solveLayOptions(hand, PHASES[Number(phase)]).map((o) => o.description);
+    optionCases += 1;
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+      optionMismatches += 1;
+      if (optionMismatches <= 3) {
+        console.log(`  LAY OPTIONS phase ${phase} [${fixture.hand.join(" ")}]`);
+        console.log(`    python ${JSON.stringify(expected)}`);
+        console.log(`    js     ${JSON.stringify(actual)}`);
+      }
+    }
+  }
+}
+console.log(`options   ${optionCases} hand/phase pairs, ${optionMismatches} mismatched`);
+
 let invalid = 0;
 const examples = [];
 
@@ -153,7 +178,7 @@ if (examples.length) {
   console.log("\nfirst failures:");
   for (const e of examples) console.log("  " + e);
 }
-if (mismatches === 0 && invalid === 0) {
+if (mismatches === 0 && invalid === 0 && optionMismatches === 0) {
   console.log("\nPASS - the JS port agrees with the Python engine on every verdict");
   process.exit(0);
 }

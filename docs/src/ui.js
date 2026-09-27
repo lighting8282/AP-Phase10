@@ -263,10 +263,62 @@ function mulligan() {
   render();
 }
 
+/**
+ * Lay the phase down, asking what the wilds are when it matters.
+ *
+ * One option means there is nothing to ask: the wild can only be one thing,
+ * or there is no wild at all. More than one and the choice is real -- a run of
+ * 4 from `W 4 5 6` is 3-4-5-6 or 4-5-6-7, and those take different cards
+ * afterwards -- so the player picks instead of the solver.
+ */
+function layDown() {
+  const hand = app.session.hand;
+  if (!hand || hand.state !== HAND_STATE.IN_PROGRESS) {
+    log("No hand in progress -- pick a phase first.");
+    return;
+  }
+  const options = hand.layDownOptions();
+  if (!options.length) {
+    log(`Phase ${hand.phase} is not satisfiable from your hand yet.`);
+    return;
+  }
+  if (options.length === 1) {
+    withHand((h) => h.layDown(options[0]));
+    return;
+  }
+  renderLayChoice(options);
+}
+
+function renderLayChoice(options) {
+  const box = el("lay-options");
+  box.replaceChildren();
+  for (const option of options) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = option.description;
+    button.addEventListener("click", () => {
+      el("lay-choice").hidden = true;
+      withHand((h) => h.layDown(option));
+    });
+    box.append(button);
+  }
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "cancel";
+  cancel.textContent = "Not yet";
+  cancel.addEventListener("click", () => {
+    el("lay-choice").hidden = true;
+    render();
+  });
+  box.append(cancel);
+  el("lay-choice").hidden = false;
+  el("lay-choice").scrollIntoView({ block: "nearest" });
+}
+
 const ACTIONS = {
   draw: () => withHand((hand) => hand.draw(false)),
   "draw-discard": () => withHand((hand) => hand.draw(true)),
-  lay: () => withHand((hand) => hand.layDown()),
+  lay: () => layDown(),
   skip: () => withHand((hand) => hand.playSkip()),
   mulligan: () => mulligan(),
 };
@@ -301,6 +353,9 @@ function render() {
   renderHand(hand);
   renderDig(hand);
   renderPhases(s);
+  if (!hand || hand.laid || hand.state !== HAND_STATE.IN_PROGRESS) {
+    el("lay-choice").hidden = true;
+  }
   renderPhaseHelp(s);
   renderStore(s);
   renderChecks(s);

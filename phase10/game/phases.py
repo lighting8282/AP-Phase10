@@ -341,6 +341,146 @@ class Meld:
         self.cards.append(card)
 
 
+def _search_all(specs: tuple[GroupSpec, ...], pool: Counter, wilds: int,
+                min_nat: int):
+    """Every plan `_search` could have returned, not just the first.
+
+    `_search` commits to the first candidate that works, which is what makes it
+    fast and what makes the wild's meaning arbitrary: a lone 5 with a wild is
+    3-4-5, 4-5-6 or 5-6-7 and the solver picks whichever it reached first. This
+    yields all of them so the player can be asked.
+    """
+    if not specs:
+        yield []
+        return
+    head, tail = specs[0], specs[1:]
+    for used, used_wilds, meaning in _candidates(head, pool, wilds, min_nat):
+        for sub in _search_all(tail, pool - used, wilds - used_wilds, min_nat):
+            yield [(used, used_wilds, meaning)] + sub
+
+
+def _wild_values(plan: _RankPlan, size: int) -> list[str]:
+    """What the wilds in one group are standing in for.
+
+    This is the whole point of offering the choice: in a run, a wild is a
+    specific rank, and which rank decides what can be hit onto the group
+    afterwards.
+    """
+    used, used_wilds, (kind, value) = plan
+    if not used_wilds:
+        return []
+    if kind == "run":
+        span = list(range(value, value + size))
+        remaining = Counter(used)
+        gaps = []
+        for rank in span:
+            if remaining[rank]:
+                remaining[rank] -= 1
+            else:
+                gaps.append(str(rank))
+        return gaps
+    if kind == "set":
+        return [str(value) if value is not None else "any rank"] * used_wilds
+    return ["any card of the colour"] * used_wilds
+
+
+@dataclass(frozen=True)
+class LayOption:
+    """One way to lay the phase down, and what the wilds mean in it."""
+
+    melds: tuple[Meld, ...]
+    #: Rendered per group, e.g. "run 3-6, wild as 3". Built here rather than in
+    #: a client so both ports describe a choice the same way.
+    description: str
+
+    @property
+    def layout(self) -> Layout:
+        return [list(m.cards) for m in self.melds]
+
+    @property
+    def uses_wild(self) -> bool:
+        return any(c.is_wild for m in self.melds for c in m.cards)
+
+
+def _describe(meld: Meld, wild_values: list[str]) -> str:
+    if meld.kind is GroupKind.RUN:
+        head = f"run {meld.lo}-{meld.hi}"
+    elif meld.kind is GroupKind.SET:
+        head = f"set of {meld.rank}s"
+    else:
+        head = f"{meld.color.value if meld.color else 'colour'} group"
+    if not wild_values:
+        return head
+    joined = " and ".join(wild_values)
+    return f"{head}, wild as {joined}" if len(wild_values) == 1 else \
+        f"{head}, wilds as {joined}"
+
+
+#: A hand with several wilds can spell the same phase a great many ways. The
+#: chooser is a list a player reads, so it is capped -- and the cap is high
+#: enough that it has never been reached by a real hand in the sweeps.
+MAX_LAY_OPTIONS = 24
+
+
+def solve_lay_options(
+    hand: list[Card],
+    spec: PhaseSpec,
+    *,
+    min_naturals_per_group: int = DEFAULT_MIN_NATURALS_PER_GROUP,
+) -> list[LayOption]:
+    """Every distinct way this hand can lay this phase down.
+
+    Distinct by *meaning*, not by which physical card went where: two layouts
+    that differ only in which of your two 7s is in the set are the same choice
+    to a player, and only one of them is offered.
+    """
+    kinds = {g.kind for g in spec}
+    if GroupKind.COLOR in kinds:
+        # A colour group's only choice is its colour, and _solve_color already
+        # decides that from the naturals. Offer the one it found.
+        melds = solve_melds(hand, spec, min_naturals_per_group=min_naturals_per_group)
+        if melds is None:
+            return []
+        wilds = sum(1 for c in melds[0].cards if c.is_wild)
+        return [LayOption(tuple(melds),
+                          _describe(melds[0], ["any card of the colour"] * wilds))]
+
+    wilds = sum(1 for c in hand if c.is_wild)
+    pool = Counter(c.rank for c in hand if c.is_number)
+
+    options: list[LayOption] = []
+    seen: set[tuple] = set()
+    for plans in _search_all(spec, pool, wilds, min_naturals_per_group):
+        # Keyed on what the table ends up being, not on which group the wild
+        # physically sits in. `3 3 W` + `3 4 5 6` and `3 3 3` + `W 4 5 6` leave
+        # the same set of 3s and the same run of 3-6 behind, so they are one
+        # choice to a player, not two.
+        signature = tuple(
+            (kind, value, size)
+            for (used, _w, (kind, value)), size in zip(plans, (g.size for g in spec))
+        )
+        if signature in seen:
+            continue
+        seen.add(signature)
+
+        groups = _materialize(hand, plans)
+        melds: list[Meld] = []
+        parts: list[str] = []
+        for group_spec, cards, plan in zip(spec, groups, plans):
+            kind, value = plan[2]
+            if kind == "set":
+                meld = Meld(group_spec, list(cards), GroupKind.SET, rank=value)
+            else:
+                meld = Meld(group_spec, list(cards), GroupKind.RUN,
+                            lo=value, hi=value + group_spec.size - 1)
+            melds.append(meld)
+            parts.append(_describe(meld, _wild_values(plan, group_spec.size)))
+        options.append(LayOption(tuple(melds), " + ".join(parts)))
+        if len(options) >= MAX_LAY_OPTIONS:
+            break
+    return options
+
+
 def solve_melds(
     hand: list[Card],
     spec: PhaseSpec,

@@ -308,13 +308,37 @@ class Phase10CommandProcessor(ClientCommandProcessor):
         self.output(f"Mulligan spent -- fresh hand. {session.mulligans_left} left.")
         self._cmd_hand()
 
-    def _cmd_lay(self) -> None:
-        """Lay the phase down, if your hand satisfies it."""
+    def _cmd_lay(self, choice: str = "") -> None:
+        """Lay the phase down. With several ways to spend a wild, /lay lists
+        them and /lay <n> picks one."""
         hand = self._require_hand()
         if hand is None:
             return
+        options = hand.lay_down_options()
+        if not options:
+            self.output(f"Phase {hand.phase} is not satisfiable from your hand yet.")
+            return
+
+        picked = None
+        if choice:
+            try:
+                picked = options[int(choice) - 1]
+            except (ValueError, IndexError):
+                self.output(f"Pick 1 to {len(options)}.")
+                return
+        elif len(options) == 1:
+            picked = options[0]
+        else:
+            # The choice decides what the group will take afterwards, so it is
+            # worth stopping for rather than picking silently.
+            self.output("More than one way to spend your wild:")
+            for i, option in enumerate(options, 1):
+                self.output(f"  {i}. {option.description}")
+            self.output("Choose with /lay <n>.")
+            return
+
         try:
-            layout = hand.lay_down()
+            layout = hand.lay_down(picked)
         except RuntimeError as e:
             self.output(str(e))
             return

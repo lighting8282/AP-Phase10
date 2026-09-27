@@ -150,6 +150,15 @@ header.slim #free-play-offer { display: none; }
   font-weight: 600;
 }
 
+/* --- choosing what a wild is ------------------------------------------- */
+#lay-options { display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-start; }
+#lay-options button {
+  text-align: left;
+  border-color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+#lay-options button:hover { border-color: #6ee7a8; }
+
 #actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
 
 #phases { display: flex; gap: 0.4rem; flex-wrap: wrap; }
