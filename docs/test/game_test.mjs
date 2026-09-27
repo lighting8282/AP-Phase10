@@ -10,8 +10,9 @@
  *     node docs/test/game_test.mjs
  */
 
-import { SKIP, WILD, cardToString, numberCard } from "../src/cards.js";
+import { SKIP, WILD, cardToString, isSkip, numberCard } from "../src/cards.js";
 import { HAND_STATE, PhaseHand, Table, gameConfig, mulberry32 } from "../src/engine.js";
+import { MID, buildOpponents } from "../src/opponents.js";
 import { Phase10Game, SAVE_VERSION, roundToString } from "../src/game.js";
 
 let passed = 0;
@@ -228,6 +229,49 @@ check(many.scorecard(10)[0].includes("4 earlier round(s)"), "scorecard elides ol
   g.layDown();
   eq(g.melds[0].cards.map(cardToString), ["8Y", "W", "10B", "11B"],
     "a wild sits in the gap it stands for");
+}
+
+
+// -- a Skip that denies a turn ----------------------------------------------
+// The mirror of the block of the same name in tests/test_game.py. Free play
+// plays the printed rule; a seed keeps the dig its clear rates were measured
+// with, so the default must not move.
+{
+  const denyTable = (seed = 11, seats = 3) => {
+    const cfg = gameConfig({ wildsInDeck: 8, maxDraws: 0, startingSkips: 2,
+      skipMode: "deny" });
+    const random = mulberry32(seed);
+    const table = new Table();
+    const hand = new PhaseHand(1, cfg, { random, table });
+    if (seats) {
+      table.seats = buildOpponents(seats, Array(seats).fill(1), cfg, random, MID);
+      table.dealSeats(cfg.handSize);
+    }
+    return { hand, table };
+  };
+
+  eq(gameConfig({}).skipMode, "dig", "the default is still the dig");
+
+  const denied = denyTable();
+  const before = denied.hand.stock.length;
+  const revealed = denied.hand.playSkip();
+  eq(revealed, [], "denying reveals nothing");
+  check(!denied.hand.digPending, "and leaves no dig to resolve");
+  const event = denied.hand.events.find((e) => e.kind === "skip_denied");
+  eq(event.detail.seat, denied.table.seats[0].name, "it names who lost the turn");
+  check(denied.hand.discard.some(isSkip), "the Skip is spent onto the discard");
+  check(before - denied.hand.stock.length < 4,
+    "and the table takes less off the stock than a full round of turns");
+
+  // A seat already denied is passed over, or a second Skip costs nothing.
+  const pair = denyTable();
+  pair.table.seats[0].skipped = true;
+  eq(pair.table.nextActor().name, pair.table.seats[1].name, "a denied seat is passed over");
+
+  const alone = denyTable(11, 0);
+  let refused = false;
+  try { alone.hand.playSkip(); } catch { refused = true; }
+  check(refused, "a Skip with nobody to skip is refused");
 }
 
 console.log(`\n${passed} passed, ${failures.length} failed`);

@@ -185,11 +185,19 @@ for what you were holding.
 
 ### Skips
 
-In the printed game a Skip makes another player lose a turn, which does not
-mean much when the table is three computer players. Here a Skip is something
-you **hold and spend**: play it to look at the **top three cards of the stock
-and keep one**, free. It costs you no draw, and the Skip itself becomes that
-turn's discard.
+A Skip is never part of a phase, and it does one of two things depending on
+where you are playing.
+
+**Without Archipelago**, it is the printed rule: play it and **the next player
+loses their turn**.
+
+**In an Archipelago seed**, play it to look at the **top three cards of the
+stock and keep one**, free. It costs you no draw. That is not the printed rule,
+and it is deliberate — the access rules in a seed are built on measured clear
+rates, and every one of those was measured with the dig.
+
+Either way the Skip itself becomes that turn's discard, so playing one sheds
+the 15 points it would have cost you to be caught holding it.
 
 ### How this version differs from the box
 
@@ -198,7 +206,9 @@ turn's discard.
   thirds of the time, so every one of them was a fight.
 - **Skips are dealt to you, not shuffled in.** Shuffled in, one turns up only
   about once every three hands — too rarely to be worth the density it costs
-  every other draw.
+  every other draw. You start each round holding two.
+- **In an Archipelago seed a Skip digs rather than denying a turn**, for the
+  reason above.
 - **If the stock runs out**, the discard pile is shuffled back into it, leaving
   the top card face up.
 - **In an Archipelago seed**, the deck starts with *no* Wilds and you have a

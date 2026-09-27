@@ -78,6 +78,9 @@ class Opponent:
         self.melds: list[Meld] = []
         self.laid_down = False
         self.went_out = False
+        #: Set by a Skip played against this seat; consumed when its turn
+        #: would have come round.
+        self.skipped = False
 
     @property
     def spec(self) -> PhaseSpec:

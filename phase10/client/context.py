@@ -122,7 +122,9 @@ class Phase10CommandProcessor(ClientCommandProcessor):
             )
             self.output(f"table: {racing}    -- /table for detail")
         if hand.skips_in_hand:
-            self.output(f"{hand.skips_in_hand} Skip(s) in hand -- /skip digs for free")
+            what = ("/skip denies the next player a turn"
+                    if hand.config.skip_mode == "deny" else "/skip digs for free")
+            self.output(f"{hand.skips_in_hand} Skip(s) in hand -- {what}")
         if not hand.laid and hand.can_lay_down():
             self.output("You can lay this phase down now: /lay")
         if hand.laid and hand.hittable():
@@ -163,7 +165,11 @@ class Phase10CommandProcessor(ClientCommandProcessor):
             self._cmd_hand()
 
     def _cmd_skip(self) -> None:
-        """Spend a Skip to look at the top of the draw pile. Then /take <i>."""
+        """Play a Skip.
+
+        What that does depends on the seed: it denies the next player a turn,
+        or it digs three off the stock for you to keep one of with /take <i>.
+        """
         hand = self._require_hand()
         if hand is None:
             return
@@ -172,6 +178,18 @@ class Phase10CommandProcessor(ClientCommandProcessor):
         except RuntimeError as e:
             self.output(str(e))
             return
+
+        if hand.config.skip_mode == "deny":
+            # Nothing was revealed, so there is nothing to choose; say who it
+            # cost instead, because that is the whole effect.
+            denial = next(
+                (e for e in reversed(hand.events) if e.kind == "skip_denied"), None
+            )
+            if denial:
+                self.output(f"{denial.detail['seat']} loses a turn.")
+            self._cmd_hand()
+            return
+
         shown = "  ".join(f"[{i}]{c}" for i, c in enumerate(options))
         self.output(f"top of the pile: {shown}")
         self.output("Keep one with /take <i>; the rest go to the bottom.")

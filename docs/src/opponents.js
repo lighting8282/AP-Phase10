@@ -50,6 +50,9 @@ export class Opponent {
     this.melds = [];
     this.laidDown = false;
     this.wentOut = false;
+    //: Set by a Skip played against this seat; consumed when its turn would
+    //: have come round.
+    this.skipped = false;
   }
 
   get spec() {

@@ -37,6 +37,9 @@ const FREE_PLAY_SLOT = Object.freeze({
   // printed game does, rather than when a clock the box has never heard of
   // runs down.
   starting_draws: 0,
+  // The printed rule: a Skip denies the next player a turn. Archipelago keeps
+  // the dig, whose clear rates its access rules are built on.
+  skip_mode: "deny",
   checks_per_phase: 0,
   opponents: 3,
   death_link: false,

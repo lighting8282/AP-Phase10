@@ -167,6 +167,100 @@ def test_scorecard_elides_old_rounds():
     assert any("10 earlier round(s)" in line for line in card)
 
 
+# -- a Skip that denies a turn ------------------------------------------------
+# The printed rule, and what the game without Archipelago plays. A seed keeps
+# the dig, because every measured clear rate its access rules are built on was
+# measured with it -- so the default must not move.
+
+
+def deny_table(seed=4, seats=3):
+    from game.opponents import MID, build_opponents
+
+    cfg = GameConfig(wilds_in_deck=8, max_draws=0, starting_skips=2,
+                     skip_mode="deny")
+    rng = random.Random(seed)
+    table = Table()
+    if seats:
+        table.seats = build_opponents(seats, [1] * seats, cfg, rng, MID)
+    return PhaseHand(1, cfg, rng, table=table), table
+
+
+def test_the_default_is_still_the_dig():
+    assert GameConfig().skip_mode == "dig"
+
+
+def test_a_denied_seat_misses_its_turn():
+    """Measured by what the table takes off the stock, not by a flag: a normal
+    turn is your draw plus three seats, and a Skip turn is two seats and no
+    draw of your own."""
+    normal, _ = deny_table(seed=11)
+    before = len(normal.stock)
+    normal.draw()
+    normal.discard_card(normal.hand[-1])
+    normal_used = before - len(normal.stock)
+
+    denied, _ = deny_table(seed=11)
+    before = len(denied.stock)
+    denied.play_skip()
+    denied_used = before - len(denied.stock)
+
+    assert normal_used == 4, normal_used
+    assert denied_used == 2, denied_used
+
+
+def test_denying_reveals_nothing():
+    hand, _ = deny_table()
+    assert hand.play_skip() == []
+    assert not hand.dig_pending
+
+
+def test_it_names_who_lost_the_turn():
+    hand, table = deny_table()
+    hand.play_skip()
+    denial = next(e for e in hand.events if e.kind == "skip_denied")
+    assert denial.detail["seat"] == table.seats[0].name
+
+
+def test_the_skip_is_spent_onto_the_discard():
+    """In the pile, not necessarily on top of it: playing a Skip ends your
+    turn, so the seats that still act discard on top of it before this
+    returns."""
+    hand, _ = deny_table()
+    before = hand.skips_in_hand
+    hand.play_skip()
+    assert hand.skips_in_hand == before - 1
+    assert any(card.is_skip for card in hand.discard)
+
+
+def test_two_skips_deny_two_different_seats():
+    """The flag is consumed when that seat's turn comes round, so a second
+    Skip played later in the round finds the first seat available again --
+    but a second played before the turn cycle must not be wasted on a seat
+    already denied."""
+    hand, table = deny_table()
+    table.seats[0].skipped = True
+    assert table.next_actor() is table.seats[1]
+
+
+def test_nobody_to_skip_is_refused():
+    hand, _ = deny_table(seats=0)
+    try:
+        hand.play_skip()
+    except RuntimeError as err:
+        assert "nobody left to skip" in str(err)
+    else:
+        raise AssertionError("a Skip with no opponents should have been refused")
+
+
+def test_a_deal_clears_a_pending_denial():
+    """A Mulligan redeals the table; a denial left over would cost a seat a
+    turn in a round it was never played in."""
+    hand, table = deny_table()
+    table.seats[0].skipped = True
+    hand.redeal()
+    assert not any(seat.skipped for seat in table.seats)
+
+
 # -- no draw budget -----------------------------------------------------------
 # Free play takes the budget away entirely: a round ends when somebody empties
 # their hand, the way the printed game does. Archipelago never asks for this --

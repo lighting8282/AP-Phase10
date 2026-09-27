@@ -32,6 +32,9 @@ export class Phase10Session {
     this.startingDraws = opts.startingDraws ?? 4;
     this.checksPerPhase = opts.checksPerPhase ?? 4;
     this.storeSlots = opts.storeSlots ?? 0;
+    //: "dig" or "deny". Only free play sends the latter; an Archipelago seed
+    //: never does, because its access rules are built on the dig's numbers.
+    this.skipMode = opts.skipMode ?? "dig";
     this.deathLink = opts.deathLink ?? false;
     this.opponents = opts.opponents ?? 3;
 
@@ -57,6 +60,7 @@ export class Phase10Session {
       startingDraws: Number(slotData.starting_draws ?? 4),
       checksPerPhase: Number(slotData.checks_per_phase ?? 4),
       storeSlots: Number(slotData.store_slots ?? 0),
+      skipMode: slotData.skip_mode === "deny" ? "deny" : "dig",
       deathLink: Boolean(slotData.death_link ?? false),
       opponents: Number(slotData.opponents ?? 3),
       game: game ?? new Phase10Game(),
@@ -137,6 +141,7 @@ export class Phase10Session {
       // asks for: the Archipelago option starts at 2.
       maxDraws: this.startingDraws <= 0 ? 0 : Math.max(1, draws),
       startingSkips: Math.min(this.count(SKIP_CARD), MAX_SKIPS),
+      skipMode: this.skipMode,
     });
   }
 

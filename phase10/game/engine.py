@@ -52,6 +52,15 @@ class GameConfig:
     max_draws: int = 20           # "Extra Draw" items
     starting_skips: int = 0       # "Skip Card" items
 
+    #: What playing a Skip does.
+    #:
+    #: "dig" reveals the top three of the stock and keeps one. "deny" is the
+    #: printed rule: the next seat loses its turn. Archipelago uses the dig,
+    #: because every measured clear rate its access rules are built on was
+    #: measured with it. "deny" is the free-play game, where nothing is gated
+    #: on a difficulty number.
+    skip_mode: str = "dig"
+
     #: Skips shuffled into the draw pile, for fidelity to the physical deck.
     #: Measured as a straight loss -- they turn up 0.34 times per hand, too
     #: rarely to repay the density they cost every other draw -- so Archipelago
@@ -104,10 +113,23 @@ class Table:
             seat.layout = []
             seat.laid_down = False
             seat.went_out = False
+            seat.skipped = False
 
     @property
     def discard_top(self) -> Card | None:
         return self.discard[-1] if self.discard else None
+
+    def next_actor(self):
+        """The seat that would play next, or None if nobody would.
+
+        Seats act in order after the player, so the next one is the first that
+        is still in the round. A seat already denied a turn is skipped over:
+        stacking two Skips on one seat would cost the second one nothing.
+        """
+        for seat in self.seats:
+            if not seat.went_out and not seat.skipped:
+                return seat
+        return None
 
     def all_melds(self) -> list:
         """Every group face up on the table, in seat order.
@@ -130,6 +152,12 @@ class Table:
         if self.winner is not None:
             return self.winner
         for seat in self.seats:
+            if seat.skipped:
+                # Consumed where the turn would have happened rather than
+                # where the Skip was played, so it costs exactly one turn
+                # however long it waits for that seat to come round.
+                seat.skipped = False
+                continue
             if seat.take_turn(self):
                 self.winner = seat
                 return seat
@@ -309,7 +337,14 @@ class PhaseHand:
         self._end_turn()
 
     def play_skip(self) -> list[Card]:
-        """Spend a Skip to look at the top of the stock.
+        """Play a Skip. What that does depends on `skip_mode`.
+
+        In "deny" -- the printed rule, and what the game without Archipelago
+        uses -- the next seat loses its turn and nothing is revealed, so the
+        returned list is empty and there is no dig to resolve.
+
+        In "dig", the default and what every measured clear rate was measured
+        against: look at the top of the stock.
 
         The Skip becomes this turn's discard, so no separate discard follows --
         that is what keeps hand size stable and lets the Skip shed itself. The
@@ -325,6 +360,22 @@ class PhaseHand:
         skip = next((c for c in self.hand if c.is_skip), None)
         if skip is None:
             raise RuntimeError("no Skip in hand")
+
+        if self.config.skip_mode == "deny":
+            target = self.table.next_actor()
+            if target is None:
+                raise RuntimeError("nobody left to skip")
+            self.hand.remove(skip)
+            self.discard.append(skip)
+            target.skipped = True
+            self.skips_played += 1
+            self.drew_this_turn = False
+            self._emit("skip_denied", seat=target.name)
+            # The Skip was this turn's discard, so the turn ends here -- the
+            # same bargain the dig makes.
+            self._end_turn()
+            return []
+
         if not self.stock:
             raise RuntimeError("stock is empty")
 

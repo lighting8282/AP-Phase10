@@ -45,7 +45,13 @@ export function gameConfig(overrides = {}) {
     // plays: the round ends when somebody goes out, not when a clock runs
     // down. Archipelago never sets it there, so this is the free-play path.
     maxDraws: 20,          // "Extra Draw" items
-    startingSkips: 0,      // "Skip Card" items
+    startingSkips: 0,
+    // What playing a Skip does. "dig" reveals the top three of the stock and
+    // keeps one; "deny" is the printed rule, where the next seat loses its
+    // turn. Archipelago uses the dig, because every measured clear rate its
+    // access rules are built on was measured with it. "deny" is the free-play
+    // game, where nothing is gated on a difficulty number.
+    skipMode: "dig",      // "Skip Card" items
     // Skips shuffled into the draw pile, for fidelity to the physical deck.
     // Measured as a straight loss -- they turn up 0.34 times per hand, too
     // rarely to repay the density they cost every other draw -- so Archipelago
@@ -139,11 +145,26 @@ export class Table {
       seat.melds = [];
       seat.laidDown = false;
       seat.wentOut = false;
+      seat.skipped = false;
     }
   }
 
   get discardTop() {
     return this.discard.length ? this.discard[this.discard.length - 1] : null;
+  }
+
+  /**
+   * The seat that would play next, or null if nobody would.
+   *
+   * Seats act in order after the player, so the next one is the first still in
+   * the round. One already denied a turn is passed over: stacking two Skips on
+   * a seat would cost the second one nothing.
+   */
+  nextActor() {
+    for (const seat of this.seats) {
+      if (!seat.wentOut && !seat.skipped) return seat;
+    }
+    return null;
   }
 
   /**
@@ -162,6 +183,12 @@ export class Table {
   endOfTurn() {
     if (this.winner !== null) return this.winner;
     for (const seat of this.seats) {
+      if (seat.skipped) {
+        // Consumed where the turn would have happened rather than where the
+        // Skip was played, so it costs exactly one turn however long it waits.
+        seat.skipped = false;
+        continue;
+      }
       if (seat.takeTurn(this)) {
         this.winner = seat;
         return seat;
@@ -379,6 +406,22 @@ export class PhaseHand {
     if (this.drewThisTurn) throw new Error("already drew this turn; discard first");
     const skip = this.hand.find(isSkip);
     if (!skip) throw new Error("no Skip in hand");
+
+    if (this.config.skipMode === "deny") {
+      const target = this.table.nextActor();
+      if (!target) throw new Error("nobody left to skip");
+      removeCard(this.hand, skip);
+      this.discard.push(skip);
+      target.skipped = true;
+      this.skipsPlayed += 1;
+      this.drewThisTurn = false;
+      this._emit("skip_denied", { seat: target.name });
+      // The Skip was this turn's discard, so the turn ends here -- the same
+      // bargain the dig makes.
+      this._endTurn();
+      return [];
+    }
+
     if (!this.stock.length) throw new Error("stock is empty");
 
     removeCard(this.hand, skip);

@@ -58,6 +58,10 @@ class Phase10Session:
     death_link: bool = False
     opponents: int = 3
     store_slots: int = 0
+    #: "dig" or "deny". Only the free-play client sends the latter; an
+    #: Archipelago seed never does, because its access rules are built on the
+    #: dig's measured numbers.
+    skip_mode: str = "dig"
 
     items: Counter = field(default_factory=Counter)
     consumed_traps: Counter = field(default_factory=Counter)
@@ -83,6 +87,7 @@ class Phase10Session:
             death_link=bool(slot_data.get("death_link", False)),
             opponents=int(slot_data.get("opponents", 3)),
             store_slots=int(slot_data.get("store_slots", 0)),
+            skip_mode="deny" if slot_data.get("skip_mode") == "deny" else "dig",
             game=Phase10Game(rng),
         )
 
@@ -147,6 +152,7 @@ class Phase10Session:
             # play asks for: the Archipelago option starts at 2.
             max_draws=0 if self.starting_draws <= 0 else max(1, draws),
             starting_skips=min(self.items[SKIP_CARD], MAX_SKIPS),
+            skip_mode=self.skip_mode,
         )
 
     # -- playing -----------------------------------------------------------

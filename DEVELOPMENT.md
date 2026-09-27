@@ -773,6 +773,23 @@ does not quietly turn a ten into a twenty, and a saved run from before the
 choice existed restores as twenty, which is what it was. Archipelago's out-of-order unlocking is the thing being replaced
 here, so handing over all twenty at once would miss the point.
 
+**A Skip denies the next player a turn**, which is the printed rule. An
+Archipelago seed keeps the dig instead, and the split is deliberate rather than
+lazy: every measured clear rate the access rules are built on was measured with
+the dig, so changing what a Skip does in a seed would mean re-deriving the
+difficulty tables and every gate standing on them. Free play gates nothing on a
+difficulty number, so it can have the rule off the box for free.
+
+`skip_mode` is a `GameConfig` knob defaulting to `"dig"`, so a seed cannot
+reach the new behaviour by accident. The seat carries a `skipped` flag that
+`Table.end_of_turn` consumes where the turn would have happened, rather than
+where the Skip was played -- that way it costs exactly one turn however long it
+waits for that seat to come round. `next_actor` passes over a seat already
+denied, or a second Skip in the same cycle would cost nothing.
+
+Measured rather than asserted: a normal turn takes four cards off the stock
+(your draw plus three seats), and a Skip turn takes two.
+
 **There is no draw budget.** The budget is the solo model's replacement for the
 race to go out, and free play has the race — three seats at the table — so
 keeping both would be a clock the box has never heard of. `max_draws` of zero

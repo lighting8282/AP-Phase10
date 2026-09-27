@@ -158,7 +158,8 @@ function renderStats(session, hand) {
     // point of looking, and a generic pile symbol would say nothing.
     box.append(cardTile(hand.discardTop, hand.discardTop ? describe(hand.discardTop) : "empty",
       "on the discard", "wide"));
-    box.append(cardTile(SKIP_FACE, hand.skipsInHand, "skips in hand"));
+    box.append(cardTile(SKIP_FACE, hand.skipsInHand,
+      session.skipMode === "deny" ? "skips - deny a turn" : "skips in hand"));
     box.append(cardTile(WILD_FACE, hand.config.wildsInDeck, "wilds in the deck"));
   } else {
     const c = session.config;
@@ -319,7 +320,12 @@ const ACTIONS = {
   draw: () => withHand((hand) => hand.draw(false)),
   "draw-discard": () => withHand((hand) => hand.draw(true)),
   lay: () => layDown(),
-  skip: () => withHand((hand) => hand.playSkip()),
+  skip: () => withHand((hand) => {
+    const before = hand.events.length;
+    hand.playSkip();
+    const denial = hand.events.slice(before).find((e) => e.kind === "skip_denied");
+    if (denial) log(`${denial.detail.seat} loses a turn.`);
+  }),
   mulligan: () => mulligan(),
 };
 
@@ -365,6 +371,15 @@ function render() {
   }
   // Narrower than the rest: a Mulligan needs a copy in hand and an untouched
   // deal, so it stays disabled even mid-hand.
+  // A Skip does two different things depending on the seed, so the button
+  // has to say which -- "Dig" in front of a Skip that denies a turn would be
+  // a plain lie about what the click does.
+  const skip = el("skip-button");
+  skip.textContent = s.skipMode === "deny" ? "Play Skip" : "Dig (Skip)";
+  skip.title = s.skipMode === "deny"
+    ? "Make the next player miss their turn"
+    : "Look at the top three of the stock and keep one";
+
   const mull = el("mulligan-button");
   mull.disabled = s.canMulligan() !== null;
   mull.textContent = s.mulligansLeft ? `Mulligan (${s.mulligansLeft})` : "Mulligan";
