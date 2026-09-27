@@ -104,6 +104,8 @@
          phase wants, and how the game works. A title attribute never appears
          on a phone, so neither can rely on hovering. -->
     <div id="reference">
+      <button type="button" id="start-tutorial">Quick tutorial</button>
+
     <!-- The rules, on the screen the game is played on. A README is no use
          to somebody who arrived from "Just play" and is holding cards. -->
     <details id="how-to-play">
@@ -167,6 +169,21 @@
     <div id="stats"></div>
   </aside>
 </main>
+
+<!-- The tutorial points at the page rather than describing it, so it lives
+     over the top of everything and moves from element to element. -->
+<div id="tutorial" hidden>
+  <div id="tutorial-box" role="dialog" aria-modal="false" aria-labelledby="tutorial-title">
+    <p id="tutorial-step"></p>
+    <h2 id="tutorial-title"></h2>
+    <p id="tutorial-text"></p>
+    <div id="tutorial-buttons">
+      <button type="button" id="tutorial-back">Back</button>
+      <button type="button" id="tutorial-next">Next</button>
+      <button type="button" id="tutorial-done">Close</button>
+    </div>
+  </div>
+</div>
 
 <script type="module" src="src/ui.js"></script>
 </body>

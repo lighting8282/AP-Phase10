@@ -886,6 +886,173 @@ el("connect").addEventListener("submit", async (event) => {
   button.disabled = false;
 });
 
+// -- the tutorial ------------------------------------------------------------
+// Six steps that point at the page rather than describing it. Everything it
+// highlights is a real element, so it cannot drift out of date the way a
+// screenshot in a README does -- if a step's element is not on screen, the
+// step is skipped rather than pointing at nothing.
+
+const TUTORIAL = [
+  {
+    target: ".felt",
+    title: "This is the table",
+    text: "Three computer players sit across from you, and you are at the "
+      + "bottom. Everyone is racing to empty their hand.",
+  },
+  {
+    target: "#you-needs",
+    title: "What you are building",
+    text: "Your phase is written above your cards -- \u201cset of 3 + set of "
+      + "3\u201d means two groups of three matching numbers. Colours do not "
+      + "matter for a set.",
+  },
+  {
+    target: "#stock-pile",
+    title: "Start your turn by drawing",
+    text: "Click the face-down pile to draw the top card, or the face-up one "
+      + "to take what somebody threw away.",
+  },
+  {
+    target: '#actions button[data-action="lay"]',
+    title: "Lay your phase down",
+    text: "The moment your hand contains the whole phase, put it on the table. "
+      + "If a wild could stand for more than one card, you choose which.",
+  },
+  {
+    target: "#table",
+    title: "Then play onto anything",
+    text: "Once your own phase is down you can add spare cards to any group on "
+      + "the table, including theirs. A run takes either end; a set takes its "
+      + "own number.",
+  },
+  {
+    target: "#hand",
+    title: "End your turn by discarding",
+    text: "Click any card in your hand to throw it. Shed your last card and "
+      + "you have gone out -- the round ends and everyone else counts what "
+      + "they are still holding.",
+  },
+  {
+    target: "#phases",
+    title: "Then pick the next phase",
+    text: "Twenty of them, opening one at a time as you clear them. The two "
+      + "links underneath say what each phase needs and how everything works.",
+  },
+];
+
+//: Elements that draw nothing of their own, so the dimming would show through
+//: them if they were merely lifted above it.
+const TUT_SOLID = new Set(["#you-needs", "#hand", "#phases", "#table"]);
+
+let tutorialAt = 0;
+let tutorialSteps = [];
+
+function tutorialTarget(step) {
+  const node = document.querySelector(step.target);
+  if (!node) return null;
+  const box = node.getBoundingClientRect();
+  // Zero-sized means hidden or empty -- an empty table before a round starts,
+  // for instance. Nothing to point at, so the step does not run.
+  return box.width > 0 && box.height > 0 ? node : null;
+}
+
+function clearTutorialHighlight() {
+  for (const node of document.querySelectorAll(".tut-lit")) {
+    node.classList.remove("tut-lit", "tut-solid");
+  }
+}
+
+function placeTutorialBox(node) {
+  const box = el("tutorial-box");
+  const target = node.getBoundingClientRect();
+  const width = box.offsetWidth;
+  const height = box.offsetHeight;
+  const margin = 12;
+
+  // Below the element if it fits, above if it does not -- and then clamped to
+  // both edges, not just the bottom one. Clamping only the bottom put the box
+  // at top: -1411 on a phone, where the element it points at can be far above
+  // the fold at the moment it is measured.
+  let top = target.bottom + margin;
+  if (top + height > window.innerHeight - margin) top = target.top - height - margin;
+  top = Math.max(margin, Math.min(top, window.innerHeight - height - margin));
+
+  let left = target.left + target.width / 2 - width / 2;
+  left = Math.max(margin, Math.min(left, window.innerWidth - width - margin));
+
+  box.style.top = `${Math.round(top)}px`;
+  box.style.left = `${Math.round(left)}px`;
+}
+
+function showTutorialStep(index) {
+  tutorialAt = Math.max(0, Math.min(index, tutorialSteps.length - 1));
+  const step = tutorialSteps[tutorialAt];
+  clearTutorialHighlight();
+
+  const node = tutorialTarget(step);
+  if (node) {
+    node.classList.add("tut-lit");
+    if (TUT_SOLID.has(step.target)) node.classList.add("tut-solid");
+    // Instant, not smooth: the box is placed from the element's position, and
+    // a scroll still in flight is a position that is about to be wrong.
+    node.scrollIntoView({ block: "center", behavior: "auto" });
+  }
+
+  el("tutorial-step").textContent = `${tutorialAt + 1} of ${tutorialSteps.length}`;
+  el("tutorial-title").textContent = step.title;
+  el("tutorial-text").textContent = step.text;
+  el("tutorial-back").disabled = tutorialAt === 0;
+  el("tutorial-next").textContent =
+    tutorialAt === tutorialSteps.length - 1 ? "Finish" : "Next";
+
+  // Placed straight away, because requestAnimationFrame does not fire in a
+  // background tab and a box that waits for a frame that never comes stays in
+  // the corner. The extra frame is for the case where the text has just
+  // changed the box's height.
+  if (node) {
+    placeTutorialBox(node);
+    requestAnimationFrame(() => placeTutorialBox(node));
+  }
+}
+
+function startTutorial() {
+  tutorialSteps = TUTORIAL.filter((step) => tutorialTarget(step));
+  if (!tutorialSteps.length) {
+    log("Nothing to show yet -- start a round first.");
+    return;
+  }
+  el("tutorial").hidden = false;
+  showTutorialStep(0);
+}
+
+function endTutorial() {
+  clearTutorialHighlight();
+  el("tutorial").hidden = true;
+}
+
+el("start-tutorial").addEventListener("click", () => startTutorial());
+el("tutorial-next").addEventListener("click", () => {
+  if (tutorialAt === tutorialSteps.length - 1) endTutorial();
+  else showTutorialStep(tutorialAt + 1);
+});
+el("tutorial-back").addEventListener("click", () => showTutorialStep(tutorialAt - 1));
+el("tutorial-done").addEventListener("click", () => endTutorial());
+// Clicking the dimmed page closes it, but clicking the box must not.
+el("tutorial").addEventListener("click", (event) => {
+  if (event.target === el("tutorial")) endTutorial();
+});
+document.addEventListener("keydown", (event) => {
+  if (el("tutorial").hidden) return;
+  if (event.key === "Escape") endTutorial();
+  if (event.key === "ArrowRight") showTutorialStep(tutorialAt + 1);
+  if (event.key === "ArrowLeft") showTutorialStep(tutorialAt - 1);
+});
+window.addEventListener("resize", () => {
+  if (el("tutorial").hidden) return;
+  const node = document.querySelector(".tut-lit");
+  if (node) placeTutorialBox(node);
+});
+
 // Exposed deliberately: it is what the browser test harness drives, and it
 // lets a player inspect their own state from the console. Read-only in
 // practice -- every mutation still goes through the client.

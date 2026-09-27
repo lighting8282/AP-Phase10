@@ -166,6 +166,44 @@ header.slim #free-play-offer { display: none; }
 #phases button.open { background: var(--accent); }
 #phases button.cleared { background: var(--cleared); }
 
+/* --- the tutorial ------------------------------------------------------- */
+/* A dimmed page with one thing lit up. The popover is positioned in script,
+   because it follows whichever element the step is about. */
+#tutorial {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(4, 8, 18, 0.72);
+}
+
+#tutorial-box {
+  position: absolute;
+  width: min(23rem, calc(100vw - 2rem));
+  padding: 0.9rem 1rem 0.8rem;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+#tutorial-step { margin: 0 0 0.2rem; color: var(--muted); font-size: 12px; }
+#tutorial-title { margin: 0 0 0.35rem; font-size: 1rem; }
+#tutorial-text { margin: 0 0 0.75rem; font-size: 13px; line-height: 1.55; color: var(--ink); }
+#tutorial-buttons { display: flex; gap: 0.4rem; }
+#tutorial-buttons #tutorial-done { margin-left: auto; }
+
+/* The element the step is about, lifted out of the dimming. */
+.tut-lit {
+  position: relative;
+  z-index: 51;
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+/* Its own background, or the dim shows straight through a transparent box. */
+.tut-lit.tut-solid { background: var(--bg); }
+
+#start-tutorial { font-size: 13px; }
+
 /* --- the rules, on the game screen -------------------------------------- */
 /* Closed, the two sit side by side; opened, one takes the width so its prose
    is not squeezed into half a column. */
