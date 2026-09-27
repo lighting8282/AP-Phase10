@@ -52,10 +52,19 @@ main.board {
   display: grid;
   gap: 0 1.25rem;
   grid-template-columns: 27rem minmax(0, 1fr) 13.5rem;
-  grid-template-areas: "left center right";
+  /* The rules get their own area rather than living inside the left column:
+     it is the one panel whose right place differs by layout. Beside the
+     scorecard on a desktop; directly under the cards on a phone, where the
+     left column is two and a half thousand pixels down and the person who
+     needs the rules is the one who just arrived. */
+  grid-template-areas:
+    "left  center right"
+    "rules center right";
+  grid-template-rows: max-content 1fr;
   align-items: start;
 }
 #left { grid-area: left; }
+#how-to-play { grid-area: rules; }
 #center { grid-area: center; min-width: 0; }
 #right { grid-area: right; }
 
@@ -64,7 +73,8 @@ main.board {
 @media (max-width: 1280px) {
   main.board {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "center" "right" "left";
+    grid-template-areas: "center" "rules" "right" "left";
+    grid-template-rows: none;
   }
   #right #stats { display: flex; flex-wrap: wrap; }
   #right .tile { flex: 1 1 9rem; }
@@ -536,22 +546,22 @@ button.meld::after {
   #scorecard { max-height: min(20rem, 32vh); }
 }
 
-/* --- filling the left column ------------------------------------------ */
-/* In three columns the record of the game has a tall, otherwise empty
-   column to itself, and the play area is far taller than either panel. Let
-   the log take what is going spare rather than stopping at an arbitrary
-   line count with dead space beneath it. */
+/* --- the left column ---------------------------------------------------- */
+/* Everything here is read rather than played with: what has happened, and
+   what is left to get. The middle column is for the things you touch, and it
+   was carrying the rules and the check list on top of the cards.
+   The log used to grow to fill an otherwise empty column. It has company
+   below it now, so it takes a fixed slice instead -- growing would push the
+   check list off the bottom of a short screen. */
 @media (min-width: 1281px) {
-  #left {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-  }
   #left .log {
-    flex: 1 1 auto;
-    /* A floor as well as a ceiling: on a short screen the ceiling is doing
-       the work, on a tall one the floor keeps it from collapsing. */
-    min-height: 18rem;
-    max-height: min(52rem, 62vh);
+    min-height: 12rem;
+    max-height: min(28rem, 34vh);
   }
+  #left #scorecard { max-height: min(18rem, 26vh); }
 }
+
+/* The check grid has a narrower column to live in than the play area did, so
+   its cells give up their cap before the page gives up its gutter. */
+#left #checks { gap: 0.2rem; }
+#left .chk { padding: 0 0.3rem; }

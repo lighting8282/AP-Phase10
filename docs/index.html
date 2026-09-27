@@ -34,6 +34,15 @@
 
     <h2>Log <small>your game and the rest of the room</small></h2>
     <div id="log" class="log" aria-live="polite"></div>
+
+    <div id="checks-wrap">
+      <h2>Checks <small>every one this seed has, and where you are</small></h2>
+      <div id="checks-summary"></div>
+      <div id="checks"></div>
+      <h3>Hands won</h3>
+      <div id="milestones"></div>
+    </div>
+
   </aside>
 
   <!-- Everything you actually touch, laid out as the table it is: the others
@@ -89,46 +98,6 @@
       <button data-action="mulligan" id="mulligan-button">Mulligan</button>
     </div>
 
-    <!-- The rules, on the screen the game is played on. A README is no use
-         to somebody who arrived from "Just play" and is holding cards. -->
-    <details id="how-to-play">
-      <summary>How to play</summary>
-      <div class="help">
-        <p><b>A turn is three steps, in order.</b> Draw one card — the top of the
-        stock, or the face-up discard. Then lay your phase down if you can, and
-        play spare cards onto any group already on the table. Then discard one
-        card, which ends your turn.</p>
-
-        <p><b>Laying down</b> needs the whole phase at once, and you only do it
-        once a round. After that it stays down whatever happens next.</p>
-
-        <p><b>Hitting</b> is how you empty your hand, and you can only do it
-        once your own phase is down. A set takes another card of its rank, a
-        run takes either end and grows as it does, a colour group takes another
-        card of its colour, and no group ever takes a Skip.</p>
-
-        <p><b>Going out</b> is shedding your last card, by discarding it or by
-        hitting it onto a group. The round ends there for everyone.</p>
-
-        <p><b>Scoring is golf: low is good.</b> Whatever is still in your hand
-        when the round ends is what it costs you — 5 a card for 1 to 9, 10 for
-        10 to 12, 15 for a Skip and 25 for a Wild. Going out costs nothing.
-        Laying your phase down still clears it even if you are caught holding
-        cards; you just pay for them.</p>
-
-        <p><b>A Wild</b> stands in for any card, and you choose what it is when
-        you lay down — a run of 4 from W&nbsp;4&nbsp;5&nbsp;6 can be 3-4-5-6 or
-        4-5-6-7, and that decides what the group will take afterwards. Every
-        group needs at least one real card.</p>
-
-        <p><b>A Skip</b> is never part of a phase. Play it to look at the top
-        three of the stock and keep one, free — it costs no draw, and the Skip
-        becomes that turn's discard.</p>
-
-        <p><b>Runs do not wrap</b>: 11-12-1 is not a run.</p>
-      </div>
-    </details>
-
     <h2>Phases</h2>
     <div id="phases"></div>
     <!-- The reference card. A title attribute never appears on a phone, so
@@ -147,14 +116,47 @@
       <div id="store"></div>
     </div>
 
-    <div id="checks-wrap">
-      <h2>Checks <small>every one this seed has, and where you are</small></h2>
-      <div id="checks-summary"></div>
-      <div id="checks"></div>
-      <h3>Hands won</h3>
-      <div id="milestones"></div>
-    </div>
   </section>
+
+  <!-- The rules, on the screen the game is played on. A README is no use
+       to somebody who arrived from "Just play" and is holding cards. -->
+  <details id="how-to-play">
+    <summary>How to play</summary>
+    <div class="help">
+      <p><b>A turn is three steps, in order.</b> Draw one card — the top of the
+      stock, or the face-up discard. Then lay your phase down if you can, and
+      play spare cards onto any group already on the table. Then discard one
+      card, which ends your turn.</p>
+
+      <p><b>Laying down</b> needs the whole phase at once, and you only do it
+      once a round. After that it stays down whatever happens next.</p>
+
+      <p><b>Hitting</b> is how you empty your hand, and you can only do it
+      once your own phase is down. A set takes another card of its rank, a
+      run takes either end and grows as it does, a colour group takes another
+      card of its colour, and no group ever takes a Skip.</p>
+
+      <p><b>Going out</b> is shedding your last card, by discarding it or by
+      hitting it onto a group. The round ends there for everyone.</p>
+
+      <p><b>Scoring is golf: low is good.</b> Whatever is still in your hand
+      when the round ends is what it costs you — 5 a card for 1 to 9, 10 for
+      10 to 12, 15 for a Skip and 25 for a Wild. Going out costs nothing.
+      Laying your phase down still clears it even if you are caught holding
+      cards; you just pay for them.</p>
+
+      <p><b>A Wild</b> stands in for any card, and you choose what it is when
+      you lay down — a run of 4 from W&nbsp;4&nbsp;5&nbsp;6 can be 3-4-5-6 or
+      4-5-6-7, and that decides what the group will take afterwards. Every
+      group needs at least one real card.</p>
+
+      <p><b>A Skip</b> is never part of a phase. Play it to look at the top
+      three of the stock and keep one, free — it costs no draw, and the Skip
+      becomes that turn's discard.</p>
+
+      <p><b>Runs do not wrap</b>: 11-12-1 is not a run.</p>
+    </div>
+  </details>
 
   <!-- What you are working with right now: glanced at constantly. -->
   <aside id="right">
