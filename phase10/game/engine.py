@@ -90,6 +90,10 @@ class Table:
         self.stock: list[Card] = []
         self.discard: list[Card] = []
         self.seats: list = []
+        #: What the seats did, oldest first, as (seat name, sentence). The
+        #: clients drain it: opponents played in silence before this, so a
+        #: seat denied its turn looked exactly like one that took it.
+        self.log: list[tuple[str, str]] = []
         #: The seat that went out, once one has. Sticky: the round is over,
         #: and a player who keeps acting must keep losing it rather than
         #: slipping through because the transition already happened.
@@ -99,6 +103,15 @@ class Table:
         self.stock = stock
         self.discard = discard
         self.winner = None
+        self.log.clear()
+
+    def say(self, seat: str, sentence: str) -> None:
+        self.log.append((seat, sentence))
+
+    def drain_log(self) -> list[tuple[str, str]]:
+        """Take everything said since the last time anybody looked."""
+        said, self.log = self.log, []
+        return said
 
     def deal(self, count: int) -> list[Card]:
         """Take `count` cards off the stock for a seat."""
@@ -157,6 +170,7 @@ class Table:
                 # where the Skip was played, so it costs exactly one turn
                 # however long it waits for that seat to come round.
                 seat.skipped = False
+                self.say(seat.name, "misses a turn")
                 continue
             if seat.take_turn(self):
                 self.winner = seat

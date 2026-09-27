@@ -185,6 +185,40 @@ def deny_table(seed=4, seats=3):
     return PhaseHand(1, cfg, rng, table=table), table
 
 
+def test_the_table_says_what_each_seat_did():
+    """Opponents played in silence, so a seat denied its turn looked exactly
+    like one that took it -- which is how a working Skip reads as broken."""
+    hand, table = deny_table(seed=9)
+    hand.draw()
+    hand.discard_card(hand.hand[-1])
+    said = table.drain_log()
+    who = [name for name, _ in said]
+    assert who.count("Ada") >= 1 and who.count("Bo") >= 1 and who.count("Cy") >= 1
+    assert any("draws from the stock" in line or "from the discard" in line
+               for _, line in said)
+    assert any("discards" in line for _, line in said)
+
+
+def test_a_denied_seat_says_so_and_the_others_still_play():
+    hand, table = deny_table(seed=9)
+    hand.play_skip()
+    said = table.drain_log()
+    assert ("Ada", "misses a turn") in said
+    # And it is only Ada: the other two took their turns as usual.
+    assert not any(name == "Ada" and text != "misses a turn" for name, text in said)
+    assert any(name == "Bo" for name, _ in said)
+    assert any(name == "Cy" for name, _ in said)
+
+
+def test_the_account_is_drained_not_replayed():
+    """Read twice and a client would print every turn twice."""
+    hand, table = deny_table(seed=9)
+    hand.draw()
+    hand.discard_card(hand.hand[-1])
+    assert table.drain_log()
+    assert table.drain_log() == []
+
+
 def test_the_default_is_still_the_dig():
     assert GameConfig().skip_mode == "dig"
 

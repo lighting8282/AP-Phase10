@@ -41,6 +41,16 @@ def render_group(index: int, group) -> str:
 class Phase10CommandProcessor(ClientCommandProcessor):
     ctx: Phase10Context
 
+    def _after_acting(self) -> None:
+        """Read out the seats' turns, then show the hand.
+
+        Only the commands that can end a turn call this -- the table cannot
+        have moved after any other, and /hand on its own should not have the
+        side effect of consuming the account.
+        """
+        self.ctx.report_table()
+        self._cmd_hand()
+
     def _require_hand(self):
         hand = self.ctx.session.hand
         if hand is None or hand.state is not HandState.IN_PROGRESS:
@@ -162,7 +172,7 @@ class Phase10CommandProcessor(ClientCommandProcessor):
         if hand.state is HandState.FAILED:
             self.ctx.settle(hand)
         else:
-            self._cmd_hand()
+            self._after_acting()
 
     def _cmd_skip(self) -> None:
         """Play a Skip.
@@ -180,14 +190,9 @@ class Phase10CommandProcessor(ClientCommandProcessor):
             return
 
         if hand.config.skip_mode == "deny":
-            # Nothing was revealed, so there is nothing to choose; say who it
-            # cost instead, because that is the whole effect.
-            denial = next(
-                (e for e in reversed(hand.events) if e.kind == "skip_denied"), None
-            )
-            if denial:
-                self.output(f"{denial.detail['seat']} loses a turn.")
-            self._cmd_hand()
+            # Nothing was revealed, so there is nothing to choose. The table
+            # says who it cost, where the turn would have been.
+            self._after_acting()
             return
 
         shown = "  ".join(f"[{i}]{c}" for i, c in enumerate(options))
@@ -209,7 +214,7 @@ class Phase10CommandProcessor(ClientCommandProcessor):
         if hand.state is HandState.FAILED:
             self.ctx.settle(hand)
         else:
-            self._cmd_hand()
+            self._after_acting()
 
     def _cmd_hit(self, target: str = "") -> None:
         """Play a card onto a group on the table. Usage: /hit 2
@@ -522,6 +527,7 @@ class Phase10Context(CommonContext):
         lost_to = None
         if hand.events and hand.events[-1].kind == "hand_failed":
             lost_to = hand.events[-1].detail.get("opponent")
+        self.report_table()
         self._report_final_table()
         new = self.session.finish_hand(hand)
         result = self.session.last_result
@@ -534,6 +540,17 @@ class Phase10Context(CommonContext):
         self.save_pending = True
         if died and send_death and self.session.death_link:
             self.death_link_pending = True
+
+    def report_table(self) -> None:
+        """Read out what the seats did since anybody last looked.
+
+        Drained rather than replayed, so nothing is printed twice.
+        """
+        table = self.session.table
+        if table is None:
+            return
+        for who, what in table.drain_log():
+            logger.info(f"{who} {what}")
 
     def _report_final_table(self) -> None:
         """What every seat had down, before the table is replaced.

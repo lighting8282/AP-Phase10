@@ -37,7 +37,7 @@ from dataclasses import dataclass
 
 from .cards import Card, hand_score
 from .engine import GameConfig, Table, cards_short
-from .phases import PHASES, Layout, Meld, PhaseSpec, solve_melds
+from .phases import PHASES, Layout, Meld, PhaseSpec, describe_meld, solve_melds
 
 
 @dataclass(frozen=True)
@@ -124,7 +124,7 @@ class Opponent:
             return ranked[1]
         return ranked[0]
 
-    def _try_lay_down(self) -> None:
+    def _try_lay_down(self, table: Table | None = None) -> None:
         if self.laid_down:
             return
         melds = self._solution()
@@ -136,6 +136,9 @@ class Opponent:
         self.melds = melds
         self.layout = [m.cards for m in melds]
         self.laid_down = True
+        if table is not None:
+            groups = ", ".join(describe_meld(m) for m in melds)
+            table.say(self.name, f"lays down phase {self.phase}: {groups}")
 
     # -- turn ---------------------------------------------------------------
     def take_turn(self, table: Table) -> bool:
@@ -145,8 +148,9 @@ class Opponent:
         if not table.stock:
             return False
 
-        self._try_lay_down()
+        self._try_lay_down(table)
         if self._finished():
+            table.say(self.name, "goes out")
             return True
 
         if self.laid_down:
@@ -156,21 +160,34 @@ class Opponent:
             # forever, so a seat that had laid down could never go out.
             self._hit_what_it_can(table)
             if self._finished():
+                table.say(self.name, "goes out")
                 return True
             if self.hand:
-                table.discard.append(self._shed())
-            return self._finished()
+                shed = self._shed()
+                table.discard.append(shed)
+                table.say(self.name, f"discards {shed}")
+            if self._finished():
+                table.say(self.name, "goes out")
+                return True
+            return False
 
         if self._wants_discard_top(table.discard_top):
-            self.hand.append(table.discard.pop())
+            taken = table.discard.pop()
+            self.hand.append(taken)
+            table.say(self.name, f"takes {taken} from the discard")
         else:
             self.hand.append(table.stock.pop(0))
+            # Not which card: it went into a hand you cannot see.
+            table.say(self.name, "draws from the stock")
 
-        self._try_lay_down()
+        self._try_lay_down(table)
         if self._finished():
+            table.say(self.name, "goes out")
             return True
 
-        table.discard.append(self._choose_discard_card())
+        thrown = self._choose_discard_card()
+        table.discard.append(thrown)
+        table.say(self.name, f"discards {thrown}")
         return self._finished()
 
     def _hit_what_it_can(self, table: Table) -> int:
@@ -189,6 +206,8 @@ class Opponent:
                     if meld.accepts(card):
                         self.hand.remove(card)
                         meld.add(card)
+                        table.say(self.name,
+                                  f"plays {card} onto {describe_meld(meld)}")
                         played += 1
                         moved = True
                         break

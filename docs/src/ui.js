@@ -232,9 +232,21 @@ function hitMeld(meld) {
     log(err.message);
     return;
   }
-  log(`Played ${describe(playable[0])} onto the table.`);
+  log(`You play ${describe(playable[0])} onto the table.`);
+  reportTable();
   if (hand.state !== HAND_STATE.IN_PROGRESS) settle(hand);
   render();
+}
+
+/**
+ * Read out what the seats did since anybody last looked.
+ *
+ * Drained rather than replayed, so a redraw cannot print the same turn twice.
+ */
+function reportTable() {
+  const table = app.session.table;
+  if (!table) return;
+  for (const [who, what] of table.drainLog()) log(`${who} ${what}`);
 }
 
 function withHand(fn) {
@@ -247,8 +259,10 @@ function withHand(fn) {
     fn(hand);
   } catch (err) {
     log(err.message);
+    reportTable();
     return;
   }
+  reportTable();
   if (hand.state !== HAND_STATE.IN_PROGRESS) settle(hand);
   render();
 }
@@ -320,12 +334,7 @@ const ACTIONS = {
   draw: () => withHand((hand) => hand.draw(false)),
   "draw-discard": () => withHand((hand) => hand.draw(true)),
   lay: () => layDown(),
-  skip: () => withHand((hand) => {
-    const before = hand.events.length;
-    hand.playSkip();
-    const denial = hand.events.slice(before).find((e) => e.kind === "skip_denied");
-    if (denial) log(`${denial.detail.seat} loses a turn.`);
-  }),
+  skip: () => withHand((hand) => hand.playSkip()),
   mulligan: () => mulligan(),
 };
 

@@ -13,9 +13,9 @@
 // near turn five. So the race resolves before a large budget can matter -- see
 // the Python module for the numbers and what was done about them.
 
-import { handScore, points } from "./cards.js";
+import { cardToString, handScore, points } from "./cards.js";
 import { cardsShort, removeCard } from "./engine.js";
-import { PHASES, solveMelds } from "./phases.js";
+import { PHASES, describeMeldCards, solveMelds } from "./phases.js";
 
 /**
  * How well a seat plays. 1.0 / 0.0 is the greedy autoplayer exactly.
@@ -99,7 +99,7 @@ export class Opponent {
     return ranked[0];
   }
 
-  _tryLayDown() {
+  _tryLayDown(table = null) {
     if (this.laidDown) return;
     const melds = this._solution();
     if (melds === null) return;
@@ -114,6 +114,10 @@ export class Opponent {
     this.melds = melds;
     this.layout = melds.map((m) => m.cards);
     this.laidDown = true;
+    if (table) {
+      const groups = melds.map(describeMeldCards).join(", ");
+      table.say(this.name, `lays down phase ${this.phase}: ${groups}`);
+    }
   }
 
   // -- turn -----------------------------------------------------------------
@@ -122,8 +126,11 @@ export class Opponent {
     if (this.wentOut) return false;
     if (!table.stock.length) return false;
 
-    this._tryLayDown();
-    if (this._finished()) return true;
+    this._tryLayDown(table);
+    if (this._finished()) {
+      table.say(this.name, "goes out");
+      return true;
+    }
 
     if (this.laidDown) {
       // Already down: hit everything that legally extends a group on the
@@ -131,21 +138,41 @@ export class Opponent {
       // Drawing one and discarding one would leave the hand the same size
       // forever, so a seat that had laid down could never go out.
       this._hitWhatItCan(table);
-      if (this._finished()) return true;
-      if (this.hand.length) table.discard.push(this._shed());
-      return this._finished();
+      if (this._finished()) {
+        table.say(this.name, "goes out");
+        return true;
+      }
+      if (this.hand.length) {
+        const shed = this._shed();
+        table.discard.push(shed);
+        table.say(this.name, `discards ${cardToString(shed)}`);
+      }
+      if (this._finished()) {
+        table.say(this.name, "goes out");
+        return true;
+      }
+      return false;
     }
 
     if (this._wantsDiscardTop(table.discardTop)) {
-      this.hand.push(table.discard.pop());
+      const taken = table.discard.pop();
+      this.hand.push(taken);
+      table.say(this.name, `takes ${cardToString(taken)} from the discard`);
     } else {
       this.hand.push(table.stock.shift());
+      // Not which card: it went into a hand you cannot see.
+      table.say(this.name, "draws from the stock");
     }
 
-    this._tryLayDown();
-    if (this._finished()) return true;
+    this._tryLayDown(table);
+    if (this._finished()) {
+      table.say(this.name, "goes out");
+      return true;
+    }
 
-    table.discard.push(this._takeChosenDiscard());
+    const thrown = this._takeChosenDiscard();
+    table.discard.push(thrown);
+    table.say(this.name, `discards ${cardToString(thrown)}`);
     return this._finished();
   }
 
@@ -166,6 +193,8 @@ export class Opponent {
           if (meld.accepts(card)) {
             removeCard(this.hand, card);
             meld.add(card);
+            table.say(this.name,
+              `plays ${cardToString(card)} onto ${describeMeldCards(meld)}`);
             played += 1;
             moved = true;
             break;

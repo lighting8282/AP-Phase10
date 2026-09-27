@@ -37,6 +37,17 @@ class FakeContext:
         self.session = session
         self.rng = random.Random(11)
         self.settled: list = []
+        self.lines: list[str] = []
+
+    def report_table(self) -> None:
+        """Read out the seats' turns, as the real context does. Without this
+        the fake diverges from the thing it stands in for, and a command that
+        calls it dies on an attribute rather than being tested."""
+        table = self.session.table
+        if table is None:
+            return
+        for who, what in table.drain_log():
+            self.lines.append(f"{who} {what}")
 
     def settle(self, hand, quiet: bool = False) -> None:
         self.settled.append(hand)

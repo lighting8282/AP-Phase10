@@ -122,6 +122,10 @@ export class Table {
     this.stock = [];
     this.discard = [];
     this.seats = [];
+    //: What the seats did, oldest first, as [seat name, sentence]. The clients
+    //: drain it: opponents played in silence before this, so a seat denied its
+    //: turn looked exactly like one that took it.
+    this.log = [];
     // Sticky: once somebody is out the round is over, and a player who keeps
     // acting must keep losing it rather than slipping through because the
     // transition already happened.
@@ -132,6 +136,18 @@ export class Table {
     this.stock = stock;
     this.discard = discard;
     this.winner = null;
+    this.log.length = 0;
+  }
+
+  say(seat, sentence) {
+    this.log.push([seat, sentence]);
+  }
+
+  /** Take everything said since the last time anybody looked. */
+  drainLog() {
+    const said = this.log;
+    this.log = [];
+    return said;
   }
 
   deal(count) {
@@ -187,6 +203,7 @@ export class Table {
         // Consumed where the turn would have happened rather than where the
         // Skip was played, so it costs exactly one turn however long it waits.
         seat.skipped = false;
+        this.say(seat.name, "misses a turn");
         continue;
       }
       if (seat.takeTurn(this)) {
