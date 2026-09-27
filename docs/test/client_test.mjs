@@ -147,6 +147,32 @@ const packet = { cmd: "PrintJSON", data: [{ text: "one line, one packet" }] };
   check("a seed is not capped at all", seed.phaseCap, PHASE_COUNT);
 }
 
+// -- what was on the table when the round ended ------------------------------
+// The seat panels show this until the next round starts, and the round ends
+// the instant somebody goes out -- which is exactly when you want to read it.
+{
+  const logs = [];
+  const app = new Phase10Client({ onLog: (line) => logs.push(line) });
+  await app.startFreePlay({ fresh: true });
+
+  const hand = app.startHand(1);
+  const seats = app.session.seats;
+  check("there are seats to report on", seats.length, 3);
+  // Put something down on one of them, so there is something to describe.
+  const opponent = seats[0];
+  opponent.hand = [];
+  opponent.laidDown = true;
+  hand.markFailed("test");
+  await app.settle(hand);
+
+  const reported = logs.filter((line) => line.startsWith(`  ${opponent.name}`));
+  check("every seat is reported", logs.filter((l) => l.startsWith("  ")).length, 3);
+  check("including the one that emptied its hand", reported.length, 1);
+  // Defaulted rather than indexed blind: with no report at all the filter
+  // comes back empty, and a crash here would hide the one real failure.
+  check("and it says what it had down", (reported[0] ?? "").includes("nothing down"), true);
+}
+
 for (const line of failures) console.log(`  FAIL ${line}`);
 console.log(`\n${passed} passed, ${failures.length} failed`);
 process.exit(failures.length ? 1 : 0);

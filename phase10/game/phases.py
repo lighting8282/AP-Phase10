@@ -457,6 +457,21 @@ def _describe(meld: Meld, wild_values: list[str]) -> str:
 MAX_LAY_OPTIONS = 24
 
 
+def describe_meld(meld: Meld) -> str:
+    """One group, as a player would read it back: what it is and what is in it.
+
+    Lives here rather than in a client so the browser, the desktop tab and the
+    text client all say the same thing about the same group.
+    """
+    cards = " ".join(str(c) for c in meld.cards)
+    if meld.kind is GroupKind.RUN:
+        return f"run {meld.lo}-{meld.hi} [{cards}]"
+    if meld.kind is GroupKind.SET:
+        return f"set of {meld.rank}s [{cards}]"
+    colour = meld.color.value if meld.color else "colour"
+    return f"{colour} group [{cards}]"
+
+
 def solve_lay_options(
     hand: list[Card],
     spec: PhaseSpec,

@@ -15,6 +15,7 @@ import { GAME_NAME, MULLIGAN, PHASE_COUNT, SKIP_CARD, WILD_CARD, phaseUnlock }
   from "./data.js";
 import { Phase10Game, roundToString } from "./game.js";
 import { Phase10Session } from "./session.js";
+import { describeMeldCards } from "./phases.js";
 
 /**
  * The deck a free-play run is dealt, with no Archipelago to hand items out.
@@ -317,8 +318,28 @@ export class Phase10Client {
   }
 
   /** Finish a hand: report its checks, save, and trip the goal if it is met. */
+  /**
+   * What every seat had on the table, written down before the table goes.
+   *
+   * The seat panels show this until the next round starts, and the round ends
+   * the instant somebody goes out -- which is exactly when you want to look at
+   * it. The log keeps.
+   */
+  #reportFinalTable() {
+    const seats = this.session.seats;
+    if (!seats.length) return;
+    for (const seat of seats) {
+      const what = seat.melds.length
+        ? seat.melds.map(describeMeldCards).join("  +  ")
+        : "nothing down";
+      const held = seat.wentOut ? "went out" : `held ${seat.hand.length}`;
+      this.onLog(`  ${seat.name} (${held}): ${what}`);
+    }
+  }
+
   async settle(hand, { sendDeath = true } = {}) {
     const died = hand.state === "failed";
+    this.#reportFinalTable();
     const fresh = this.session.finishHand(hand);
     const result = this.session.lastResult;
     if (result) this.onLog(roundToString(result));

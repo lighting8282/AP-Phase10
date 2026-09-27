@@ -13,7 +13,9 @@
  * Wilds substitute for any card. Skips can never be part of a phase.
  */
 
-import { COLORS, MAX_RANK, MIN_RANK, isNumber, isSkip, isWild } from "./cards.js";
+import {
+  COLORS, MAX_RANK, MIN_RANK, cardToString, isNumber, isSkip, isWild,
+} from "./cards.js";
 
 /**
  * Official rules forbid completing a phase using only wild cards. The exact
@@ -486,6 +488,19 @@ export const MAX_LAY_OPTIONS = 24;
  * that differ only in which of your two 7s is in the set are one choice to a
  * player, and only one of them is offered.
  */
+/**
+ * One group, as a player would read it back: what it is and what is in it.
+ *
+ * Lives here rather than in a client so every client says the same thing about
+ * the same group. Mirrors describe_meld in phases.py.
+ */
+export function describeMeldCards(meld) {
+  const cards = meld.cards.map(cardToString).join(" ");
+  if (meld.kind === GROUP.RUN) return `run ${meld.lo}-${meld.hi} [${cards}]`;
+  if (meld.kind === GROUP.SET) return `set of ${meld.rank}s [${cards}]`;
+  return `${meld.color ?? "colour"} group [${cards}]`;
+}
+
 export function solveLayOptions(hand, spec, minNaturalsPerGroup = DEFAULT_MIN_NATURALS_PER_GROUP) {
   const kinds = new Set(spec.map((g) => g.kind));
   if (kinds.has(GROUP.COLOR)) {

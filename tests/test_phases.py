@@ -395,6 +395,42 @@ def test_ordering_never_loses_a_card():
                 assert before == after
 
 
+def test_a_meld_describes_itself_with_its_cards():
+    """What the clients print when a round ends. The point of including the
+    cards is that a group can be bigger than the phase asked for -- that is
+    what somebody hit onto it, and it is invisible from the size alone."""
+    import random as _random
+
+    from game.engine import GameConfig, PhaseHand, Table
+    from game.phases import describe_meld
+
+    hand = PhaseHand(4, GameConfig(wilds_in_deck=0, max_draws=0),
+                     _random.Random(1), table=Table())
+    hand.spec = (RUN(4),)
+    hand.hand = [n(8, Y), WILD, n(10, B), n(11, B), n(7, R)]
+    # Chosen rather than left to the solver, which would have spent the 7 on a
+    # run of 7-10 and left nothing to hit with.
+    option = next(o for o in hand.lay_down_options()
+                  if o.description.startswith("run 8-11"))
+    hand.lay_down(option)
+    meld = hand.melds[0]
+    assert describe_meld(meld) == "run 8-11 [8Y W 10B 11B]"
+
+    hand.hit(n(7, R), meld)
+    assert describe_meld(meld) == "run 7-11 [7R 8Y W 10B 11B]"
+
+    sets = PhaseHand(1, GameConfig(wilds_in_deck=0, max_draws=0),
+                     _random.Random(1), table=Table())
+    sets.spec = (SET(3),)
+    sets.hand = [n(6, R), n(6, B), WILD, n(2, G)]
+    sets.lay_down()
+    # Which of two 6s comes first is not a fact about anything; the label and
+    # the wild's place at the end are.
+    described = describe_meld(sets.melds[0])
+    assert described.startswith("set of 6s ["), described
+    assert described.endswith(" W]"), described
+
+
 def test_an_option_from_another_hand_is_refused():
     """The chooser hands back concrete cards, so the engine has to check they
     are yours. Without it a client could lay cards it never held."""

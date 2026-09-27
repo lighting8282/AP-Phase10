@@ -25,7 +25,7 @@ from NetUtils import ClientStatus
 from ..data import GAME_NAME, PHASE_COUNT, store_gate
 from ..game.autoplay import play_out
 from ..game.engine import HandState
-from ..game.phases import PHASES, phase_description
+from ..game.phases import PHASES, describe_meld, phase_description
 from .session import Phase10Session
 
 
@@ -522,6 +522,7 @@ class Phase10Context(CommonContext):
         lost_to = None
         if hand.events and hand.events[-1].kind == "hand_failed":
             lost_to = hand.events[-1].detail.get("opponent")
+        self._report_final_table()
         new = self.session.finish_hand(hand)
         result = self.session.last_result
         if not quiet and lost_to:
@@ -533,6 +534,18 @@ class Phase10Context(CommonContext):
         self.save_pending = True
         if died and send_death and self.session.death_link:
             self.death_link_pending = True
+
+    def _report_final_table(self) -> None:
+        """What every seat had down, before the table is replaced.
+
+        The /table command shows this until the next round starts, and the
+        round ends the instant somebody goes out -- which is exactly when you
+        want to look at it.
+        """
+        for seat in self.session.seats:
+            groups = "  +  ".join(describe_meld(m) for m in seat.melds) or "nothing down"
+            held = "went out" if seat.went_out else f"held {len(seat.hand)}"
+            logger.info(f"  {seat.name} ({held}): {groups}")
 
     async def phase10_loop(self) -> None:
         while not self.exit_event.is_set():
