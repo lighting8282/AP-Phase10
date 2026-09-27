@@ -52,19 +52,10 @@ main.board {
   display: grid;
   gap: 0 1.25rem;
   grid-template-columns: 27rem minmax(0, 1fr) 13.5rem;
-  /* The rules get their own area rather than living inside the left column:
-     it is the one panel whose right place differs by layout. Beside the
-     scorecard on a desktop; directly under the cards on a phone, where the
-     left column is two and a half thousand pixels down and the person who
-     needs the rules is the one who just arrived. */
-  grid-template-areas:
-    "left  center right"
-    "rules center right";
-  grid-template-rows: max-content 1fr;
+  grid-template-areas: "left center right";
   align-items: start;
 }
 #left { grid-area: left; }
-#how-to-play { grid-area: rules; }
 #center { grid-area: center; min-width: 0; }
 #right { grid-area: right; }
 
@@ -73,8 +64,7 @@ main.board {
 @media (max-width: 1280px) {
   main.board {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "center" "rules" "right" "left";
-    grid-template-rows: none;
+    grid-template-areas: "center" "right" "left";
   }
   #right #stats { display: flex; flex-wrap: wrap; }
   #right .tile { flex: 1 1 9rem; }
@@ -133,7 +123,7 @@ header.slim #free-play-offer { display: none; }
 .needs:empty { display: none; }
 .you .needs { color: #b9cdf0; }
 
-#phase-help { margin-top: 0.6rem; }
+#phase-help { margin-top: 0; }
 #phase-help summary {
   cursor: pointer;
   color: var(--muted);
@@ -177,7 +167,19 @@ header.slim #free-play-offer { display: none; }
 #phases button.cleared { background: var(--cleared); }
 
 /* --- the rules, on the game screen -------------------------------------- */
-#how-to-play { margin-top: 1.4rem; }
+/* Closed, the two sit side by side; opened, one takes the width so its prose
+   is not squeezed into half a column. */
+#reference {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.4rem 1.5rem;
+  margin-top: 1rem;
+}
+#reference > details { flex: 0 1 auto; }
+#reference > details[open] { flex: 1 1 100%; }
+
+#how-to-play { margin-top: 0; }
 #how-to-play summary {
   cursor: pointer;
   font-size: 0.95rem;
