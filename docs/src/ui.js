@@ -330,7 +330,7 @@ function render() {
 
   el("summary").textContent =
     `Round ${s.game.roundNumber} - score ${s.totalScore} (lower is better) - ` +
-    `won ${s.handsWon} - cleared ${s.clearedPhases.size}/${PHASE_COUNT}` +
+    `won ${s.handsWon} - cleared ${s.clearedPhases.size}/${app.phaseCap}` +
     (s.scoreReduction ? ` - ${s.scoreReduction} reduced` : "");
 
   if (hand) {
@@ -747,7 +747,7 @@ function renderPhaseHelp(session) {
   const unlocked = session.unlockedPhases;
   const playing = session.hand ? session.hand.phase : null;
 
-  for (let phase = 1; phase <= PHASE_COUNT; phase += 1) {
+  for (let phase = 1; phase <= app.phaseCap; phase += 1) {
     const state = phase === playing ? "now"
       : session.clearedPhases.has(phase) ? "done"
       : unlocked.has(phase) ? "open" : "";
@@ -771,7 +771,9 @@ function renderPhases(session) {
   const box = el("phases");
   box.replaceChildren();
   const unlocked = session.unlockedPhases;
-  for (let phase = 1; phase <= PHASE_COUNT; phase += 1) {
+  // The run's own length: a ten-phase free-play run should not show ten
+  // buttons that can never light up.
+  for (let phase = 1; phase <= app.phaseCap; phase += 1) {
     const button = document.createElement("button");
     button.textContent = String(phase);
     button.title = phaseDescription(phase);
@@ -840,23 +842,28 @@ el("edit-connection").addEventListener("click", () => setConnectionFormOpen(true
 }
 
 // -- free play ---------------------------------------------------------------
-async function startFreePlay(fresh) {
+async function startFreePlay(fresh, phases = null) {
   const status = el("status");
-  await app.startFreePlay({ fresh });
+  await app.startFreePlay({ fresh, phases });
   status.className = "free";
   status.textContent = "free play - no server";
   setConnectionFormOpen(false);
   el("free-play-controls").hidden = false;
+  for (const button of document.querySelectorAll("#free-play-controls .new-run")) {
+    button.classList.toggle("current", Number(button.dataset.phases) === app.phaseCap);
+  }
   render();
 }
 
 el("free-play").addEventListener("click", () => startFreePlay(false));
-el("free-play-reset").addEventListener("click", () => {
-  // Deliberately confirmed: it throws away a scorecard that only exists here,
-  // with nothing on a server to restore it from.
-  if (!globalThis.confirm?.("Start a new run? The current scorecard is lost.")) return;
-  startFreePlay(true);
-});
+for (const button of document.querySelectorAll("#free-play-controls .new-run")) {
+  button.addEventListener("click", () => {
+    // Deliberately confirmed: it throws away a scorecard that only exists
+    // here, with nothing on a server to restore it from.
+    if (!globalThis.confirm?.("Start a new run? The current scorecard is lost.")) return;
+    startFreePlay(true, Number(button.dataset.phases));
+  });
+}
 
 el("connect").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -935,7 +942,7 @@ const TUTORIAL = [
   {
     target: "#phases",
     title: "Then pick the next phase",
-    text: "Twenty of them, opening one at a time as you clear them. The two "
+    text: "They open one at a time as you clear them. The two "
       + "links underneath say what each phase needs and how everything works.",
   },
 ];

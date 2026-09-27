@@ -46,6 +46,16 @@ const FREE_PLAY_SLOT = Object.freeze({
 /** Where a free-play run is kept. Per browser, per device, and nowhere else. */
 const FREE_PLAY_KEY = "ap10_free_play";
 
+/**
+ * How many phases a free-play run climbs.
+ *
+ * Ten is the game as it comes in the box. Twenty is those ten plus the ten
+ * measured to fill the gap they leave -- nothing printed clears more than
+ * about two thirds of the time, so every one of them is a fight. Archipelago
+ * seeds are always the full twenty; this is a free-play choice only.
+ */
+export const FREE_PLAY_PHASE_COUNTS = Object.freeze([10, PHASE_COUNT]);
+
 export class Phase10Client {
   constructor({ onUpdate = () => {}, onLog = () => {}, onMessage = () => {} } = {}) {
     this.client = new Client();
@@ -61,6 +71,9 @@ export class Phase10Client {
     //: Playing with no server at all. Not the same as disconnected: a
     //: free-play run has its own items, its own saves, and no checks.
     this.offline = false;
+    //: How far a run climbs. Only free play moves it; a seed is always the
+    //: full set, because its locations exist for every phase.
+    this.phaseCap = PHASE_COUNT;
     this.restoreState = "needed";
     this.goalSent = false;
 
@@ -118,10 +131,11 @@ export class Phase10Client {
    * miss the point. Nothing is checked and nothing is sent; the run lives in
    * this browser.
    */
-  async startFreePlay({ fresh = false } = {}) {
+  async startFreePlay({ fresh = false, phases = null } = {}) {
     this.connected = false;
     this.offline = true;
     this.goalSent = false;
+    if (phases) this.phaseCap = this.#validCap(phases);
     this.session = Phase10Session.fromSlotData(FREE_PLAY_SLOT, new Phase10Game());
     this.restoreState = "needed";
 
@@ -145,8 +159,13 @@ export class Phase10Client {
    * after a restore without the unlocks having been saved -- and a replayed
    * phase cannot open two.
    */
+  #validCap(phases) {
+    const wanted = Number(phases);
+    return FREE_PLAY_PHASE_COUNTS.includes(wanted) ? wanted : PHASE_COUNT;
+  }
+
   #grantFreePlayItems() {
-    const open = Math.min(this.session.clearedPhases.size + 1, PHASE_COUNT);
+    const open = Math.min(this.session.clearedPhases.size + 1, this.phaseCap);
     const items = [...FREE_PLAY_DECK];
     for (let phase = 1; phase <= open; phase += 1) items.push(phaseUnlock(phase));
     this.session.setItems(items);
@@ -158,7 +177,8 @@ export class Phase10Client {
     try {
       if (typeof localStorage === "undefined") return;
       if (payload === null) localStorage.removeItem(FREE_PLAY_KEY);
-      else localStorage.setItem(FREE_PLAY_KEY, JSON.stringify(payload));
+      else localStorage.setItem(FREE_PLAY_KEY,
+        JSON.stringify({ ...payload, phase_cap: this.phaseCap }));
     } catch {
       /* not worth telling the player about */
     }
@@ -174,6 +194,9 @@ export class Phase10Client {
       return;
     }
     if (stored === null) return;
+    // Written by this client, so a missing cap is a run from before the choice
+    // existed -- which was always the full twenty.
+    this.phaseCap = this.#validCap(stored.phase_cap ?? PHASE_COUNT);
     if (this.session.loadPayload(stored)) {
       const game = this.session.game;
       this.onLog(`Restored ${game.rounds.length} round(s), ${game.totalScore} points.`);

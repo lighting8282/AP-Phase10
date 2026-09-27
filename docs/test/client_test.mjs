@@ -8,6 +8,7 @@
 // listeners could quietly drift back into it.
 
 import { Phase10Client } from "../src/client.js";
+import { PHASE_COUNT } from "../src/data.js";
 
 let passed = 0;
 const failures = [];
@@ -113,6 +114,37 @@ const packet = { cmd: "PrintJSON", data: [{ text: "one line, one packet" }] };
   // Saving must not throw where there is no localStorage, which is Node, and
   // is also a private window.
   check("a round was recorded", app.session.game.rounds.length, 1);
+}
+
+// -- ten phases or twenty ----------------------------------------------------
+// Free play only. An Archipelago seed is always the full set, because its
+// locations exist for every phase.
+{
+  const app = new Phase10Client({});
+  app.client.login = () => { throw new Error("free play must not log in"); };
+
+  await app.startFreePlay({ fresh: true, phases: 10 });
+  check("a ten-phase run caps at ten", app.phaseCap, 10);
+
+  // Clearing ten must not open an eleventh.
+  for (let phase = 1; phase <= 10; phase += 1) {
+    const hand = app.startHand(phase);
+    hand.state = "went_out";
+    await app.settle(hand);
+  }
+  check("ten cleared", app.session.clearedPhases.size, 10);
+  check("and nothing beyond it opens", Math.max(...app.session.unlockedPhases), 10);
+
+  const twenty = new Phase10Client({});
+  await twenty.startFreePlay({ fresh: true, phases: 20 });
+  check("twenty is the other choice", twenty.phaseCap, 20);
+
+  const bad = new Phase10Client({});
+  await bad.startFreePlay({ fresh: true, phases: 13 });
+  check("anything else falls back to the full set", bad.phaseCap, PHASE_COUNT);
+
+  const seed = new Phase10Client({});
+  check("a seed is not capped at all", seed.phaseCap, PHASE_COUNT);
 }
 
 for (const line of failures) console.log(`  FAIL ${line}`);

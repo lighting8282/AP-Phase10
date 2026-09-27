@@ -766,7 +766,11 @@ login.
 
 It is the printed game rather than a sandbox: the full eight wilds, two Skips,
 three Mulligans, three opponents — and **the phases open one at a time as they
-are cleared**. Archipelago's out-of-order unlocking is the thing being replaced
+are cleared**. A run is ten phases or twenty, chosen when it starts: ten is
+what the box holds, and a ten-phase run shows ten buttons rather than twenty
+with half of them permanently dark. The cap is saved with the run, so a reload
+does not quietly turn a ten into a twenty, and a saved run from before the
+choice existed restores as twenty, which is what it was. Archipelago's out-of-order unlocking is the thing being replaced
 here, so handing over all twenty at once would miss the point.
 
 **There is no draw budget.** The budget is the solo model's replacement for the

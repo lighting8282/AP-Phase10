@@ -87,7 +87,15 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 #free-play-offer { margin: 0.5rem 0 0; color: var(--muted); font-size: 13px; }
 header.slim #free-play-offer { display: none; }
-#free-play-controls { margin-top: 0.6rem; }
+#free-play-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+#free-play-controls .label { color: var(--muted); font-size: 13px; }
+#free-play-controls .current { border-color: var(--accent); }
 
 #status { color: var(--muted); }
 #status.free { color: #8ab4ff; }
