@@ -14,7 +14,15 @@ second process.
   - [In a browser, connected to a room](#in-a-browser-connected-to-a-room)
   - [From the Archipelago launcher](#from-the-archipelago-launcher)
 - [Install the apworld](#install-the-apworld)
-- [How a hand plays](#how-a-hand-plays)
+- [The rules](#the-rules)
+  - [The deck](#the-deck)
+  - [A round](#a-round)
+  - [What a phase asks for](#what-a-phase-asks-for)
+  - [Hitting](#hitting)
+  - [Going out](#going-out)
+  - [Scoring, where low is good](#scoring-where-low-is-good)
+  - [Skips](#skips)
+  - [How this version differs from the box](#how-this-version-differs-from-the-box)
 - [Options](#options)
 - [Items and locations](#items-and-locations)
 - [Layout](#layout)
@@ -88,28 +96,104 @@ requires:
 Releases that change the items or locations need a new seed; each release says
 so at the top of its notes.
 
-## How a hand plays
+## The rules
 
-Each hand is one attempt at one phase — *two sets of three*, *a run of seven*,
-*seven cards of one colour*, and so on up to twenty.
+### The deck
 
-You draw a card and discard a card, and the moment your hand satisfies the
-phase you lay it down. After that you keep going: you can play spare cards onto
-any group on the table, yours or an opponent's, and shed your whole hand to go
-out. Whatever you are still holding when the round ends is what it costs you,
-and **lower is better**.
+108 cards: the numbers **1 to 12** in four colours, two of each, plus **8
+Wilds** and **4 Skips**.
 
-A round ends on whichever comes first:
+A **Wild** stands in for any card. A **Skip** can never be part of a phase.
 
-- **your draw budget runs out** — the solo clock, raised by Extra Draw items
-- **an opponent goes out** — the table clock, three seats racing you
+### A round
 
-Laying your phase down clears it either way. The clocks only stop you shedding
-the rest.
+Each round is one attempt at one phase. You are dealt **10 cards**, one card
+goes face up to start the discard pile, and the rest is the stock.
 
-Two cards are special. A **Wild** stands in for anything except a Skip. A
-**Skip** is not dead weight here — play it to look at the top three of the
-draw pile and keep one, free, without spending a draw.
+A turn is three steps, in this order:
+
+1. **Draw one card** — off the top of the stock, or the face-up card from the
+   discard pile.
+2. **Lay down**, if your hand now satisfies the phase, and then **hit** — play
+   spare cards onto any group already on the table.
+3. **Discard one card**, which ends your turn.
+
+You can only lay down once, and only when you can make the *whole* phase at
+once. Once it is down it stays down: nothing later in the round takes it back.
+
+### What a phase asks for
+
+Every phase is one or more groups:
+
+| | |
+|---|---|
+| **set of N** | N cards of the same rank. Colours do not matter — three 7s is a set of 3, whatever colour they are. |
+| **run of N** | N cards of consecutive ranks. Colours do not matter, and runs **do not wrap**: 11-12-1 is not a run. |
+| **N cards of one colour** | N cards sharing a colour. Ranks do not matter, and repeats are fine. |
+
+So *set of 3 + set of 3* wants six cards in two groups of matching ranks, and
+*run of 7* wants seven consecutive ranks in one group.
+
+Wilds fill any gap, but **every group needs at least one real card** — you
+cannot lay a group made entirely of Wilds.
+
+### Hitting
+
+Once your own phase is down, you can play spare cards onto any group on the
+table, **including your opponents'**. That is how you empty your hand.
+
+- a **set** takes another card of its rank
+- a **run** takes either end, and grows as it does
+- a **colour group** takes another card of its colour
+- **no group ever takes a Skip**
+
+You cannot hit before your own phase is down, which is what stops hitting being
+a way to dump cards you could not otherwise place.
+
+### Going out
+
+Shed your last card — by discarding it, or by hitting it onto a group — and you
+have **gone out**. The round ends immediately for everyone.
+
+### Scoring, where low is good
+
+When the round ends, everyone still holding cards scores what is in their hand:
+
+| | |
+|---|---|
+| a 1 to 9 | **5** points |
+| a 10 to 12 | **10** points |
+| a Skip | **15** points |
+| a Wild | **25** points |
+
+Going out scores **zero**. Points accumulate across rounds, and **the lowest
+total is the best** — so being caught holding a Wild is the most expensive
+thing that can happen to you.
+
+Laying your phase down and being caught still clears the phase. You just pay
+for what you were holding.
+
+### Skips
+
+In the printed game a Skip makes another player lose a turn, which does not
+mean much when the table is three computer players. Here a Skip is something
+you **hold and spend**: play it to look at the **top three cards of the stock
+and keep one**, free. It costs you no draw, and the Skip itself becomes that
+turn's discard.
+
+### How this version differs from the box
+
+- **Twenty phases**, not ten. The extra ten were measured to fill a gap the
+  original ten left: none of the printed phases clears more than about two
+  thirds of the time, so every one of them was a fight.
+- **Skips are dealt to you, not shuffled in.** Shuffled in, one turns up only
+  about once every three hands — too rarely to be worth the density it costs
+  every other draw.
+- **If the stock runs out**, the discard pile is shuffled back into it, leaving
+  the top card face up.
+- **In an Archipelago seed**, the deck starts with *no* Wilds and you have a
+  limited number of draws per round; items put the Wilds back and raise the
+  budget. Free play has all eight Wilds and no draw limit.
 
 ## Options
 
@@ -208,6 +292,12 @@ Packaging:
 
     python tools/build_apworld.py                          # dist/phase10.apworld
     python tools/build_apworld.py --verify dist/phase10.apworld
+
+Every number and every "always" or "never" in the rules section above is
+asserted against the engine, because prose is where a rule drifts from the code
+with nothing failing:
+
+    python tools/check_rules_doc.py
 
 [DEVELOPMENT.md](DEVELOPMENT.md) has the rest: what was measured, why the
 numbers above are the numbers, and the bugs worth not reintroducing.
