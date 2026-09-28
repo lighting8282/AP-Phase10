@@ -33,9 +33,10 @@ def card_json(card):
 
 
 def trace(seed: int, phases: list[int], hand_size: int, awareness: float,
-          error: float) -> dict:
+          error: float, skip_mode: str = "dig", skips_in_deck: int = 0) -> dict:
     rng = random.Random(seed)
-    cfg = GameConfig(hand_size=hand_size, max_draws=99)
+    cfg = GameConfig(hand_size=hand_size, max_draws=99,
+                     skip_mode=skip_mode, skips_in_deck=skips_in_deck)
     deck = shuffled_deck(rng, cfg.wilds_in_deck, cfg.skips_in_deck)
 
     table = Table()
@@ -76,6 +77,7 @@ def trace(seed: int, phases: list[int], hand_size: int, awareness: float,
     return {
         "seed": seed, "phases": phases, "hand_size": hand_size,
         "awareness": awareness, "error": error,
+        "skip_mode": skip_mode, "skips_in_deck": skips_in_deck,
         "deck": [card_json(c) for c in deck],
         "rolls": rolls,
         "turns": turns,
@@ -90,6 +92,13 @@ def main() -> None:
         cases.append(trace(seed, [3, 5, 7], 10, 1.0, 0.0))
     for seed in range(18, 22):
         cases.append(trace(seed, [2], 11, 0.4, 0.5))
+    # Deny mode with the box's Skips shuffled in. Without these the seats
+    # never hold a Skip in a trace, so the policy that aims one -- and the
+    # coin flip inside it -- is the one piece of opponent behaviour the
+    # differential test would not have been covering at all.
+    for seed in range(22, 30):
+        cases.append(trace(seed, [1, 1, 1], 10, 0.7, 0.25,
+                           skip_mode="deny", skips_in_deck=4))
 
     OUT.write_text(json.dumps(cases), encoding="utf-8")
     turns = sum(len(c["turns"]) for c in cases)

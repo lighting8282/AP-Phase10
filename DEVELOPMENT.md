@@ -582,8 +582,10 @@ threshold.
 
 ### Still not built
 
-A Skip still digs rather than skipping a player's turn. With opponents at the
-table it has a real meaning again, and that conflict is unresolved.
+In an Archipelago seed a Skip digs rather than denying a turn, which is the one
+place the two differ: every measured clear rate the access rules stand on was
+measured with the dig. Free play denies, in both directions -- see
+[Free play, with no server](#free-play-with-no-server).
 
 ### Keeping the two ports honest
 
@@ -923,12 +925,41 @@ routes to one effect, one of which skips the target choice, is the kind of
 surface that drifts between the two ports. Dig mode is untouched, so no measured
 clear rate moves.
 
-**The opponents still cannot play one.** A seat holds a Skip as an ordinary card
-and discards it for nothing, because the AI has no notion of spending one --
-`skipped` is a flag done *to* a seat. So the rule is one-sided: you can deny
-them and they cannot deny you. Teaching the AI to throw Skips is a real feature
-with its own balance question (which seat does a seat deny?), and it would move
-free play's measured rates, so it is not smuggled in here.
+**The seats play them too, and can aim at you.** For a while they could not:
+`skipped` was a flag done *to* a seat, the AI had no notion of spending one, and
+the player was not a seat at all, so a Skip ran one way and only one way.
+
+Three pieces make it symmetric.
+
+`Table.player` is a back-reference to the hand being played, so the seats can
+see you as a target. It is a reference rather than a copy of what they need to
+know, because what a good target looks like is the seats' business and copying
+it would spell the rule out twice.
+
+`PhaseHand.skipped` is the flag on your side, consumed in `_end_turn` where your
+turn would have been -- the same bargain a seat's own Skip makes, costing
+exactly one turn however long it waited. Losing it means the table comes round
+*twice* before you act, which is what a lost turn is. `turns_missed` counts them,
+because the flag is gone the instant the turn is spent and a client that only
+looks between moves would never see it.
+
+`_deny_somebody` aims at whoever is closest to going out: down first, then
+fewest cards held, everybody included. That is usually you, and denying the next
+seat round the table instead would be the safe-looking choice and the wrong one.
+Everything it reads is face up -- who is down, how many cards they hold -- so it
+is not a seat looking at hands it cannot see. A mistake is the second-best
+target rather than a random one, the same shape `_choose_discard` already uses,
+so `discard_error` tunes it for free.
+
+A seat throws its Skip as soon as it has one. It is the only card in hand that
+does something on the way out, it is never part of a phase, and it costs fifteen
+to be caught holding.
+
+**The differential test would not have caught any of this.** Every recorded
+trace ran with `skips_in_deck: 0`, so no seat ever held a Skip and the whole
+policy -- including the coin flip inside it -- was invisible to the crosscheck
+while passing it. Eight deny-mode traces with the box's four Skips now carry 17
+denials between them.
 
 **There is no draw budget.** The budget is the solo model's replacement for the
 race to go out, and free play has the race — three seats at the table — so

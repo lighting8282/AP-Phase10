@@ -319,6 +319,72 @@ check(many.scorecard(10)[0].includes("4 earlier round(s)"), "scorecard elides ol
   check(!last.hand.denyPending, "and asks nobody to miss a turn");
 }
 
+// -- the seats can deny too, and can deny you ---------------------------------
+// A Skip used to run one way: you could deny a seat and no seat could deny
+// anybody, because `skipped` was a flag on a seat and the player was not one.
+{
+  const cfg = gameConfig({
+    handSize: 10, maxDraws: 0, wildsInDeck: 8, skipsInDeck: 4, skipMode: "deny",
+  });
+  const deal = (seed) => {
+    const random = mulberry32(seed);
+    const table = new Table();
+    table.seats = buildOpponents(3, [1, 2, 3], cfg, random, MID);
+    return new PhaseHand(1, cfg, { random, table });
+  };
+
+  // A seat holding a Skip throws it, and somebody loses a turn for it.
+  const thrown = deal(3);
+  thrown.table.seats[0].hand.push(SKIP);
+  thrown.draw();
+  thrown.discardCard(thrown.hand[thrown.hand.length - 1]);
+  const denials = thrown.table.log.filter(([, w]) => /makes .* miss a turn/.test(w));
+  check(denials.length > 0, "a seat throws its Skip at somebody");
+
+  // Aimed at whoever is closest to going out, and that can be you. Set up so
+  // the player is unambiguously the best target: down, and holding one card.
+  const aimed = deal(5);
+  aimed.laid = true;
+  aimed.hand = [aimed.hand[0]];
+  for (const seat of aimed.table.seats) seat.laidDown = false;
+  const seat = aimed.table.seats[0];
+  seat.hand.push(SKIP);
+  const target = seat._denySomebody(aimed.table);
+  check(target === aimed, "and aims at the player when the player is the threat");
+  check(aimed.skipped, "which marks you, not a seat");
+  eq(aimed.table.drainLog().filter(([, w]) => /miss a turn/.test(w)),
+    [[seat.name, "makes you miss a turn"]], "and says so by name");
+
+  // The thrower is never a target, and nobody is denied twice over.
+  const list = deal(11);
+  const first = list.table.seats[0];
+  eq(list.table.denyTargets(first).map((t) => t.name ?? "You"),
+    ["You", list.table.seats[1].name, list.table.seats[2].name],
+    "a seat's targets are everybody but itself");
+  list.skipped = true;
+  eq(list.table.denyTargets(first).map((t) => t.name ?? "You"),
+    [list.table.seats[1].name, list.table.seats[2].name],
+    "and somebody already denied is not worth a second Skip");
+
+  // A lost turn is the table coming round again before you act. Counted from
+  // the log rather than from seat draws, because a seat can itself be denied
+  // in between -- which is the mechanic working, not a miscount.
+  const lost = deal(7);
+  lost.skipped = true;
+  lost.draw();
+  lost.discardCard(lost.hand[lost.hand.length - 1]);
+  const said = lost.table.drainLog();
+  eq(said[0], ["You", "miss a turn"], "losing a turn says so first");
+  const acted = new Set();
+  let cycles = 0;
+  for (const [who] of said) {
+    if (who === "You") continue;
+    if (acted.has(who)) { cycles += 1; acted.clear(); }
+    acted.add(who);
+  }
+  check(cycles >= 1, "and the table comes round again before you play");
+}
+
 // -- every card a seat was dealt is somewhere ---------------------------------
 // Reported from a real run: a seat went out with eight cards showing, having
 // been dealt ten, and the board could not be reconciled. It balanced -- the

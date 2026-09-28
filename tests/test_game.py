@@ -185,6 +185,65 @@ def deny_table(seed=4, seats=3):
     return PhaseHand(1, cfg, rng, table=table), table
 
 
+def test_a_seat_throws_its_skip_at_somebody():
+    """A Skip used to run one way: the player could deny a seat and no seat
+    could deny anybody, because `skipped` was a flag on a seat and the player
+    was not one."""
+    hand, table = deny_table(seed=3)
+    table.seats[0].hand.append(SKIP)
+    hand.draw()
+    hand.discard_card(hand.hand[-1])
+    denials = [line for line in table.log if "miss a turn" in line[1]]
+    assert denials, table.log
+
+
+def test_a_seat_aims_at_the_player_when_the_player_is_the_threat():
+    """Closest to going out, which can be you. Set up so it is unambiguous:
+    down, and holding a single card."""
+    hand, table = deny_table(seed=5)
+    hand.laid = True
+    hand.hand = hand.hand[:1]
+    for seat in table.seats:
+        seat.laid_down = False
+    seat = table.seats[0]
+    seat.hand.append(SKIP)
+    target = seat._deny_somebody(table)
+    assert target is hand
+    assert hand.skipped
+    said = [line for line in table.drain_log() if "miss a turn" in line[1]]
+    assert said == [(seat.name, "makes you miss a turn")], said
+
+
+def test_the_thrower_is_never_a_target_and_nobody_is_denied_twice():
+    hand, table = deny_table(seed=11)
+    first = table.seats[0]
+    names = [getattr(t, "name", "You") for t in table.deny_targets(first)]
+    assert names == ["You", table.seats[1].name, table.seats[2].name], names
+    hand.skipped = True
+    names = [getattr(t, "name", "You") for t in table.deny_targets(first)]
+    assert names == [table.seats[1].name, table.seats[2].name], names
+
+
+def test_a_lost_turn_is_the_table_coming_round_again():
+    """Counted from the log rather than from seat turns, because a seat can
+    itself be denied in between -- which is the mechanic working."""
+    hand, table = deny_table(seed=7)
+    hand.skipped = True
+    hand.draw()
+    hand.discard_card(hand.hand[-1])
+    said = table.drain_log()
+    assert said[0] == ("You", "miss a turn"), said[:2]
+    acted, cycles = set(), 0
+    for who, _ in said:
+        if who == "You":
+            continue
+        if who in acted:
+            cycles += 1
+            acted.clear()
+        acted.add(who)
+    assert cycles >= 1, said
+
+
 def test_the_table_says_what_each_seat_did():
     """Opponents played in silence, so a seat denied its turn looked exactly
     like one that took it -- which is how a working Skip reads as broken."""

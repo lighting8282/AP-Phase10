@@ -200,13 +200,68 @@ class Opponent:
                 table.say(self.name, "goes out")
                 return True
 
-        # Down, the phase is safe and the only thing left to manage is points
-        # in hand; still building, the choice is about what the phase needs.
-        thrown = self._shed() if self.laid_down else self._choose_discard_card()
+        thrown = self._choose_throw()
         table.discard.append(thrown)
         self.threw += 1
         table.say(self.name, f"discards {thrown}")
+        # The printed rule, and the same one the player plays by: the Skip is
+        # the discard, and whoever threw it says who loses a turn.
+        if thrown.is_skip and self.config.skip_mode == "deny":
+            self._deny_somebody(table)
         return self._finished()
+
+    def _choose_throw(self) -> Card:
+        """What to throw this turn.
+
+        A Skip first, where a Skip denies: it is the only card in hand that
+        does something on the way out, it is never part of a phase, and it
+        costs fifteen to be caught with. Otherwise the usual choice -- down,
+        the phase is safe and only points in hand matter; still building, it
+        is about what the phase still needs.
+        """
+        if self.config.skip_mode == "deny":
+            skip = next((c for c in self.hand if c.is_skip), None)
+            if skip is not None:
+                self.hand.remove(skip)
+                return skip
+        return self._shed() if self.laid_down else self._choose_discard_card()
+
+    def _deny_somebody(self, table: Table):
+        """Aim a thrown Skip at whoever is closest to going out.
+
+        The player counts, and is usually the answer: a seat that has laid
+        down and holds two cards is one turn from ending the round, and so are
+        you. Denying the next seat round the table instead would be the
+        safe-looking choice and the wrong one.
+
+        Everything read here is face up -- whether somebody is down, and how
+        many cards they hold -- so this is not the seat looking at hands it
+        cannot see. A mistake is the second-best target rather than a random
+        one, the same shape the discard chooser uses.
+        """
+        targets = table.deny_targets(self)
+        # Nobody left to deny. The Skip is spent either way, which is what the
+        # player's own throw does in the same spot.
+        if not targets:
+            return None
+        # Duck-typed rather than by class, exactly as the JS port does it: a
+        # seat has `laid_down`, the player has `laid`, and importing PhaseHand
+        # here to tell them apart would be a circular import.
+        def down(t) -> bool:
+            return t.laid_down if hasattr(t, "laid_down") else t.laid
+        ranked = sorted(
+            ((target, order) for order, target in enumerate(targets)),
+            key=lambda pair: (not down(pair[0]), len(pair[0].hand), pair[1]),
+        )
+        ranked = [target for target, _ in ranked]
+        if len(ranked) > 1 and self.rng.random() < self.skill.discard_error:
+            pick = ranked[1]
+        else:
+            pick = ranked[0]
+        pick.skipped = True
+        table.say(self.name, "makes you miss a turn" if pick is table.player
+                  else f"makes {pick.name} miss a turn")
+        return pick
 
     def _hit_what_it_can(self, table: Table) -> int:
         """Lay every card that legally extends a group already on the table.

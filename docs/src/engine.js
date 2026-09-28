@@ -21,10 +21,10 @@ import {
   isWild,
   numberCard,
   COLORS,
-} from "./cards.js?v=8612bdea";
+} from "./cards.js?v=f0519056";
 import {
   GROUP, PHASES, phaseCardCount, solveLayOptions, solveMelds, solvePhase,
-} from "./phases.js?v=8612bdea";
+} from "./phases.js?v=f0519056";
 
 /** How deep into the stock a played Skip lets you look. */
 export const SKIP_DIG_DEPTH = 3;
@@ -130,6 +130,10 @@ export class Table {
     // acting must keep losing it rather than slipping through because the
     // transition already happened.
     this.winner = null;
+    //: The hand being played at this table, so a seat aiming a Skip can see
+    //: the player as a target like any other. Without it the seats could only
+    //: ever deny each other, which is a rule that runs one way.
+    this.player = null;
   }
 
   reset(stock, discard) {
@@ -186,6 +190,27 @@ export class Table {
       if (!seat.wentOut && !seat.skipped) return seat;
     }
     return null;
+  }
+
+  /**
+   * Everybody still in the round who could lose a turn, the player included.
+   *
+   * One place, so the player throwing a Skip and a seat throwing one are
+   * choosing from the same list by the same rule. `exclude` is whoever is
+   * throwing it -- you cannot deny yourself -- and anyone already denied is
+   * left out, since a second Skip on them would cost nothing.
+   */
+  denyTargets(exclude = null) {
+    const targets = [];
+    const player = this.player;
+    if (player && player !== exclude && !player.skipped
+      && player.state === HAND_STATE.IN_PROGRESS) {
+      targets.push(player);
+    }
+    for (const seat of this.seats) {
+      if (seat !== exclude && !seat.wentOut && !seat.skipped) targets.push(seat);
+    }
+    return targets;
   }
 
   /**
@@ -256,6 +281,17 @@ export class PhaseHand {
     this._random = opts.random ?? Math.random;
     //: Shared with the opponents when there are any; private otherwise.
     this.table = opts.table ?? new Table();
+    // So the seats can aim at you. A back-reference rather than a copy of what
+    // they need to know, because what a good target looks like is the seats'
+    // business and it would otherwise be spelled out twice.
+    this.table.player = this;
+    //: Set by a seat that threw a Skip at you; consumed after the seats have
+    //: played, where your turn would have been.
+    this.skipped = false;
+    //: How many turns Skips have cost you this hand. The flag is consumed the
+    //: instant the turn is lost, so a driver that only looks between moves
+    //: would never see it -- this is what it reads instead.
+    this.turnsMissed = 0;
     //: Opt-in: the browser client shows each seat move and so needs to hold
     //: them, while every headless driver wants the turn resolved on the spot.
     this.paced = Boolean(opts.paced);
@@ -467,7 +503,9 @@ export class PhaseHand {
    * the second one nothing, which is the same reason nextActor passes it over.
    */
   denyTargets() {
-    return this.table.seats.filter((seat) => !seat.wentOut && !seat.skipped);
+    // Excluding yourself, which is the only difference between your list and
+    // a seat's -- the rule is otherwise the same for everybody at the table.
+    return this.table.denyTargets(this);
   }
 
   /** Whether a discarded Skip is waiting to be pointed at somebody. */
@@ -554,13 +592,34 @@ export class PhaseHand {
   _endTurn() {
     this._failIfOutOfRoad();
     if (this.state !== HAND_STATE.IN_PROGRESS) return;
+    // A turn you have been denied is spent here, where it would have happened
+    // -- the same bargain a seat's own Skip makes -- and it costs you exactly
+    // one turn however long it waited. Losing it means the seats come round
+    // again before you act, which is what a lost turn *is*: the table plays
+    // twice and you play once.
+    const lost = this.skipped;
+    if (lost) {
+      this.skipped = false;
+      this.turnsMissed += 1;
+      this.table.say("You", "miss a turn");
+      this._emit("turn_missed", {});
+    }
     if (this.paced) {
       // Queued, not played: the driver walks them with stepOpponent so the
       // player can watch. Nothing is owed once somebody has already gone out.
-      this.pendingSeats = this.table.winner === null ? [...this.table.seats] : [];
+      if (this.table.winner !== null) {
+        this.pendingSeats = [];
+        return;
+      }
+      this.pendingSeats = lost
+        ? [...this.table.seats, ...this.table.seats]
+        : [...this.table.seats];
       return;
     }
     this._settleTableTurn(this.table.endOfTurn());
+    if (lost && this.state === HAND_STATE.IN_PROGRESS) {
+      this._settleTableTurn(this.table.endOfTurn());
+    }
   }
 
   /** Apply what the table's turn did to the hand. */

@@ -13,9 +13,9 @@
 // near turn five. So the race resolves before a large budget can matter -- see
 // the Python module for the numbers and what was done about them.
 
-import { cardToString, handScore, points } from "./cards.js?v=8612bdea";
-import { cardsShort, removeCard } from "./engine.js?v=8612bdea";
-import { PHASES, describeMeldCards, solveMelds } from "./phases.js?v=8612bdea";
+import { cardToString, handScore, isSkip, points } from "./cards.js?v=f0519056";
+import { cardsShort, removeCard } from "./engine.js?v=f0519056";
+import { PHASES, describeMeldCards, solveMelds } from "./phases.js?v=f0519056";
 
 /**
  * How well a seat plays. 1.0 / 0.0 is the greedy autoplayer exactly.
@@ -183,12 +183,13 @@ export class Opponent {
       }
     }
 
-    // Down, the phase is safe and the only thing left to manage is points in
-    // hand; still building, the choice is about what the phase still needs.
-    const thrown = this.laidDown ? this._shed() : this._takeChosenDiscard();
+    const thrown = this._chooseThrow();
     table.discard.push(thrown);
     this.threw += 1;
     table.say(this.name, `discards ${cardToString(thrown)}`);
+    // The printed rule, and the same one the player plays by: the Skip is the
+    // discard, and whoever threw it says who loses a turn.
+    if (isSkip(thrown) && this.config.skipMode === "deny") this._denySomebody(table);
     return this._finished();
   }
 
@@ -235,6 +236,62 @@ export class Opponent {
     const card = this._chooseDiscard();
     removeCard(this.hand, card);
     return card;
+  }
+
+  /**
+   * What to throw this turn.
+   *
+   * A Skip first, where a Skip denies: it is the only card in hand that does
+   * something on the way out, it is never part of a phase, and it costs
+   * fifteen to be caught with. Otherwise the usual choice -- down, the phase
+   * is safe and only points in hand matter; still building, it is about what
+   * the phase still needs.
+   */
+  _chooseThrow() {
+    if (this.config.skipMode === "deny") {
+      const skip = this.hand.find(isSkip);
+      if (skip) {
+        removeCard(this.hand, skip);
+        return skip;
+      }
+    }
+    return this.laidDown ? this._shed() : this._takeChosenDiscard();
+  }
+
+  /**
+   * Aim a thrown Skip at whoever is closest to going out.
+   *
+   * The player counts, and is usually the answer: a seat that has laid down
+   * and holds two cards is one turn from ending the round, and so are you.
+   * Denying the next seat round the table instead would be the safe-looking
+   * choice and the wrong one.
+   *
+   * Everything read here is face up -- whether somebody is down, and how many
+   * cards they hold -- so this is not the seat looking at hands it cannot see.
+   * A mistake is the second-best target rather than a random one, the same
+   * shape the discard chooser uses: a player who misjudges the table still
+   * denies somebody plausible.
+   */
+  _denySomebody(table) {
+    const targets = table.denyTargets(this);
+    // Nobody left to deny. The Skip is spent either way, which is what the
+    // player's own throw does in the same spot.
+    if (!targets.length) return null;
+    const down = (t) => (t.laidDown === undefined ? t.laid : t.laidDown);
+    const ranked = targets
+      .map((target, order) => ({ target, order }))
+      .sort((a, b) => (down(b.target) - down(a.target))
+        || (a.target.hand.length - b.target.hand.length)
+        || (a.order - b.order))
+      .map((k) => k.target);
+    const pick = ranked.length > 1 && this.random() < this.skill.discardError
+      ? ranked[1]
+      : ranked[0];
+    pick.skipped = true;
+    table.say(this.name, pick === table.player
+      ? "makes you miss a turn"
+      : `makes ${pick.name} miss a turn`);
+    return pick;
   }
 
   _finished() {
