@@ -4,18 +4,18 @@
 // client, and holds no game state of its own. Anything it needed to remember
 // would be a second copy of something the session already owns.
 
-import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=9ba1d30d";
+import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=1a662d21";
 
 //: Faces used purely as icons in the stat panel.
 const SKIP_FACE = SKIP;
 const WILD_FACE = WILD;
-import { HAND_STATE } from "./engine.js?v=9ba1d30d";
+import { HAND_STATE } from "./engine.js?v=1a662d21";
 import {
   HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, milestoneLocationName,
   phaseLocationName, storeGate, storeLocationName,
-} from "./data.js?v=9ba1d30d";
-import { PHASE_COUNT, phaseDescription } from "./phases.js?v=9ba1d30d";
-import { Phase10Client } from "./client.js?v=9ba1d30d";
+} from "./data.js?v=1a662d21";
+import { PHASE_COUNT, phaseDescription } from "./phases.js?v=1a662d21";
+import { Phase10Client } from "./client.js?v=1a662d21";
 
 const el = (id) => document.getElementById(id);
 
@@ -286,16 +286,23 @@ function reportTable() {
  *
  * The log is drained per seat rather than once at the end, which is the whole
  * point: the lines have to arrive beside the pause they belong to.
+ *
+ * Every pass re-checks that this hand is still the one being played. The walk
+ * spans real seconds, and starting a new free-play run is possible throughout
+ * them -- so without the check the seats of an abandoned hand would play on,
+ * write into the new run's log and settle a round it never had.
  */
 async function runOpponentTurns(hand) {
   if (pacing) return;
+  const current = () => app.session.hand === hand;
   pacing = true;
   try {
-    while (hand.turnPending) {
+    while (hand.turnPending && current()) {
       // Whose turn it is, before anything of theirs moves.
       [activeSeat] = hand.pendingSeats;
       render();
       await sleep(OPPONENT_TURN_MS);
+      if (!current()) break;
       const seat = hand.stepOpponent();
       if (seat === null) break;
       activeSeat = seat;
@@ -307,7 +314,7 @@ async function runOpponentTurns(hand) {
     activeSeat = null;
   }
   render();
-  if (hand.state !== HAND_STATE.IN_PROGRESS) await settle(hand);
+  if (current() && hand.state !== HAND_STATE.IN_PROGRESS) await settle(hand);
 }
 
 /**
