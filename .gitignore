@@ -4,6 +4,11 @@ __pycache__/
 output/
 dist/
 
-# Editor and tooling scratch, not part of the world
-.claude/
+# Editor and tooling scratch, not part of the world. The shared session
+# config is the exception: it is checked in so every machine and every cloud
+# session runs the same startup checks. Machine-local overrides live in
+# .claude/settings.local.json and stay ignored by the wildcard.
+.claude/*
+!.claude/hooks/
+!.claude/settings.json
 Pictures/
