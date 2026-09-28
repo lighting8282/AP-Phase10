@@ -15,7 +15,7 @@
 
 import {
   COLORS, MAX_RANK, MIN_RANK, cardToString, isNumber, isSkip, isWild,
-} from "./cards.js?v=c6630edb";
+} from "./cards.js?v=8612bdea";
 
 /**
  * Official rules forbid completing a phase using only wild cards. The exact

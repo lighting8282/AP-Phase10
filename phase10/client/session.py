@@ -62,6 +62,12 @@ class Phase10Session:
     #: Archipelago seed never does, because its access rules are built on the
     #: dig's measured numbers.
     skip_mode: str = "dig"
+    #: Skips shuffled into the draw pile, so everybody at the table is dealt
+    #: from the same deck. Free play sends the four the box has; a seed sends
+    #: none and grants Skips as items instead, because a shuffled Skip turns
+    #: up too rarely to repay the density it costs every other draw -- which
+    #: is a statement about an item's worth, not about how the game is dealt.
+    skips_in_deck: int = 0
 
     items: Counter = field(default_factory=Counter)
     consumed_traps: Counter = field(default_factory=Counter)
@@ -88,6 +94,7 @@ class Phase10Session:
             opponents=int(slot_data.get("opponents", 3)),
             store_slots=int(slot_data.get("store_slots", 0)),
             skip_mode="deny" if slot_data.get("skip_mode") == "deny" else "dig",
+            skips_in_deck=int(slot_data.get("skips_in_deck", 0)),
             game=Phase10Game(rng),
         )
 
@@ -152,6 +159,7 @@ class Phase10Session:
             # play asks for: the Archipelago option starts at 2.
             max_draws=0 if self.starting_draws <= 0 else max(1, draws),
             starting_skips=min(self.items[SKIP_CARD], MAX_SKIPS),
+            skips_in_deck=self.skips_in_deck,
             skip_mode=self.skip_mode,
         )
 

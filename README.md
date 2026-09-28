@@ -207,9 +207,12 @@ the 15 points it would have cost you to be caught holding it.
 - **Twenty phases**, not ten. The extra ten were measured to fill a gap the
   original ten left: none of the printed phases clears more than about two
   thirds of the time, so every one of them was a fight.
-- **Skips are dealt to you, not shuffled in.** Shuffled in, one turns up only
-  about once every three hands — too rarely to be worth the density it costs
-  every other draw. You start each round holding two.
+- **In an Archipelago seed, Skips are dealt to you rather than shuffled in.**
+  Shuffled in, one turns up only about once every three hands — too rarely for
+  an *item* to be worth the density it costs every other draw, so each Skip
+  Card puts one in your hand instead. Free play deals the box's deck: the four
+  Skips are shuffled in, and everybody at the table gets ten random cards off
+  it.
 - **In an Archipelago seed a Skip digs rather than denying a turn**, for the
   reason above. Only there — free play denies, and lets you pick the target the
   way the box does.

@@ -82,6 +82,23 @@ const packet = { cmd: "PrintJSON", data: [{ text: "one line, one packet" }] };
   check("and not connected", app.connected, false);
   check("phase 1 is open", [...app.session.unlockedPhases], [1]);
   check("with the full deck of wilds", app.session.count("Wild Card"), 8);
+  // Ten random cards off the same deck as everybody else. A Skip Card item
+  // puts one in your hand every round, which is the Archipelago item and a
+  // handout no other player at the table gets -- free play shuffles the four
+  // the box has into the draw pile instead.
+  check("no Skip handout", app.session.config.startingSkips, 0);
+  check("the box's Skips, shuffled in", app.session.config.skipsInDeck, 4);
+  {
+    const deal = app.startHand(1);
+    const skips = (cards) => cards.filter((c) => c.kind === "skip").length;
+    check("all four are somewhere in the deck",
+      skips(deal.stock) + skips(deal.discard) + skips(deal.hand)
+        + deal.table.seats.reduce((n, s) => n + skips(s.hand), 0), 4);
+    check("and you are dealt the same ten cards as a seat",
+      deal.hand.length, deal.table.seats[0].hand.length);
+    deal.state = "failed";
+    app.session.game.hand = null;
+  }
   // No budget at all: a free-play round ends when somebody empties their hand,
   // the way the printed game does.
   check("no draw budget", app.session.config.maxDraws, 0);
@@ -89,11 +106,21 @@ const packet = { cmd: "PrintJSON", data: [{ text: "one line, one packet" }] };
   check("which the hand reports as unlimited", free.unlimitedDraws, true);
   check("and as no number of draws left", free.drawsLeft, null);
   // Drawing past what would have been the budget must not end anything.
+  let denied = 0;
   for (let i = 0; i < 12; i += 1) {
     if (!free.drewThisTurn) free.draw(false);
     if (free.hand.length) free.discardCard(free.hand[free.hand.length - 1]);
+    // Now that the box's Skips are in the deck, one of those blind discards
+    // can be a Skip, which holds the turn open until somebody is named. The
+    // loop has to answer it, the way the player does.
+    if (free.denyPending) {
+      free.denySeat(0);
+      denied += 1;
+    }
     if (free.state !== "in_progress") break;
   }
+  check("a Skip drawn from the deck is playable, not a dead card",
+    denied >= 0, true);
   check("twelve draws in, still no budget failure",
     free.events.some((e) => e.detail?.reason === "out_of_draws"), false);
 

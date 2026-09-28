@@ -18,11 +18,11 @@ import {
   SCORE_REDUCTION_VALUE, SKIP_CARD, TIERS, WILD_CARD,
   WILD_THEFT, milestoneLocationName, phaseLocationName, phaseUnlock,
   storeGate, storeLocationName, storePrices,
-} from "./data.js?v=c6630edb";
-import { STOCK_WILDS } from "./cards.js?v=c6630edb";
-import { HAND_STATE, Table, gameConfig } from "./engine.js?v=c6630edb";
-import { MID, buildOpponents } from "./opponents.js?v=c6630edb";
-import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js?v=c6630edb";
+} from "./data.js?v=8612bdea";
+import { STOCK_WILDS } from "./cards.js?v=8612bdea";
+import { HAND_STATE, Table, gameConfig } from "./engine.js?v=8612bdea";
+import { MID, buildOpponents } from "./opponents.js?v=8612bdea";
+import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js?v=8612bdea";
 
 export const LEAN_DEAL_PENALTY = 2;
 
@@ -35,6 +35,12 @@ export class Phase10Session {
     //: "dig" or "deny". Only free play sends the latter; an Archipelago seed
     //: never does, because its access rules are built on the dig's numbers.
     this.skipMode = opts.skipMode ?? "dig";
+    //: Skips shuffled into the draw pile, so everybody at the table is dealt
+    //: from the same deck. Free play sends the four the box has; a seed sends
+    //: none and grants Skips as items instead, because a shuffled Skip turns
+    //: up too rarely to repay the density it costs every other draw -- which
+    //: is a statement about an item's worth, not about how the game is dealt.
+    this.skipsInDeck = opts.skipsInDeck ?? 0;
     this.deathLink = opts.deathLink ?? false;
     this.opponents = opts.opponents ?? 3;
 
@@ -61,6 +67,7 @@ export class Phase10Session {
       checksPerPhase: Number(slotData.checks_per_phase ?? 4),
       storeSlots: Number(slotData.store_slots ?? 0),
       skipMode: slotData.skip_mode === "deny" ? "deny" : "dig",
+      skipsInDeck: Number(slotData.skips_in_deck ?? 0),
       deathLink: Boolean(slotData.death_link ?? false),
       opponents: Number(slotData.opponents ?? 3),
       game: game ?? new Phase10Game(),
@@ -141,6 +148,7 @@ export class Phase10Session {
       // asks for: the Archipelago option starts at 2.
       maxDraws: this.startingDraws <= 0 ? 0 : Math.max(1, draws),
       startingSkips: Math.min(this.count(SKIP_CARD), MAX_SKIPS),
+      skipsInDeck: this.skipsInDeck,
       skipMode: this.skipMode,
     });
   }
