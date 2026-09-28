@@ -135,6 +135,45 @@ header.slim #free-play-offer { display: none; }
 /* A Skip asked to be thrown away, waiting for the second click to mean it. */
 .card.armed img { outline: 2px dashed #ff9a9a; }
 
+/* The card a seat just added to a group. Groups are small and identical at a
+   glance, so growth is invisible without this -- and it is what answers "is
+   that seat adding on, or only discarding?" where the question is asked,
+   rather than in a log column on the other side of the page. */
+.meld img.hit {
+  outline: 2px solid var(--cleared);
+  box-shadow: 0 0 10px rgba(46, 139, 87, 0.75);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .meld img.hit { animation: hit-land 0.5s ease-out; }
+}
+@keyframes hit-land {
+  from { transform: translateY(-6px); opacity: 0.35; }
+  to   { transform: none; opacity: 1; }
+}
+
+/* --- who misses their turn --------------------------------------------- */
+/* Laid out like the seats it is asking about rather than as a list of names:
+   the choice is between three seats, and the one worth denying is the one
+   closest to going out. */
+#deny { margin: 0.75rem 0; }
+#deny-seats { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.deny-seat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+.deny-seat:hover { border-color: var(--accent); background: rgba(63, 111, 208, 0.18); }
+.deny-seat span { color: var(--muted); font-size: 13px; }
+
 /* --- what a phase needs ------------------------------------------------ */
 .needs { color: var(--muted); font-size: 13px; margin-top: 0.15rem; }
 .needs:empty { display: none; }

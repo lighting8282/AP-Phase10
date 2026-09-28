@@ -21,10 +21,10 @@ import {
   isWild,
   numberCard,
   COLORS,
-} from "./cards.js?v=1a662d21";
+} from "./cards.js?v=91ad3551";
 import {
   GROUP, PHASES, phaseCardCount, solveLayOptions, solveMelds, solvePhase,
-} from "./phases.js?v=1a662d21";
+} from "./phases.js?v=91ad3551";
 
 /** How deep into the stock a played Skip lets you look. */
 export const SKIP_DIG_DEPTH = 3;
@@ -277,6 +277,9 @@ export class PhaseHand {
     this.usedWildsInLayout = 0;
     this.skipsPlayed = 0;
     this.digOptions = null;
+    //: A discarded Skip waiting to be aimed, as the seats it could be aimed
+    //: at. Null when there is nothing to aim. Deny mode only.
+    this.pendingDeny = null;
   }
 
   /**
@@ -372,6 +375,7 @@ export class PhaseHand {
   draw(fromDiscard = false) {
     if (this.state !== HAND_STATE.IN_PROGRESS) throw new Error(`hand is ${this.state}`);
     if (this.drewThisTurn) throw new Error("already drew this turn; discard first");
+    if (this.denyPending) throw new Error("say who misses their turn first");
 
     let card;
     if (fromDiscard) {
@@ -419,6 +423,10 @@ export class PhaseHand {
 
   discardCard(card) {
     if (this.state !== HAND_STATE.IN_PROGRESS) throw new Error(`hand is ${this.state}`);
+    // Before the draw check: once a Skip is waiting to be aimed the draw is
+    // already spent, so "must draw before discarding" would name the wrong
+    // problem and send the player looking for a draw they cannot make.
+    if (this.denyPending) throw new Error("say who misses their turn first");
     if (!this.drewThisTurn) throw new Error("must draw before discarding");
     removeCard(this.hand, card);
     this.discard.push(card);
@@ -426,11 +434,55 @@ export class PhaseHand {
     if (this.laid && !this.hand.length) {
       // Shedding the last card onto the discard pile is going out, the
       // ordinary way it happens: hit what you can and throw the rest.
+      // Going out ends the round, so a Skip thrown to go out denies nobody --
+      // there is no next turn left for anyone to miss.
       this.state = HAND_STATE.WENT_OUT;
       this._emit("went_out", { draws_used: this.drawsUsed });
       return;
     }
+    // The printed rule: a Skip is discarded, and whoever discarded it says who
+    // loses a turn. The turn does not end until they have said, which is what
+    // denySeat is for. With nobody eligible it is an ordinary discard -- the
+    // card is spent either way, and refusing the throw would strand a player
+    // holding a Skip they cannot legally get rid of.
+    if (this.config.skipMode === "deny" && isSkip(card)) {
+      const targets = this.denyTargets();
+      if (targets.length) {
+        this.pendingDeny = targets;
+        return;
+      }
+    }
     this._endTurn();
+  }
+
+  /**
+   * The seats a Skip could be thrown at right now.
+   *
+   * One already denied is left out: stacking two Skips on a seat would cost
+   * the second one nothing, which is the same reason nextActor passes it over.
+   */
+  denyTargets() {
+    return this.table.seats.filter((seat) => !seat.wentOut && !seat.skipped);
+  }
+
+  /** Whether a discarded Skip is waiting to be pointed at somebody. */
+  get denyPending() {
+    return this.pendingDeny !== null;
+  }
+
+  /** Say who misses their turn, and end the turn. */
+  denySeat(index) {
+    if (this.pendingDeny === null) throw new Error("no Skip to aim");
+    if (!(index >= 0 && index < this.pendingDeny.length)) {
+      throw new RangeError(`pick 0..${this.pendingDeny.length - 1}`);
+    }
+    const target = this.pendingDeny[index];
+    this.pendingDeny = null;
+    target.skipped = true;
+    this.skipsPlayed += 1;
+    this._emit("skip_denied", { seat: target.name });
+    this._endTurn();
+    return target;
   }
 
   /**
@@ -447,19 +499,12 @@ export class PhaseHand {
     const skip = this.hand.find(isSkip);
     if (!skip) throw new Error("no Skip in hand");
 
+    // Denying is done by discarding the Skip, the way the box has it, so there
+    // is no pre-draw move to make. There used to be, and it was a trap: the
+    // button went dark the moment you drew, and the only thing left to do with
+    // the Skip was throw it away for nothing.
     if (this.config.skipMode === "deny") {
-      const target = this.table.nextActor();
-      if (!target) throw new Error("nobody left to skip");
-      removeCard(this.hand, skip);
-      this.discard.push(skip);
-      target.skipped = true;
-      this.skipsPlayed += 1;
-      this.drewThisTurn = false;
-      this._emit("skip_denied", { seat: target.name });
-      // The Skip was this turn's discard, so the turn ends here -- the same
-      // bargain the dig makes.
-      this._endTurn();
-      return [];
+      throw new Error("discard the Skip to make somebody miss a turn");
     }
 
     if (!this.stock.length) throw new Error("stock is empty");
@@ -646,6 +691,7 @@ export class PhaseHand {
     if (this.state !== HAND_STATE.IN_PROGRESS) throw new Error(`hand is ${this.state}`);
     if (!this.laid) throw new Error("lay your own phase down before hitting");
     if (this.digPending) throw new Error("finish the dig first");
+    if (this.denyPending) throw new Error("say who misses their turn first");
     if (!meld.accepts(card)) throw new Error(`${cardToString(card)} does not fit that group`);
 
     removeCard(this.hand, card);

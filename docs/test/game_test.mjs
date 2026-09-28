@@ -252,26 +252,71 @@ check(many.scorecard(10)[0].includes("4 earlier round(s)"), "scorecard elides ol
 
   eq(gameConfig({}).skipMode, "dig", "the default is still the dig");
 
-  const denied = denyTable();
-  const before = denied.hand.stock.length;
-  const revealed = denied.hand.playSkip();
-  eq(revealed, [], "denying reveals nothing");
-  check(!denied.hand.digPending, "and leaves no dig to resolve");
-  const event = denied.hand.events.find((e) => e.kind === "skip_denied");
-  eq(event.detail.seat, denied.table.seats[0].name, "it names who lost the turn");
+  /** Draw, then throw a Skip, which is how one is played here. */
+  const throwSkip = (t) => {
+    t.hand.hand.push(SKIP);
+    t.hand.draw();
+    t.hand.discardCard(t.hand.hand.find(isSkip));
+    return t;
+  };
+
+  // The printed rule: the Skip is the discard, and the thrower picks who pays.
+  const denied = throwSkip(denyTable());
+  check(denied.hand.denyPending, "a discarded Skip waits to be aimed");
+  eq(denied.hand.pendingDeny.map((s) => s.name),
+    denied.table.seats.map((s) => s.name), "and every seat still in is a target");
   check(denied.hand.discard.some(isSkip), "the Skip is spent onto the discard");
-  check(before - denied.hand.stock.length < 4,
-    "and the table takes less off the stock than a full round of turns");
+
+  // Aimed at the last seat, which is precisely not the one nextActor would
+  // have taken -- the choice is the whole point of the rule.
+  const target = denied.hand.denySeat(2);
+  eq(target.name, denied.table.seats[2].name, "the thrower says who misses");
+  // Aiming ends the turn, and the seats play at once here, so the flag is
+  // already spent by now -- what it did is in the log rather than on the seat.
+  const missed = denied.table.log.filter(([, what]) => what === "misses a turn");
+  eq(missed, [[denied.table.seats[2].name, "misses a turn"]],
+    "and that seat, alone, misses its turn");
+  const event = denied.hand.events.find((e) => e.kind === "skip_denied");
+  eq(event.detail.seat, denied.table.seats[2].name, "the event names the chosen seat");
+  check(!denied.hand.denyPending, "and nothing is left to aim");
+
+  // The turn is held open until the choice is made.
+  const waiting = throwSkip(denyTable());
+  let held = 0;
+  for (const act of [() => waiting.hand.draw(),
+    () => waiting.hand.discardCard(waiting.hand.hand[0])]) {
+    try { act(); } catch { held += 1; }
+  }
+  eq(held, 2, "no move lands while a Skip is waiting to be aimed");
 
   // A seat already denied is passed over, or a second Skip costs nothing.
   const pair = denyTable();
   pair.table.seats[0].skipped = true;
   eq(pair.table.nextActor().name, pair.table.seats[1].name, "a denied seat is passed over");
+  eq(throwSkip(pair).hand.pendingDeny.map((s) => s.name),
+    [pair.table.seats[1].name, pair.table.seats[2].name],
+    "and cannot be denied twice over");
 
-  const alone = denyTable(11, 0);
-  let refused = false;
-  try { alone.hand.playSkip(); } catch { refused = true; }
-  check(refused, "a Skip with nobody to skip is refused");
+  // With nobody to deny it is an ordinary discard. Refusing the throw would
+  // strand a player holding a Skip they could not legally get rid of.
+  const alone = throwSkip(denyTable(11, 0));
+  check(!alone.hand.denyPending, "with no seats a Skip is just a discard");
+  check(alone.hand.discard.some(isSkip), "and it still leaves the hand");
+
+  // The pre-draw move is gone: it stopped being legal the moment you drew,
+  // which left throwing the Skip away for nothing as the only thing to do.
+  let refused = "";
+  try { denyTable().hand.playSkip(); } catch (err) { refused = err.message; }
+  check(/discard the Skip/.test(refused), "and there is no pre-draw Skip to play");
+
+  // Going out on a Skip denies nobody -- there is no next turn left to miss.
+  const last = denyTable();
+  last.hand.hand = [SKIP];
+  last.hand.laid = true;
+  last.hand.drewThisTurn = true;
+  last.hand.discardCard(SKIP);
+  eq(last.hand.state, HAND_STATE.WENT_OUT, "a Skip thrown to go out still goes out");
+  check(!last.hand.denyPending, "and asks nobody to miss a turn");
 }
 
 // -- paced opponents --------------------------------------------------------

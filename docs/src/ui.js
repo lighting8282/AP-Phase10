@@ -4,18 +4,18 @@
 // client, and holds no game state of its own. Anything it needed to remember
 // would be a second copy of something the session already owns.
 
-import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=1a662d21";
+import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=91ad3551";
 
 //: Faces used purely as icons in the stat panel.
 const SKIP_FACE = SKIP;
 const WILD_FACE = WILD;
-import { HAND_STATE } from "./engine.js?v=1a662d21";
+import { HAND_STATE } from "./engine.js?v=91ad3551";
 import {
   HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, milestoneLocationName,
   phaseLocationName, storeGate, storeLocationName,
-} from "./data.js?v=1a662d21";
-import { PHASE_COUNT, phaseDescription } from "./phases.js?v=1a662d21";
-import { Phase10Client } from "./client.js?v=1a662d21";
+} from "./data.js?v=91ad3551";
+import { PHASE_COUNT, phaseDescription } from "./phases.js?v=91ad3551";
+import { Phase10Client } from "./client.js?v=91ad3551";
 
 const el = (id) => document.getElementById(id);
 
@@ -46,6 +46,14 @@ let activeSeat = null;
 //: Cleared by any move that lands, so it never survives the turn it was armed
 //: on. By identity, not index: a draw renumbers the hand.
 let armedSkip = null;
+//: Whether the seat being shown is about to miss its turn rather than take
+//: one. Decided before the turn happens, because afterwards the flag that said
+//: so has been consumed.
+let activeMissed = false;
+//: Cards a seat added to a group on its most recent turn, so the group can say
+//: it grew. Only ever holds the last seat's, which is the point -- marking
+//: every card ever hit would mark most of the table.
+let justHit = new Set();
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -300,18 +308,36 @@ async function runOpponentTurns(hand) {
     while (hand.turnPending && current()) {
       // Whose turn it is, before anything of theirs moves.
       [activeSeat] = hand.pendingSeats;
+      // Read now: playSeat consumes the flag, so after the turn there is no
+      // way left to tell a seat that missed from one that played.
+      activeMissed = activeSeat.skipped;
+      justHit = new Set();
       render();
+      // What each group held before the turn, so what it gains can be marked.
+      // Per meld rather than one flat set: a group that did not exist before is
+      // a lay-down, and marking all six of its cards as hits would say the
+      // wrong thing.
+      const before = new Map(
+        hand.table.allMelds().map((meld) => [meld, new Set(meld.cards)]),
+      );
       await sleep(OPPONENT_TURN_MS);
       if (!current()) break;
       const seat = hand.stepOpponent();
       if (seat === null) break;
       activeSeat = seat;
+      justHit = new Set();
+      for (const meld of hand.table.allMelds()) {
+        const had = before.get(meld);
+        if (!had) continue;
+        for (const card of meld.cards) if (!had.has(card)) justHit.add(card);
+      }
       reportTable();
       render();
     }
   } finally {
     pacing = false;
     activeSeat = null;
+    activeMissed = false;
   }
   render();
   if (current() && hand.state !== HAND_STATE.IN_PROGRESS) await settle(hand);
@@ -459,6 +485,7 @@ function render() {
   renderOwnMelds(hand);
   renderHand(hand);
   renderDig(hand);
+  renderDeny(hand);
   renderPhases(s);
   if (!hand || hand.laid || hand.state !== HAND_STATE.IN_PROGRESS) {
     el("lay-choice").hidden = true;
@@ -470,27 +497,23 @@ function render() {
   for (const button of document.querySelectorAll("#actions button")) {
     button.disabled = pacing || !hand || hand.state !== HAND_STATE.IN_PROGRESS;
   }
+  // The button is the dig, and only a seed digs. Where a Skip denies a turn it
+  // is played by being discarded, so there is no separate move to offer and a
+  // button here could only compete with the card itself.
+  const skip = el("skip-button");
+  skip.hidden = s.skipMode === "deny";
+  skip.title = "Look at the top three of the stock and keep one";
+  // A dig is a turn of its own, so it is only there before you draw, only with
+  // a Skip to spend, and only with a stock to dig into. Left enabled it was a
+  // button whose whole function was to explain, afterwards, that it could not
+  // be pressed.
+  if (!skip.disabled) {
+    skip.disabled = !hand.skipsInHand || hand.drewThisTurn
+      || hand.digPending || hand.stock.length === 0;
+  }
+
   // Narrower than the rest: a Mulligan needs a copy in hand and an untouched
   // deal, so it stays disabled even mid-hand.
-  // A Skip does two different things depending on the seed, so the button
-  // has to say which -- "Dig" in front of a Skip that denies a turn would be
-  // a plain lie about what the click does.
-  const skip = el("skip-button");
-  skip.textContent = s.skipMode === "deny" ? "Play Skip" : "Dig (Skip)";
-  skip.title = s.skipMode === "deny"
-    ? "Make the next player miss their turn"
-    : "Look at the top three of the stock and keep one";
-  // Playing a Skip is a turn of its own, so it is only there before you draw
-  // and only with a Skip to spend. Left enabled it was a button whose whole
-  // function was to explain, afterwards, that it could not be pressed. What
-  // else it needs differs by seed: a denial needs somebody still to deny, and
-  // a dig needs a stock to dig into.
-  if (!skip.disabled) {
-    const spendable = hand.skipsInHand && !hand.drewThisTurn && !hand.digPending;
-    skip.disabled = !spendable || (s.skipMode === "deny"
-      ? hand.table.nextActor() === null
-      : hand.stock.length === 0);
-  }
 
   const mull = el("mulligan-button");
   mull.disabled = pacing || s.canMulligan() !== null;
@@ -520,6 +543,10 @@ function meldNode(meld) {
     const img = document.createElement("img");
     img.src = `assets/cards/${cardFilename(card)}`;
     img.alt = describe(card);
+    // The card a seat just added. A group that grew by one between two redraws
+    // is otherwise a group that looks the same, and "did that seat add on or
+    // just discard?" was a question the log alone had to answer.
+    if (justHit.has(card)) img.classList.add("hit");
     node.append(img);
   }
   return node;
@@ -565,8 +592,12 @@ function renderTable(session) {
 
     const what = document.createElement("div");
     what.className = "what";
-    if (seat === activeSeat && !seat.wentOut) what.textContent = "playing...";
-    else if (seat.wentOut) what.textContent = "went out";
+    if (seat === activeSeat && !seat.wentOut) {
+      // A seat denied a turn is sitting it out, not playing it. Saying
+      // "playing..." for three seconds and then "misses a turn" in the log was
+      // the table contradicting itself.
+      what.textContent = activeMissed ? "misses a turn" : "playing...";
+    } else if (seat.wentOut) what.textContent = "went out";
     else if (seat.laidDown) what.textContent = `down - ${seat.hand.length} left to shed`;
     else what.textContent = `building - ${seat.hand.length} cards`;
 
@@ -640,53 +671,41 @@ function promptFor(hand, live, drawn) {
   if (!hand) return "* Pick a phase below to start a round *";
   if (!live) return "* The round is over *";
   if (hand.digPending) return "* Keep one of the dug cards *";
+  if (hand.denyPending) return "* Say who misses their turn *";
   if (!drawn) return "* Draw or pick up a card *";
   return "* Play what you can, then discard a card *";
 }
 
-/**
- * What playing a Skip does in this seed, as the words for a button.
- *
- * A Skip digs in an Archipelago seed and denies the next player a turn in free
- * play, and every measured clear rate the access rules stand on was measured
- * with the dig -- so the two cannot be collapsed, and "Dig" in front of a Skip
- * that denies a turn would be a plain lie about what the click does.
- */
-function skipAction() {
-  return app.session.skipMode === "deny"
-    ? { hint: "Play: make the next player miss their turn",
-      says: "A Skip makes the next player miss their turn",
-      forWhat: "A Skip is for denying a turn" }
-    : { hint: "Dig: look three cards down the stock and keep one",
-      says: "A Skip digs three cards down the stock",
-      forWhat: "A Skip is for digging" };
-}
+/** Whether a Skip is played by being discarded, rather than dug with. */
+const skipDenies = () => app.session.skipMode === "deny";
 
 /**
  * Click a card in your hand.
  *
- * Every card there is a discard except a Skip, which is a card you play.
- * Throwing one away is legal, costs you fifteen points if the round ends on it,
- * and is almost never what the click meant -- so a Skip plays itself when it
- * can, and otherwise takes a second click before it goes on the pile.
+ * What a Skip does depends on the seed, and so does what the click means.
  *
- * The two are never both available, which is what makes the first click
- * unambiguous: playing a Skip is your whole turn and so only happens before you
- * draw, and a discard only happens after.
+ * Denying, the printed rule: the Skip *is* the discard, so clicking it throws
+ * it and then asks who loses a turn. Nothing to warn about -- that is the card
+ * doing its job, and it is the click a player wants.
+ *
+ * Digging, an Archipelago seed: the dig is a whole turn and so only happens
+ * before you draw. After the draw the only thing left to do with a Skip is
+ * throw it away for nothing, fifteen points with it, which is almost never
+ * what the click meant -- so there it takes a second click.
  */
 function playFromHand(index) {
   const hand = app.session.hand;
   if (pacing || !hand || hand.state !== HAND_STATE.IN_PROGRESS) return;
   const card = hand.hand[index];
 
-  if (isSkip(card)) {
+  if (isSkip(card) && !skipDenies()) {
     if (!hand.drewThisTurn) {
       withHand((h) => h.playSkip());
       return;
     }
     if (armedSkip !== card) {
       armedSkip = card;
-      log(`${skipAction().says} -- click it again to throw it away.`);
+      log("A Skip digs three cards down the stock -- click it again to throw it away.");
       render();
       return;
     }
@@ -698,20 +717,27 @@ function renderHand(hand) {
   const box = el("hand");
   box.replaceChildren();
   if (!hand) return;
-  const skip = skipAction();
+  const denies = skipDenies();
   hand.hand.forEach((card, index) => {
     const button = cardButton(card, () => playFromHand(index));
     // Your cards are not playable while the table is mid-turn.
-    button.disabled = pacing;
+    button.disabled = pacing || hand.denyPending;
     if (isSkip(card)) {
-      if (!hand.drewThisTurn) {
+      if (denies) {
+        // Always the good click here: throwing it is how it is played, and
+        // you choose who loses the turn afterwards.
         button.classList.add("playable");
-        button.title = skip.hint;
+        button.title = hand.drewThisTurn
+          ? "Discard it and choose who misses their turn"
+          : "Draw first, then discard this to make somebody miss a turn";
+      } else if (!hand.drewThisTurn) {
+        button.classList.add("playable");
+        button.title = "Dig: look three cards down the stock and keep one";
       } else if (card === armedSkip) {
         button.classList.add("armed");
         button.title = "Click again to throw this Skip away";
       } else {
-        button.title = `${skip.forWhat} -- clicking it twice throws it away`;
+        button.title = "A Skip is for digging -- clicking it twice throws it away";
       }
     }
     box.append(button);
@@ -729,6 +755,41 @@ function renderDig(hand) {
   wrap.hidden = false;
   hand.digOptions.forEach((card, index) => {
     box.append(cardButton(card, () => withHand((h) => h.takeDug(index))));
+  });
+}
+
+/**
+ * Pick who loses a turn, after a Skip has been discarded.
+ *
+ * The choice is the player's, which is the printed rule and the reason a Skip
+ * is worth holding: the seat about to go out is rarely the seat whose turn
+ * comes next. Each button says what that seat is doing, because "deny Ada" is
+ * not a decision until you know Ada is one card from going out.
+ */
+function renderDeny(hand) {
+  const wrap = el("deny");
+  const box = el("deny-seats");
+  box.replaceChildren();
+  if (!hand || !hand.denyPending) {
+    wrap.hidden = true;
+    return;
+  }
+  wrap.hidden = false;
+  hand.pendingDeny.forEach((seat, index) => {
+    const button = document.createElement("button");
+    button.className = "deny-seat";
+    const name = document.createElement("strong");
+    name.textContent = seat.name;
+    const what = document.createElement("span");
+    what.textContent = seat.laidDown
+      ? ` - down, ${seat.hand.length} left to shed`
+      : ` - building, ${seat.hand.length} cards`;
+    button.append(name, what);
+    button.addEventListener("click", () => withHand((h) => {
+      const target = h.denySeat(index);
+      log(`${target.name} will miss a turn.`);
+    }));
+    box.append(button);
   });
 }
 

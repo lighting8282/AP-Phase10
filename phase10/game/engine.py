@@ -231,6 +231,9 @@ class PhaseHand:
         self.used_wilds_in_layout = 0
         self.skips_played = 0
         self.dig_options: list[Card] | None = None
+        #: A discarded Skip waiting to be aimed, as the seats it could be
+        #: aimed at. None when there is nothing to aim. Deny mode only.
+        self.pending_deny: list | None = None
 
     def _deal(self) -> None:
         """Shuffle and deal. Shared by the opening deal and a Mulligan, so the
@@ -317,6 +320,8 @@ class PhaseHand:
             raise RuntimeError(f"hand is {self.state.value}")
         if self.drew_this_turn:
             raise RuntimeError("already drew this turn; discard first")
+        if self.deny_pending:
+            raise RuntimeError("say who misses their turn first")
         if from_discard:
             if not self.config.allow_discard_draw or not self.discard:
                 raise RuntimeError("cannot draw from discard")
@@ -355,6 +360,12 @@ class PhaseHand:
     def discard_card(self, card: Card) -> None:
         if self.state is not HandState.IN_PROGRESS:
             raise RuntimeError(f"hand is {self.state.value}")
+        # Before the draw check: once a Skip is waiting to be aimed the draw
+        # is already spent, so "must draw before discarding" would name the
+        # wrong problem and send the player looking for a draw they cannot
+        # make.
+        if self.deny_pending:
+            raise RuntimeError("say who misses their turn first")
         if not self.drew_this_turn:
             raise RuntimeError("must draw before discarding")
         self.hand.remove(card)
@@ -363,20 +374,59 @@ class PhaseHand:
         if self.laid and not self.hand:
             # Shedding the last card onto the discard pile is going out, the
             # ordinary way it happens: you hit what you can and throw the rest.
+            # Going out ends the round, so a Skip thrown to go out denies
+            # nobody -- there is no next turn left for anyone to miss.
             self.state = HandState.WENT_OUT
             self._emit("went_out", draws_used=self.draws_used)
             return
+        # The printed rule: a Skip is discarded, and whoever discarded it says
+        # who loses a turn. The turn does not end until they have said, which
+        # is what `deny_seat` is for. With nobody eligible it is an ordinary
+        # discard -- the card is spent either way, and refusing the throw would
+        # strand a player holding a Skip they cannot legally get rid of.
+        if self.config.skip_mode == "deny" and card.is_skip:
+            targets = self.deny_targets()
+            if targets:
+                self.pending_deny = targets
+                return
         self._end_turn()
 
+    def deny_targets(self) -> list:
+        """The seats a Skip could be thrown at right now.
+
+        One already denied is left out: stacking two Skips on a seat would
+        cost the second one nothing, which is the same reason `next_actor`
+        passes it over.
+        """
+        return [s for s in self.table.seats if not s.went_out and not s.skipped]
+
+    @property
+    def deny_pending(self) -> bool:
+        """Whether a discarded Skip is waiting to be pointed at somebody."""
+        return self.pending_deny is not None
+
+    def deny_seat(self, index: int):
+        """Say who misses their turn, and end the turn."""
+        if self.pending_deny is None:
+            raise RuntimeError("no Skip to aim")
+        if not 0 <= index < len(self.pending_deny):
+            raise IndexError(f"pick 0..{len(self.pending_deny) - 1}")
+        target = self.pending_deny[index]
+        self.pending_deny = None
+        target.skipped = True
+        self.skips_played += 1
+        self._emit("skip_denied", seat=target.name)
+        self._end_turn()
+        return target
+
     def play_skip(self) -> list[Card]:
-        """Play a Skip. What that does depends on `skip_mode`.
+        """Dig with a Skip: look at the top of the stock.
 
-        In "deny" -- the printed rule, and what the game without Archipelago
-        uses -- the next seat loses its turn and nothing is revealed, so the
-        returned list is empty and there is no dig to resolve.
-
-        In "dig", the default and what every measured clear rate was measured
-        against: look at the top of the stock.
+        Only "dig" reaches this, which is the default and what every measured
+        clear rate was measured against. In "deny" -- the printed rule, and
+        what the game without Archipelago uses -- a Skip is played by being
+        discarded, so `discard_card` and `deny_seat` are the way in and this
+        refuses.
 
         The Skip becomes this turn's discard, so no separate discard follows --
         that is what keeps hand size stable and lets the Skip shed itself. The
@@ -393,20 +443,12 @@ class PhaseHand:
         if skip is None:
             raise RuntimeError("no Skip in hand")
 
+        # Denying is done by discarding the Skip, the way the box has it, so
+        # there is no pre-draw move to make. There used to be, and it was a
+        # trap: the move stopped being legal the moment you drew, and the only
+        # thing left to do with the Skip was throw it away for nothing.
         if self.config.skip_mode == "deny":
-            target = self.table.next_actor()
-            if target is None:
-                raise RuntimeError("nobody left to skip")
-            self.hand.remove(skip)
-            self.discard.append(skip)
-            target.skipped = True
-            self.skips_played += 1
-            self.drew_this_turn = False
-            self._emit("skip_denied", seat=target.name)
-            # The Skip was this turn's discard, so the turn ends here -- the
-            # same bargain the dig makes.
-            self._end_turn()
-            return []
+            raise RuntimeError("discard the Skip to make somebody miss a turn")
 
         if not self.stock:
             raise RuntimeError("stock is empty")
@@ -548,6 +590,8 @@ class PhaseHand:
             raise RuntimeError("lay your own phase down before hitting")
         if self.dig_pending:
             raise RuntimeError("finish the dig first")
+        if self.deny_pending:
+            raise RuntimeError("say who misses their turn first")
         if card not in self.hand:
             raise RuntimeError(f"{card} is not in hand")
         if not meld.accepts(card):

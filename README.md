@@ -188,13 +188,16 @@ for what you were holding.
 A Skip is never part of a phase, and it does one of two things depending on
 where you are playing.
 
-**Without Archipelago**, it is the printed rule: play it and **the next player
-loses their turn**.
+**Without Archipelago**, it is the printed rule: **discard it and choose who
+loses their turn**. Draw as usual, then throw the Skip instead of a card, and
+say which player sits the next one out. It does not have to be the player whose
+turn comes next — the one worth denying is usually whoever is closest to going
+out.
 
-**In an Archipelago seed**, play it to look at the **top three cards of the
-stock and keep one**, free. It costs you no draw. That is not the printed rule,
-and it is deliberate — the access rules in a seed are built on measured clear
-rates, and every one of those was measured with the dig.
+**In an Archipelago seed**, play it *before* you draw to look at the **top
+three cards of the stock and keep one**, free. It costs you no draw. That is not
+the printed rule, and it is deliberate — the access rules in a seed are built on
+measured clear rates, and every one of those was measured with the dig.
 
 Either way the Skip itself becomes that turn's discard, so playing one sheds
 the 15 points it would have cost you to be caught holding it.
@@ -208,7 +211,8 @@ the 15 points it would have cost you to be caught holding it.
   about once every three hands — too rarely to be worth the density it costs
   every other draw. You start each round holding two.
 - **In an Archipelago seed a Skip digs rather than denying a turn**, for the
-  reason above.
+  reason above. Only there — free play denies, and lets you pick the target the
+  way the box does.
 - **If the stock runs out**, the discard pile is shuffled back into it, leaving
   the top card face up.
 - **In an Archipelago seed**, the deck starts with *no* Wilds and you have a
