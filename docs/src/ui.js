@@ -4,18 +4,18 @@
 // client, and holds no game state of its own. Anything it needed to remember
 // would be a second copy of something the session already owns.
 
-import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=8612bdea";
+import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=f0519056";
 
 //: Faces used purely as icons in the stat panel.
 const SKIP_FACE = SKIP;
 const WILD_FACE = WILD;
-import { HAND_STATE } from "./engine.js?v=8612bdea";
+import { HAND_STATE } from "./engine.js?v=f0519056";
 import {
   HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, milestoneLocationName,
   phaseLocationName, storeGate, storeLocationName,
-} from "./data.js?v=8612bdea";
-import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=8612bdea";
-import { Phase10Client } from "./client.js?v=8612bdea";
+} from "./data.js?v=f0519056";
+import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=f0519056";
+import { Phase10Client } from "./client.js?v=f0519056";
 
 const el = (id) => document.getElementById(id);
 
@@ -54,6 +54,13 @@ let activeMissed = false;
 //: it grew. Only ever holds the last seat's, which is the point -- marking
 //: every card ever hit would mark most of the table.
 let justHit = new Set();
+//: Whether the walk now running is one you are sitting out. The flag on the
+//: hand is consumed the moment the turn is lost, so by the time anything is
+//: drawn it is already false; this is read off turnsMissed instead.
+let missingTurn = false;
+//: turnsMissed as it stood before the move just made, so a rise in it can be
+//: told from a count that was already there.
+let missedBefore = 0;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -343,6 +350,7 @@ async function runOpponentTurns(hand) {
     pacing = false;
     activeSeat = null;
     activeMissed = false;
+    missingTurn = false;
   }
   render();
   if (current() && hand.state !== HAND_STATE.IN_PROGRESS) await settle(hand);
@@ -356,11 +364,16 @@ function afterPlayerAction(hand) {
   // Any move that lands disarms the Skip: the second click has to be the very
   // next thing you do, or it is not a confirmation of anything.
   armedSkip = null;
+  // A turn a Skip took off you: the walk about to run is two passes of the
+  // table rather than one, and without saying so it reads as the seats going
+  // round twice for no reason.
+  missingTurn = hand.turnsMissed > missedBefore;
   render();
   if (hand.turnPending) {
     runOpponentTurns(hand);
     return;
   }
+  missingTurn = false;
   if (hand.state !== HAND_STATE.IN_PROGRESS) settle(hand);
 }
 
@@ -374,6 +387,9 @@ function withHand(fn) {
     log("No hand in progress -- pick a phase first.");
     return;
   }
+  // Read before the move, because a turn taken off you is lost and counted
+  // inside it -- afterwards there is nothing left to compare against.
+  missedBefore = hand.turnsMissed;
   try {
     fn(hand);
   } catch (err) {
@@ -478,6 +494,13 @@ function render() {
   // turn is it" is one question with one answer rather than two halves.
   const yourTurn = Boolean(hand) && hand.state === HAND_STATE.IN_PROGRESS && !pacing;
   document.querySelector(".you.seat").classList.toggle("turn", yourTurn);
+  // Every seat says whether it is playing or sitting out; yours said nothing,
+  // so a turn taken off you looked like the table going round twice.
+  el("you-what").textContent = !hand ? ""
+    : missingTurn ? "missing a turn"
+      : yourTurn ? "your turn"
+        : pacing ? "waiting"
+          : "";
   el("you-phase").textContent = hand ? `phase ${hand.phase}` : "";
   // Your own total in the same place as theirs: a scoreboard split across two
   // parts of the page is one you have to assemble before you can read it.
@@ -702,7 +725,10 @@ function renderMiddle(hand) {
 
 function promptFor(hand, live, drawn) {
   // Said first: while the table is moving, nothing else on this line is true.
-  if (pacing) return `* ${activeSeat ? `${activeSeat.name} is playing` : "the table is playing"} *`;
+  if (pacing) {
+    const who = activeSeat ? `${activeSeat.name} is playing` : "the table is playing";
+    return missingTurn ? `* ${who} -- you are missing a turn *` : `* ${who} *`;
+  }
   if (!hand) return "* Pick a phase below to start a round *";
   if (!live) return "* The round is over *";
   if (hand.digPending) return "* Keep one of the dug cards *";

@@ -194,6 +194,10 @@ say which player sits the next one out. It does not have to be the player whose
 turn comes next — the one worth denying is usually whoever is closest to going
 out.
 
+The computer players do exactly the same, and **you are a target like anybody
+else**. When one is thrown at you, the table simply comes round twice before
+your next turn, and the log and your own seat both say so.
+
 **In an Archipelago seed**, play it *before* you draw to look at the **top
 three cards of the stock and keep one**, free. It costs you no draw. That is not
 the printed rule, and it is deliberate — the access rules in a seed are built on
@@ -215,7 +219,8 @@ the 15 points it would have cost you to be caught holding it.
   it.
 - **In an Archipelago seed a Skip digs rather than denying a turn**, for the
   reason above. Only there — free play denies, and lets you pick the target the
-  way the box does.
+  way the box does. The computer players do the same: they throw Skips at
+  whoever is closest to going out, and that can be you.
 - **If the stock runs out**, the discard pile is shuffled back into it, leaving
   the top card face up.
 - **In an Archipelago seed**, the deck starts with *no* Wilds and you have a

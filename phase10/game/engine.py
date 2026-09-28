@@ -98,6 +98,10 @@ class Table:
         #: and a player who keeps acting must keep losing it rather than
         #: slipping through because the transition already happened.
         self.winner = None
+        #: The hand being played at this table, so a seat aiming a Skip can
+        #: see the player as a target like any other. Without it the seats
+        #: could only ever deny each other, which is a rule that runs one way.
+        self.player = None
 
     def reset(self, stock: list[Card], discard: list[Card]) -> None:
         self.stock = stock
@@ -154,6 +158,24 @@ class Table:
             if not seat.went_out and not seat.skipped:
                 return seat
         return None
+
+    def deny_targets(self, exclude=None) -> list:
+        """Everybody still in the round who could lose a turn, player included.
+
+        One place, so the player throwing a Skip and a seat throwing one are
+        choosing from the same list by the same rule. `exclude` is whoever is
+        throwing it -- you cannot deny yourself -- and anyone already denied is
+        left out, since a second Skip on them would cost nothing.
+        """
+        targets = []
+        player = self.player
+        if (player is not None and player is not exclude and not player.skipped
+                and player.state is HandState.IN_PROGRESS):
+            targets.append(player)
+        for seat in self.seats:
+            if seat is not exclude and not seat.went_out and not seat.skipped:
+                targets.append(seat)
+        return targets
 
     def all_melds(self) -> list:
         """Every group face up on the table, in seat order.
@@ -220,6 +242,17 @@ class PhaseHand:
         self.hand: list[Card] = []
         #: Shared with the opponents when there are any; private otherwise.
         self.table = table if table is not None else Table()
+        # So the seats can aim at you. A back-reference rather than a copy of
+        # what they need to know, because what a good target looks like is the
+        # seats' business and it would otherwise be spelled out twice.
+        self.table.player = self
+        #: Set by a seat that threw a Skip at you; consumed after the seats
+        #: have played, where your turn would have been.
+        self.skipped = False
+        #: How many turns Skips have cost you this hand. The flag is consumed
+        #: the instant the turn is lost, so a driver that only looks between
+        #: moves would never see it -- this is what it reads instead.
+        self.turns_missed = 0
         self._deal()
 
         self.draws_used = 0
@@ -409,7 +442,9 @@ class PhaseHand:
         cost the second one nothing, which is the same reason `next_actor`
         passes it over.
         """
-        return [s for s in self.table.seats if not s.went_out and not s.skipped]
+        # Excluding yourself, which is the only difference between your list
+        # and a seat's -- the rule is otherwise the same for everybody.
+        return self.table.deny_targets(self)
 
     @property
     def deny_pending(self) -> bool:
@@ -504,16 +539,33 @@ class PhaseHand:
         self._fail_if_out_of_road()
         if self.state is not HandState.IN_PROGRESS:
             return
-        winner = self.table.end_of_turn()
-        if winner is not None:
-            if self.laid:
-                # The phase is down, so it is cleared. Somebody else going out
-                # only stops the shedding; it cannot take the clear back.
-                self.state = HandState.PHASE_LAID
-                self._emit("raced_after_laying", opponent=winner.name,
-                           held=len(self.hand))
-            else:
-                self.mark_failed("opponent_out", opponent=winner.name)
+        # A turn you have been denied is spent here, where it would have
+        # happened -- the same bargain a seat's own Skip makes -- and it costs
+        # you exactly one turn however long it waited. Losing it means the
+        # seats come round again before you act, which is what a lost turn
+        # *is*: the table plays twice and you play once.
+        lost = self.skipped
+        if lost:
+            self.skipped = False
+            self.turns_missed += 1
+            self.table.say("You", "miss a turn")
+            self._emit("turn_missed")
+        self._settle_table_turn(self.table.end_of_turn())
+        if lost and self.state is HandState.IN_PROGRESS:
+            self._settle_table_turn(self.table.end_of_turn())
+
+    def _settle_table_turn(self, winner) -> None:
+        """Apply what the table's turn did to the hand."""
+        if winner is None:
+            return
+        if self.laid:
+            # The phase is down, so it is cleared. Somebody else going out
+            # only stops the shedding; it cannot take the clear back.
+            self.state = HandState.PHASE_LAID
+            self._emit("raced_after_laying", opponent=winner.name,
+                       held=len(self.hand))
+        else:
+            self.mark_failed("opponent_out", opponent=winner.name)
 
     def _fail_if_out_of_road(self) -> None:
         """Settle the hand if the draw budget has run out.

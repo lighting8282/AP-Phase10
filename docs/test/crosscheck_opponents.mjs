@@ -28,7 +28,12 @@ function same(name, actual, expected) {
 }
 
 for (const [index, trace] of traces.entries()) {
-  const cfg = gameConfig({ handSize: trace.hand_size, maxDraws: 99 });
+  const cfg = gameConfig({
+    handSize: trace.hand_size,
+    maxDraws: 99,
+    skipMode: trace.skip_mode ?? "dig",
+    skipsInDeck: trace.skips_in_deck ?? 0,
+  });
 
   // The same coin flips Python used, in the same order.
   let cursor = 0;
