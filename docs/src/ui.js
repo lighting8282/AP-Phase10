@@ -4,18 +4,18 @@
 // client, and holds no game state of its own. Anything it needed to remember
 // would be a second copy of something the session already owns.
 
-import { SKIP, WILD, cardFilename, isWild, points } from "./cards.js?v=a5faf97b";
+import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=9ba1d30d";
 
 //: Faces used purely as icons in the stat panel.
 const SKIP_FACE = SKIP;
 const WILD_FACE = WILD;
-import { HAND_STATE } from "./engine.js?v=a5faf97b";
+import { HAND_STATE } from "./engine.js?v=9ba1d30d";
 import {
   HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, milestoneLocationName,
   phaseLocationName, storeGate, storeLocationName,
-} from "./data.js?v=a5faf97b";
-import { PHASE_COUNT, phaseDescription } from "./phases.js?v=a5faf97b";
-import { Phase10Client } from "./client.js?v=a5faf97b";
+} from "./data.js?v=9ba1d30d";
+import { PHASE_COUNT, phaseDescription } from "./phases.js?v=9ba1d30d";
+import { Phase10Client } from "./client.js?v=9ba1d30d";
 
 const el = (id) => document.getElementById(id);
 
@@ -42,6 +42,10 @@ const OPPONENT_TURN_MS = 3000;
 let pacing = false;
 //: The seat whose turn is being shown, so the table can say whose it is.
 let activeSeat = null;
+//: A Skip the player has asked to throw away, held until they say it twice.
+//: Cleared by any move that lands, so it never survives the turn it was armed
+//: on. By identity, not index: a draw renumbers the hand.
+let armedSkip = null;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -311,6 +315,9 @@ async function runOpponentTurns(hand) {
  * settle a round that has just ended.
  */
 function afterPlayerAction(hand) {
+  // Any move that lands disarms the Skip: the second click has to be the very
+  // next thing you do, or it is not a confirmation of anything.
+  armedSkip = null;
   render();
   if (hand.turnPending) {
     runOpponentTurns(hand);
@@ -466,6 +473,17 @@ function render() {
   skip.title = s.skipMode === "deny"
     ? "Make the next player miss their turn"
     : "Look at the top three of the stock and keep one";
+  // Playing a Skip is a turn of its own, so it is only there before you draw
+  // and only with a Skip to spend. Left enabled it was a button whose whole
+  // function was to explain, afterwards, that it could not be pressed. What
+  // else it needs differs by seed: a denial needs somebody still to deny, and
+  // a dig needs a stock to dig into.
+  if (!skip.disabled) {
+    const spendable = hand.skipsInHand && !hand.drewThisTurn && !hand.digPending;
+    skip.disabled = !spendable || (s.skipMode === "deny"
+      ? hand.table.nextActor() === null
+      : hand.stock.length === 0);
+  }
 
   const mull = el("mulligan-button");
   mull.disabled = pacing || s.canMulligan() !== null;
@@ -619,12 +637,77 @@ function promptFor(hand, live, drawn) {
   return "* Play what you can, then discard a card *";
 }
 
+/**
+ * What playing a Skip does in this seed, as the words for a button.
+ *
+ * A Skip digs in an Archipelago seed and denies the next player a turn in free
+ * play, and every measured clear rate the access rules stand on was measured
+ * with the dig -- so the two cannot be collapsed, and "Dig" in front of a Skip
+ * that denies a turn would be a plain lie about what the click does.
+ */
+function skipAction() {
+  return app.session.skipMode === "deny"
+    ? { hint: "Play: make the next player miss their turn",
+      says: "A Skip makes the next player miss their turn",
+      forWhat: "A Skip is for denying a turn" }
+    : { hint: "Dig: look three cards down the stock and keep one",
+      says: "A Skip digs three cards down the stock",
+      forWhat: "A Skip is for digging" };
+}
+
+/**
+ * Click a card in your hand.
+ *
+ * Every card there is a discard except a Skip, which is a card you play.
+ * Throwing one away is legal, costs you fifteen points if the round ends on it,
+ * and is almost never what the click meant -- so a Skip plays itself when it
+ * can, and otherwise takes a second click before it goes on the pile.
+ *
+ * The two are never both available, which is what makes the first click
+ * unambiguous: playing a Skip is your whole turn and so only happens before you
+ * draw, and a discard only happens after.
+ */
+function playFromHand(index) {
+  const hand = app.session.hand;
+  if (pacing || !hand || hand.state !== HAND_STATE.IN_PROGRESS) return;
+  const card = hand.hand[index];
+
+  if (isSkip(card)) {
+    if (!hand.drewThisTurn) {
+      withHand((h) => h.playSkip());
+      return;
+    }
+    if (armedSkip !== card) {
+      armedSkip = card;
+      log(`${skipAction().says} -- click it again to throw it away.`);
+      render();
+      return;
+    }
+  }
+  withHand((h) => h.discardCard(h.hand[index]));
+}
+
 function renderHand(hand) {
   const box = el("hand");
   box.replaceChildren();
   if (!hand) return;
+  const skip = skipAction();
   hand.hand.forEach((card, index) => {
-    box.append(cardButton(card, () => withHand((h) => h.discardCard(h.hand[index]))));
+    const button = cardButton(card, () => playFromHand(index));
+    // Your cards are not playable while the table is mid-turn.
+    button.disabled = pacing;
+    if (isSkip(card)) {
+      if (!hand.drewThisTurn) {
+        button.classList.add("playable");
+        button.title = skip.hint;
+      } else if (card === armedSkip) {
+        button.classList.add("armed");
+        button.title = "Click again to throw this Skip away";
+      } else {
+        button.title = `${skip.forWhat} -- clicking it twice throws it away`;
+      }
+    }
+    box.append(button);
   });
 }
 
