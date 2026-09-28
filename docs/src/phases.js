@@ -15,7 +15,7 @@
 
 import {
   COLORS, MAX_RANK, MIN_RANK, cardToString, isNumber, isSkip, isWild,
-} from "./cards.js?v=91ad3551";
+} from "./cards.js?v=69b87009";
 
 /**
  * Official rules forbid completing a phase using only wild cards. The exact
@@ -496,9 +496,21 @@ export const MAX_LAY_OPTIONS = 24;
  */
 export function describeMeldCards(meld) {
   const cards = meld.cards.map(cardToString).join(" ");
-  if (meld.kind === GROUP.RUN) return `run ${meld.lo}-${meld.hi} [${cards}]`;
-  if (meld.kind === GROUP.SET) return `set of ${meld.rank}s [${cards}]`;
-  return `${meld.color ?? "colour"} group [${cards}]`;
+  return `${meldName(meld)} [${cards}]`;
+}
+
+/**
+ * What a group is, without listing what is in it.
+ *
+ * The cards are already on screen where this is used as a label; repeating
+ * them underneath their own pictures says nothing. Shares its wording with
+ * describeMeldCards so the label over a group and the log line about it cannot
+ * disagree. Mirrors meld_name in phases.py.
+ */
+export function meldName(meld) {
+  if (meld.kind === GROUP.RUN) return `run ${meld.lo}-${meld.hi}`;
+  if (meld.kind === GROUP.SET) return `set of ${meld.rank}s`;
+  return `${meld.color ?? "colour"} group`;
 }
 
 export function solveLayOptions(hand, spec, minNaturalsPerGroup = DEFAULT_MIN_NATURALS_PER_GROUP) {

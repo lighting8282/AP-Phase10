@@ -9,13 +9,13 @@
 // before the restore lands would overwrite a real one with that empty rebuild.
 // Nothing is saved until restoreState is "done".
 
-import { Client } from "../node_modules/archipelago.js/dist/index.js?v=91ad3551";
+import { Client } from "../node_modules/archipelago.js/dist/index.js?v=69b87009";
 
 import { GAME_NAME, MULLIGAN, PHASE_COUNT, SKIP_CARD, WILD_CARD, phaseUnlock }
-  from "./data.js?v=91ad3551";
-import { Phase10Game, roundToString } from "./game.js?v=91ad3551";
-import { Phase10Session } from "./session.js?v=91ad3551";
-import { describeMeldCards } from "./phases.js?v=91ad3551";
+  from "./data.js?v=69b87009";
+import { Phase10Game, roundToString } from "./game.js?v=69b87009";
+import { Phase10Session } from "./session.js?v=69b87009";
+import { describeMeldCards } from "./phases.js?v=69b87009";
 
 /**
  * The deck a free-play run is dealt, with no Archipelago to hand items out.
@@ -152,11 +152,8 @@ export class Phase10Client {
     this.#restoreLocal();
     this.restoreState = "done";
     this.#grantFreePlayItems();
-    this.onLog(
-      fresh
-        ? "New free-play run. Phase 1 is open; clear it to open the next."
-        : "Free play -- no server. Phase 1 is open; clear it to open the next.",
-    );
+    this.onLog(`${fresh ? "New free-play run." : "Free play -- no server."} `
+      + this.#whereYouAre());
     this.onUpdate();
     return this.session;
   }
@@ -173,8 +170,27 @@ export class Phase10Client {
     return FREE_PLAY_PHASE_COUNTS.includes(wanted) ? wanted : PHASE_COUNT;
   }
 
+  /**
+   * The phase a free-play run is up to: one past however many it has cleared.
+   *
+   * The one place that is decided, so the unlocks handed out and the line that
+   * says where you are cannot disagree -- that line used to say "phase 1" to
+   * somebody who had cleared three and reloaded the page.
+   */
+  #openPhase() {
+    return Math.min(this.session.clearedPhases.size + 1, this.phaseCap);
+  }
+
+  /** Where a run stands, for the line printed when it opens. */
+  #whereYouAre() {
+    if (this.session.clearedPhases.size >= this.phaseCap) {
+      return `All ${this.phaseCap} phases cleared -- start a new run when you like.`;
+    }
+    return `Phase ${this.#openPhase()} is open; clear it to open the next.`;
+  }
+
   #grantFreePlayItems() {
-    const open = Math.min(this.session.clearedPhases.size + 1, this.phaseCap);
+    const open = this.#openPhase();
     const items = [...FREE_PLAY_DECK];
     for (let phase = 1; phase <= open; phase += 1) items.push(phaseUnlock(phase));
     this.session.setItems(items);

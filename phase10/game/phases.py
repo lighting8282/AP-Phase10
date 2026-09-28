@@ -464,12 +464,22 @@ def describe_meld(meld: Meld) -> str:
     text client all say the same thing about the same group.
     """
     cards = " ".join(str(c) for c in meld.cards)
+    return f"{meld_name(meld)} [{cards}]"
+
+
+def meld_name(meld: Meld) -> str:
+    """What a group is, without listing what is in it.
+
+    Shares its wording with `describe_meld` so a label over a group and the
+    log line about it cannot disagree. Mirrors meldName in phases.js, where
+    the browser client uses it to caption each group on the table.
+    """
     if meld.kind is GroupKind.RUN:
-        return f"run {meld.lo}-{meld.hi} [{cards}]"
+        return f"run {meld.lo}-{meld.hi}"
     if meld.kind is GroupKind.SET:
-        return f"set of {meld.rank}s [{cards}]"
+        return f"set of {meld.rank}s"
     colour = meld.color.value if meld.color else "colour"
-    return f"{colour} group [{cards}]"
+    return f"{colour} group"
 
 
 def solve_lay_options(
