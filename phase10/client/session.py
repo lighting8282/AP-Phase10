@@ -68,6 +68,14 @@ class Phase10Session:
     #: up too rarely to repay the density it costs every other draw -- which
     #: is a statement about an item's worth, not about how the game is dealt.
     skips_in_deck: int = 0
+    #: How many phases this run climbs. A free-play run is ten or twenty by
+    #: the player's choice; a seed is always the full set, because its
+    #: locations exist for every phase.
+    phase_cap: int = PHASE_COUNT
+    #: Whether finishing the last phase ends the run for everybody, which is
+    #: the printed game. A seed has its own goal instead and must not be
+    #: ended by a seat -- an opponent finishing is not an Archipelago notion.
+    race_to_end: bool = False
 
     items: Counter = field(default_factory=Counter)
     consumed_traps: Counter = field(default_factory=Counter)
@@ -95,6 +103,7 @@ class Phase10Session:
             store_slots=int(slot_data.get("store_slots", 0)),
             skip_mode="deny" if slot_data.get("skip_mode") == "deny" else "dig",
             skips_in_deck=int(slot_data.get("skips_in_deck", 0)),
+            race_to_end=bool(slot_data.get("race_to_end", False)),
             game=Phase10Game(rng),
         )
 
@@ -164,8 +173,68 @@ class Phase10Session:
         )
 
     # -- playing -----------------------------------------------------------
+    def seat_finished(self, index: int) -> bool:
+        """Whether a seat has finished the last phase of the run."""
+        phases = self.opponent_phases
+        return index < len(phases) and phases[index] > self.phase_cap
+
+    @property
+    def player_finished(self) -> bool:
+        """Whether you have."""
+        return self.phase_cap in self.cleared_phases
+
+    @property
+    def run_over(self) -> bool:
+        """Whether the run is over, which only the printed game decides so.
+
+        Derived rather than stored, like the unlocks and the cleared set: the
+        seat phases and the scorecard are both saved already, so a reloaded
+        run knows it is finished without a save format to disagree with it.
+        """
+        if not self.race_to_end:
+            return False
+        if self.player_finished:
+            return True
+        return any(self.seat_finished(i) for i in range(len(self.opponent_phases)))
+
+    @property
+    def run_winner(self):
+        """Who won, and by what.
+
+        Everybody who finished the last phase is a finisher -- more than one
+        can, in the round that ends the run -- and the lowest score among them
+        wins, which is how the box breaks it. A tie on score goes to you, then
+        round the table, because somebody has to be named.
+        """
+        if not self.run_over:
+            return None
+        finishers = []
+        if self.player_finished:
+            finishers.append(("You", self.total_score))
+        for i in range(len(self.opponent_phases)):
+            if self.seat_finished(i):
+                finishers.append((self.seat_name(i), self.opponent_scores[i]))
+        if not finishers:
+            return None
+        return min(finishers, key=lambda who: who[1])
+
+    def seat_name(self, index: int) -> str:
+        """What a seat is called, whether or not a table is dealt right now."""
+        if index < len(self.seats):
+            return self.seats[index].name
+        if index < len(OPPONENT_NAMES):
+            return OPPONENT_NAMES[index]
+        return f"Seat {index + 1}"
+
     def can_play(self, phase: int) -> str | None:
         """Returns None if the phase is playable, else why not."""
+        if self.run_over:
+            won = self.run_winner
+            if won and won[0] == "You":
+                return "You won the run -- start a new one when you like."
+            who = won[0] if won else "Somebody"
+            return (f"{who} finished the last phase. "
+                    "The run is over -- start a new one when you like.")
         if phase not in self.unlocked_phases:
             return f"Phase {phase} is not unlocked yet."
         if self.locked_phase is not None and phase != self.locked_phase:
@@ -200,7 +269,17 @@ class Phase10Session:
         moved = []
         for index, seat in enumerate(self.seats):
             if seat.laid_down and index < len(self.opponent_phases):
-                self._opponent_phases[index] = min(PHASE_COUNT, seat.phase + 1)
+                # One past the cap in a race, and no further. That is not a
+                # phase anybody plays: it is how a seat records that it
+                # finished the last one, the same way your cleared set records
+                # that you did. It used to stop at PHASE_COUNT whatever the
+                # run's cap was, so a ten-phase run had seats climbing to 16.
+                #
+                # Without a race there is nothing to finish, so a seat stops
+                # *on* the last phase -- a seed showing "phase 21" would be a
+                # marker for an event that mode does not have.
+                ceiling = self.phase_cap + (1 if self.race_to_end else 0)
+                self._opponent_phases[index] = min(ceiling, seat.phase + 1)
                 moved.append(seat.name)
         return moved
 

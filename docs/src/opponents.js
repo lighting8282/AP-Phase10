@@ -13,9 +13,9 @@
 // near turn five. So the race resolves before a large budget can matter -- see
 // the Python module for the numbers and what was done about them.
 
-import { cardToString, handScore, isSkip, points } from "./cards.js?v=f0519056";
-import { cardsShort, removeCard } from "./engine.js?v=f0519056";
-import { PHASES, describeMeldCards, solveMelds } from "./phases.js?v=f0519056";
+import { cardToString, handScore, isSkip, points } from "./cards.js?v=8767b160";
+import { cardsShort, removeCard } from "./engine.js?v=8767b160";
+import { PHASES, describeMeldCards, solveMelds } from "./phases.js?v=8767b160";
 
 /**
  * How well a seat plays. 1.0 / 0.0 is the greedy autoplayer exactly.
@@ -30,7 +30,13 @@ export function opponentSkill(name, discardAwareness, discardError) {
 /** Beats a careless human, loses to a careful one. */
 export const MID = opponentSkill("mid", 0.7, 0.25);
 
-const NAMES = ["Ada", "Bo", "Cy", "Del", "Eve", "Fen"];
+/**
+ * Seat names, in the order they are dealt in.
+ *
+ * Exported because a finished run has to name its winner between rounds, when
+ * no table is dealt and there are no seats to ask.
+ */
+export const NAMES = ["Ada", "Bo", "Cy", "Del", "Eve", "Fen"];
 
 export class Opponent {
   constructor(name, phase, config, random, skill = MID) {

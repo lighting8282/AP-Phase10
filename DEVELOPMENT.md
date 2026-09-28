@@ -878,6 +878,34 @@ does not quietly turn a ten into a twenty, and a saved run from before the
 choice existed restores as twenty, which is what it was. Archipelago's out-of-order unlocking is the thing being replaced
 here, so handing over all twenty at once would miss the point.
 
+**The run ends when somebody finishes the last phase**, whoever it is, and the
+lowest score among those who did takes it. That is the printed game, and it was
+missing entirely: free play had no end condition in either direction. A seat
+that finished the last phase carried on to a phase that does not exist, and the
+run went on forever -- reported from a real game as a seat completing phase 10
+while the round counter climbed past sixteen.
+
+Two bugs in one, and the first was hiding the second. `advance_opponents`
+capped a seat at `PHASE_COUNT` rather than at the *run's* cap, so a ten-phase
+run had seats on phase 16; nothing consumed the signal, so even the correct
+value would have done nothing. A seat now stops one past the cap and stays
+there. That is not a phase anybody plays -- it is where "finished" is recorded,
+the same way your cleared set records that you did -- and it only exists in a
+race, because a seed showing "phase 21" would be a marker for an event that
+mode does not have.
+
+`run_over` and `run_winner` are derived rather than stored. The seat phases and
+the scorecard are both saved already, so a reloaded run knows it is finished
+without a save format that could disagree with it -- and no `SAVE_VERSION` bump,
+which would have thrown away every run in progress.
+
+`race_to_end` is a slot-data field, false by default. **An Archipelago seed is
+never ended by a seat**: it has its own goal, and an opponent finishing is not
+an Archipelago notion.
+
+A tie on score goes to you, then round the table. The box would play another
+hand; a solitaire run cannot, so somebody has to be named.
+
 **A Skip denies the next player a turn**, which is the printed rule. An
 Archipelago seed keeps the dig instead, and the split is deliberate rather than
 lazy: every measured clear rate the access rules are built on was measured with

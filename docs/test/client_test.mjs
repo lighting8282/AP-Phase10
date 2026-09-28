@@ -143,6 +143,68 @@ const packet = { cmd: "PrintJSON", data: [{ text: "one line, one packet" }] };
   check("a round was recorded", app.session.game.rounds.length, 1);
 }
 
+// -- a run that ends ---------------------------------------------------------
+// Reported from a real run: a seat finished phase 10 of a ten-phase run and
+// the game carried on. Two things were wrong. Seats climbed to PHASE_COUNT
+// rather than the run's cap, so one was on phase 16 of a ten-phase run; and
+// nothing ended a free-play run in either direction, ever.
+{
+  const app = new Phase10Client({});
+  app.client.login = () => { throw new Error("free play must not log in"); };
+  await app.startFreePlay({ fresh: true, phases: 10 });
+
+  check("the session knows the cap", app.session.phaseCap, 10);
+  check("and that this run is a race", app.session.raceToEnd, true);
+  check("nothing is over yet", app.session.runOver, false);
+  check("and a phase is playable", app.session.canPlay(1), null);
+
+  // A seat finishing the last phase ends it. One past the cap is the marker:
+  // not a phase anybody plays, just where "finished" is recorded.
+  app.session.opponentPhases[2] = 11;
+  app.session.opponentScores[0] = 300;
+  app.session.opponentScores[1] = 200;
+  app.session.opponentScores[2] = 75;
+  check("a seat past the cap has finished", app.session.seatFinished(2), true);
+  check("and that ends the run", app.session.runOver, true);
+  check("naming the seat that did it", app.session.runWinner.name, "Cy");
+  check("with its score", app.session.runWinner.score, 75);
+  check("and no new round starts", /run is over/.test(app.session.canPlay(1) ?? ""), true);
+}
+{
+  // Your own win, and the tie-break: lowest score among those who finished.
+  const app = new Phase10Client({});
+  app.client.login = () => { throw new Error("free play must not log in"); };
+  await app.startFreePlay({ fresh: true, phases: 10 });
+  for (let phase = 1; phase <= 10; phase += 1) {
+    const hand = app.startHand(phase);
+    hand.state = "went_out";
+    await app.settle(hand);
+  }
+  check("clearing the last phase finishes you", app.session.playerFinished, true);
+  check("which ends the run", app.session.runOver, true);
+  check("and you won it on nothing", app.session.runWinner.name, "You");
+  check("you cannot start an eleventh", /won the run/.test(app.session.canPlay(1) ?? ""), true);
+
+  // A seat that also finished but scored more does not take it off you.
+  // Relative to what you actually scored: these rounds were forced to
+  // "went out" with the hand still held, so your total is not zero.
+  const yours = app.session.totalScore;
+  app.session.opponentPhases[0] = 11;
+  app.session.opponentScores[0] = yours + 1;
+  check("a finisher with a worse score does not win", app.session.runWinner.name, "You");
+  // One that scored less does.
+  app.session.opponentScores[0] = yours - 1;
+  check("one with a better score does", app.session.runWinner.name, "Ada");
+}
+{
+  // An Archipelago seed is never ended by a seat: it has its own goal.
+  const seed = new Phase10Client({});
+  check("a seed does not race", seed.session.raceToEnd, false);
+  seed.session.opponentPhases[0] = 99;
+  check("so a seat finishing ends nothing", seed.session.runOver, false);
+  check("and its cap is the full set", seed.session.phaseCap, PHASE_COUNT);
+}
+
 // -- what a reloaded run says about itself -----------------------------------
 // Reported from a real run: three phases cleared, reload, and the line said
 // "Phase 1 is open". The unlocks were right and the phase buttons were right;
@@ -196,8 +258,12 @@ const packet = { cmd: "PrintJSON", data: [{ text: "one line, one packet" }] };
     const after = new Phase10Client({ onLog: (l) => done.push(l) });
     after.client.login = () => { throw new Error("free play must not log in"); };
     await after.startFreePlay({});
-    check("a finished run says so rather than naming an eleventh phase",
-      done.some((l) => l.includes("All 10 phases cleared")), true);
+    // Clearing the last phase is winning the run now, not merely reaching the
+    // end of the list, so the line says which -- and still names no eleventh.
+    check("a finished run says who won rather than naming an eleventh phase",
+      done.some((l) => l.includes("You won this run")), true);
+    check("and never offers a phase past the cap",
+      done.some((l) => /Phase 11 is open/.test(l)), false);
   } finally {
     delete globalThis.localStorage;
   }

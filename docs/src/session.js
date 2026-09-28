@@ -18,11 +18,11 @@ import {
   SCORE_REDUCTION_VALUE, SKIP_CARD, TIERS, WILD_CARD,
   WILD_THEFT, milestoneLocationName, phaseLocationName, phaseUnlock,
   storeGate, storeLocationName, storePrices,
-} from "./data.js?v=f0519056";
-import { STOCK_WILDS } from "./cards.js?v=f0519056";
-import { HAND_STATE, Table, gameConfig } from "./engine.js?v=f0519056";
-import { MID, buildOpponents } from "./opponents.js?v=f0519056";
-import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js?v=f0519056";
+} from "./data.js?v=8767b160";
+import { STOCK_WILDS } from "./cards.js?v=8767b160";
+import { HAND_STATE, Table, gameConfig } from "./engine.js?v=8767b160";
+import { MID, NAMES as OPPONENT_NAMES, buildOpponents } from "./opponents.js?v=8767b160";
+import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js?v=8767b160";
 
 export const LEAN_DEAL_PENALTY = 2;
 
@@ -41,6 +41,14 @@ export class Phase10Session {
     //: up too rarely to repay the density it costs every other draw -- which
     //: is a statement about an item's worth, not about how the game is dealt.
     this.skipsInDeck = opts.skipsInDeck ?? 0;
+    //: How many phases this run climbs. A free-play run is ten or twenty by
+    //: the player's choice; a seed is always the full set, because its
+    //: locations exist for every phase.
+    this.phaseCap = opts.phaseCap ?? PHASE_COUNT;
+    //: Whether finishing the last phase ends the run for everybody, which is
+    //: the printed game. A seed has its own goal instead and must not be
+    //: ended by a seat -- an opponent finishing is not an Archipelago notion.
+    this.raceToEnd = opts.raceToEnd ?? false;
     this.deathLink = opts.deathLink ?? false;
     this.opponents = opts.opponents ?? 3;
 
@@ -68,6 +76,7 @@ export class Phase10Session {
       storeSlots: Number(slotData.store_slots ?? 0),
       skipMode: slotData.skip_mode === "deny" ? "deny" : "dig",
       skipsInDeck: Number(slotData.skips_in_deck ?? 0),
+      raceToEnd: Boolean(slotData.race_to_end ?? false),
       deathLink: Boolean(slotData.death_link ?? false),
       opponents: Number(slotData.opponents ?? 3),
       game: game ?? new Phase10Game(),
@@ -156,6 +165,13 @@ export class Phase10Session {
   // -- playing -------------------------------------------------------------
   /** Returns null if the phase is playable, else why not. */
   canPlay(phase) {
+    if (this.runOver) {
+      const won = this.runWinner;
+      return won && won.name === "You"
+        ? "You won the run -- start a new one when you like."
+        : `${won ? won.name : "Somebody"} finished the last phase. `
+          + "The run is over -- start a new one when you like.";
+    }
     if (!this.unlockedPhases.has(phase)) {
       return `Phase ${phase} is not unlocked yet.`;
     }
@@ -287,11 +303,71 @@ export class Phase10Session {
     const moved = [];
     this.seats.forEach((seat, index) => {
       if (seat.laidDown && index < this.opponentPhases.length) {
-        this._opponentPhases[index] = Math.min(PHASE_COUNT, seat.phase + 1);
+        // One past the cap in a race, and no further. That is not a phase
+        // anybody plays: it is how a seat records that it finished the last
+        // one, the same way your own cleared set records that you did. It
+        // used to stop at PHASE_COUNT whatever the run's cap was, so a
+        // ten-phase run had seats climbing to sixteen.
+        //
+        // Without a race there is nothing to finish, so a seat stops *on* the
+        // last phase -- a seed showing "phase 21" would be a marker for an
+        // event that mode does not have.
+        const ceiling = this.phaseCap + (this.raceToEnd ? 1 : 0);
+        this._opponentPhases[index] = Math.min(ceiling, seat.phase + 1);
         moved.push(seat.name);
       }
     });
     return moved;
+  }
+
+  /** Whether a seat has finished the last phase of the run. */
+  seatFinished(index) {
+    return (this.opponentPhases[index] ?? 1) > this.phaseCap;
+  }
+
+  /** Whether you have. */
+  get playerFinished() {
+    return this.clearedPhases.has(this.phaseCap);
+  }
+
+  /**
+   * Whether the run is over, which only the printed game decides this way.
+   *
+   * Derived rather than stored, like the unlocks and the cleared set: the
+   * seat phases and the scorecard are both saved already, so a reloaded run
+   * knows it is finished without a save format that could disagree with it.
+   */
+  get runOver() {
+    if (!this.raceToEnd) return false;
+    if (this.playerFinished) return true;
+    return this.opponentPhases.some((_, i) => this.seatFinished(i));
+  }
+
+  /**
+   * Who won, and by what.
+   *
+   * Everybody who finished the last phase is a finisher -- more than one can,
+   * in the round that ends the run -- and the lowest score among them wins,
+   * which is how the box breaks it. A tie on score goes to you, then round
+   * the table, because somebody has to be named and an unresolved tie is not
+   * something a solitaire run can play off.
+   */
+  get runWinner() {
+    if (!this.runOver) return null;
+    const finishers = [];
+    if (this.playerFinished) finishers.push({ name: "You", score: this.totalScore });
+    this.opponentPhases.forEach((_, i) => {
+      if (this.seatFinished(i)) {
+        finishers.push({ name: this.seatName(i), score: this.opponentScores[i] ?? 0 });
+      }
+    });
+    if (!finishers.length) return null;
+    return finishers.reduce((best, who) => (who.score < best.score ? who : best));
+  }
+
+  /** What a seat is called, whether or not a table is dealt right now. */
+  seatName(index) {
+    return this.seats[index]?.name ?? OPPONENT_NAMES[index] ?? `Seat ${index + 1}`;
   }
 
   /**

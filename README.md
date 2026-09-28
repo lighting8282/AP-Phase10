@@ -42,6 +42,10 @@ clear them. **No draw budget** — a round runs until somebody empties their
 hand, the way the printed game does. The run is saved in your browser, so a
 reload picks up where you left off, but it lives only on that device.
 
+**It is a race.** The opponents climb the phases too, and the run ends the
+moment anybody finishes the last one — them included. If more than one of you
+finishes in the same round, the lowest score wins.
+
 Start a run at **10 phases** for the game as it comes in the box, or **20** for
 those ten plus the ten measured to fill the gap they leave. There is also a
 **Quick tutorial** button that walks through the screen a step at a time.
