@@ -48,6 +48,7 @@ while to find and would be easy to reintroduce.
   - [Checking it](#checking-it)
 - [Persistence](#persistence)
 - [Browser version](#browser-version)
+  - [Watching the table play](#watching-the-table-play)
   - [Free play, with no server](#free-play-with-no-server)
   - [Verified against a live server](#verified-against-a-live-server-1)
   - [One bug that only a browser could have found](#one-bug-that-only-a-browser-could-have-found)
@@ -323,6 +324,24 @@ Success rate at 8 draws with stock wilds:
 
 Skip Card is classified `useful`, not `progression`, so no access rule depends
 on it and the fill balance is unchanged.
+
+**Clicking one plays it.** Every other card in the hand is a discard, so a Skip
+clicked in the browser client used to go on the pile: fifteen points thrown away
+and the Skip with it, off a click that looked like every other click. Playing a
+Skip and discarding one are never both legal -- playing it is a whole turn and so
+only happens before you draw, a discard only after -- so the first click is
+unambiguous, and a Skip clicked after the draw asks for a second click before it
+goes. The hand says which is which before the click rather than in the log
+afterwards: green outline for a Skip you could play, dashed red for one waiting
+on its second click.
+
+None of that wording says "dig", because what a Skip does depends on the seed --
+a seed digs, free play denies a turn. `skipAction()` in `ui.js` is the one place
+the words are chosen, the same way the button already chose its own label. The
+button is also disabled unless playing a Skip would actually work, which differs
+the same way: a denial needs somebody still to deny, a dig needs a stock to dig
+into. Enabled regardless, its whole function was to explain afterwards that it
+could not be pressed.
 
 ## Twenty phases
 
@@ -756,6 +775,44 @@ The card faces exist twice, under `phase10/` and under `docs/`, because the
 apworld ships as a zip of `phase10/` and Pages cannot reach above `docs/`. One
 run of `tools/generate_cards.py` writes both rather than leaving the second to
 be remembered.
+
+### Watching the table play
+
+The three seats used to move in the same instant you discarded: the table simply
+arrived in a new state, and the log explained all of it afterwards, so which seat
+had taken your discard and which had ended the round was something you read
+rather than watched. The browser client now shows them one at a time, three
+seconds a seat (`OPPONENT_TURN_MS` in `ui.js`), and drains the table's log after
+each one so the lines arrive beside the pause they belong to.
+
+Two pieces, neither of them in the rules:
+
+- A hand built with `paced: true` queues the seats in `pendingSeats` instead of
+  playing them, and the driver walks them with `stepOpponent()`. Headless drivers
+  leave it off and the turn resolves on the spot as before.
+- `ui.js` holds the player's controls shut for the length of the walk, marks the
+  seat whose turn it is (and your own seat between turns) with a ring on the seat
+  itself, and marks the newest line in the log. Only the newest: two highlights
+  are no highlight.
+
+The narration is the one main already had. `Table.log` and `say()` were added
+with the opponents and are mirrored in the Python port, so the walk reuses them
+rather than recording a second account of the same turn -- draining per seat
+instead of once per turn is the only difference, and `game_test.mjs` asserts the
+paced walk produces byte-identical lines to the unpaced one.
+
+**The turn moved into `Table.playSeat`, and that is the part worth remembering.**
+It is the body of the old `endOfTurn` loop, so a seat played one at a time is
+played exactly as it was played all at once -- including consuming a Skip, which
+the loop used to own. Leaving the Skip consumption in the loop is the obvious
+refactor and it is wrong: the paced walk never calls the loop, so a denied seat
+would have quietly taken its turn. That is invisible on screen and changes who
+wins the round. `game_test.mjs` asserts the two walks reach identical state off
+one seed, and pins the denied seat on its own.
+
+`play_seat` is mirrored into Python for the same reason -- a turn should live in
+the same place in both ports -- though the paced walk itself is not, being
+presentation for a driver the Kivy client does not have.
 
 ### Free play, with no server
 
