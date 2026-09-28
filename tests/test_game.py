@@ -199,9 +199,17 @@ def test_the_table_says_what_each_seat_did():
     assert any("discards" in line for _, line in said)
 
 
+def throw_skip(hand):
+    """Draw, then throw a Skip, which is how one is played in deny mode."""
+    hand.hand.append(SKIP)
+    hand.draw()
+    hand.discard_card(next(c for c in hand.hand if c.is_skip))
+    return hand
+
+
 def test_a_denied_seat_says_so_and_the_others_still_play():
     hand, table = deny_table(seed=9)
-    hand.play_skip()
+    throw_skip(hand).deny_seat(0)
     said = table.drain_log()
     assert ("Ada", "misses a turn") in said
     # And it is only Ada: the other two took their turns as usual.
@@ -225,8 +233,7 @@ def test_the_default_is_still_the_dig():
 
 def test_a_denied_seat_misses_its_turn():
     """Measured by what the table takes off the stock, not by a flag: a normal
-    turn is your draw plus three seats, and a Skip turn is two seats and no
-    draw of your own."""
+    turn is your draw plus three seats, and a denied one is a seat short."""
     normal, _ = deny_table(seed=11)
     before = len(normal.stock)
     normal.draw()
@@ -235,34 +242,59 @@ def test_a_denied_seat_misses_its_turn():
 
     denied, _ = deny_table(seed=11)
     before = len(denied.stock)
-    denied.play_skip()
+    throw_skip(denied).deny_seat(0)
     denied_used = before - len(denied.stock)
 
     assert normal_used == 4, normal_used
-    assert denied_used == 2, denied_used
+    assert denied_used == normal_used - 1, denied_used
 
 
-def test_denying_reveals_nothing():
-    hand, _ = deny_table()
-    assert hand.play_skip() == []
+def test_a_discarded_skip_waits_to_be_aimed():
+    hand, table = deny_table()
+    throw_skip(hand)
+    assert hand.deny_pending
+    assert [s.name for s in hand.pending_deny] == [s.name for s in table.seats]
     assert not hand.dig_pending
+
+
+def test_the_thrower_chooses_who_misses():
+    """The choice is the whole point: the seat worth denying is rarely the
+    one whose turn happens to come next."""
+    hand, table = deny_table()
+    target = throw_skip(hand).deny_seat(2)
+    assert target is table.seats[2]
+    missed = [e for e in table.log if e[1] == "misses a turn"]
+    assert missed == [(table.seats[2].name, "misses a turn")], missed
 
 
 def test_it_names_who_lost_the_turn():
     hand, table = deny_table()
-    hand.play_skip()
+    throw_skip(hand).deny_seat(2)
     denial = next(e for e in hand.events if e.kind == "skip_denied")
-    assert denial.detail["seat"] == table.seats[0].name
+    assert denial.detail["seat"] == table.seats[2].name
+
+
+def test_no_move_lands_while_a_skip_waits():
+    hand, _ = deny_table()
+    throw_skip(hand)
+    for act in (lambda: hand.draw(), lambda: hand.discard_card(hand.hand[0])):
+        try:
+            act()
+        except RuntimeError as err:
+            assert "misses their turn first" in str(err)
+        else:
+            raise AssertionError("a move landed with a Skip still to aim")
 
 
 def test_the_skip_is_spent_onto_the_discard():
-    """In the pile, not necessarily on top of it: playing a Skip ends your
+    """In the pile, not necessarily on top of it: aiming the Skip ends your
     turn, so the seats that still act discard on top of it before this
     returns."""
     hand, _ = deny_table()
     before = hand.skips_in_hand
-    hand.play_skip()
-    assert hand.skips_in_hand == before - 1
+    throw_skip(hand)
+    hand.deny_seat(0)
+    assert hand.skips_in_hand == before
     assert any(card.is_skip for card in hand.discard)
 
 
@@ -274,16 +306,40 @@ def test_two_skips_deny_two_different_seats():
     hand, table = deny_table()
     table.seats[0].skipped = True
     assert table.next_actor() is table.seats[1]
+    throw_skip(hand)
+    assert [s.name for s in hand.pending_deny] == [s.name for s in table.seats[1:]]
 
 
-def test_nobody_to_skip_is_refused():
+def test_with_nobody_to_deny_a_skip_is_just_a_discard():
+    """Refusing the throw would strand a player holding a Skip they could not
+    legally get rid of."""
     hand, _ = deny_table(seats=0)
+    throw_skip(hand)
+    assert not hand.deny_pending
+    assert any(card.is_skip for card in hand.discard)
+
+
+def test_there_is_no_pre_draw_skip_to_play():
+    """It stopped being legal the moment you drew, which left throwing the
+    Skip away for nothing as the only thing left to do with it."""
+    hand, _ = deny_table()
     try:
         hand.play_skip()
     except RuntimeError as err:
-        assert "nobody left to skip" in str(err)
+        assert "discard the Skip" in str(err)
     else:
-        raise AssertionError("a Skip with no opponents should have been refused")
+        raise AssertionError("the pre-draw Skip should have been refused")
+
+
+def test_going_out_on_a_skip_denies_nobody():
+    """There is no next turn left for anyone to miss."""
+    hand, _ = deny_table()
+    hand.hand = [SKIP]
+    hand.laid = True
+    hand.drew_this_turn = True
+    hand.discard_card(SKIP)
+    assert hand.state is HandState.WENT_OUT
+    assert not hand.deny_pending
 
 
 def test_a_deal_clears_a_pending_denial():

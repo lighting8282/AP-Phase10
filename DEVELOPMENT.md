@@ -839,13 +839,50 @@ difficulty number, so it can have the rule off the box for free.
 
 `skip_mode` is a `GameConfig` knob defaulting to `"dig"`, so a seed cannot
 reach the new behaviour by accident. The seat carries a `skipped` flag that
-`Table.end_of_turn` consumes where the turn would have happened, rather than
+`Table.play_seat` consumes where the turn would have happened, rather than
 where the Skip was played -- that way it costs exactly one turn however long it
 waits for that seat to come round. `next_actor` passes over a seat already
 denied, or a second Skip in the same cycle would cost nothing.
 
-Measured rather than asserted: a normal turn takes four cards off the stock
-(your draw plus three seats), and a Skip turn takes two.
+Measured rather than asserted: a denied round takes one seat's worth less off
+the stock than an ordinary one.
+
+**The Skip is the discard, and the thrower picks the target.** Both halves of
+that are the printed rule and neither was true at first, which cost a real
+player a real Skip for nothing.
+
+It was a pre-draw move: `play_skip` spent the Skip, denied whoever `next_actor`
+named, and ended the turn without a draw. That reads fine and plays badly. The
+move stopped being legal the instant you drew, so a player holding a Skip past
+their draw had exactly one thing left to do with it -- throw it away, fifteen
+points, no effect -- and the browser client walked them into it: the button went
+dark, and the card sat in a row of cards whose every other member was a discard.
+Reported from a real game as "a skip doesn't skip anyone, at all", which is
+precisely what it looked like.
+
+So discarding a Skip *is* playing it. `discard_card` sees the Skip, holds the
+turn open in `pending_deny`, and `deny_seat` names the victim and ends it.
+Holding the turn open rather than resolving immediately is what buys the choice,
+and the choice is the point: the seat worth denying is the one closest to going
+out, which is rarely the one whose turn comes next. Nothing else lands while a
+Skip is waiting to be aimed, or a player could draw their way out of answering.
+
+Two cases that have to stay ordinary rather than become refusals. Going out on a
+Skip denies nobody -- the round is over and there is no next turn to miss.
+With no eligible seat it is a plain discard, because refusing the throw would
+strand a player holding a card they cannot legally get rid of.
+
+The pre-draw path is gone in deny mode rather than kept as a second way in: two
+routes to one effect, one of which skips the target choice, is the kind of
+surface that drifts between the two ports. Dig mode is untouched, so no measured
+clear rate moves.
+
+**The opponents still cannot play one.** A seat holds a Skip as an ordinary card
+and discards it for nothing, because the AI has no notion of spending one --
+`skipped` is a flag done *to* a seat. So the rule is one-sided: you can deny
+them and they cannot deny you. Teaching the AI to throw Skips is a real feature
+with its own balance question (which seat does a seat deny?), and it would move
+free play's measured rates, so it is not smuggled in here.
 
 **There is no draw budget.** The budget is the solo model's replacement for the
 race to go out, and free play has the race — three seats at the table — so
