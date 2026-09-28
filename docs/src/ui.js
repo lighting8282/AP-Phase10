@@ -4,18 +4,18 @@
 // client, and holds no game state of its own. Anything it needed to remember
 // would be a second copy of something the session already owns.
 
-import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=f0519056";
+import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=8767b160";
 
 //: Faces used purely as icons in the stat panel.
 const SKIP_FACE = SKIP;
 const WILD_FACE = WILD;
-import { HAND_STATE } from "./engine.js?v=f0519056";
+import { HAND_STATE } from "./engine.js?v=8767b160";
 import {
   HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, milestoneLocationName,
   phaseLocationName, storeGate, storeLocationName,
-} from "./data.js?v=f0519056";
-import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=f0519056";
-import { Phase10Client } from "./client.js?v=f0519056";
+} from "./data.js?v=8767b160";
+import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=8767b160";
+import { Phase10Client } from "./client.js?v=8767b160";
 
 const el = (id) => document.getElementById(id);
 
@@ -478,13 +478,22 @@ function render() {
   const s = app.session;
   const hand = s.hand;
 
-  el("summary").textContent =
-    `Round ${s.game.roundNumber} - score ${s.totalScore} (lower is better) - ` +
-    `won ${s.handsWon} - cleared ${s.clearedPhases.size}/${app.phaseCap}` +
-    (s.scoreReduction ? ` - ${s.scoreReduction} reduced` : "");
+  const won = s.runOver ? s.runWinner : null;
+  el("summary").textContent = won
+    // A finished run is not a round count any more. The line that mattered
+    // while it ran is the wrong thing to keep reading once it is decided.
+    ? `${won.name === "You" ? "You won" : `${won.name} won`} - ${won.score} pts - `
+      + `${s.game.rounds.length} rounds - cleared ${s.clearedPhases.size}/${s.phaseCap}`
+    : `Round ${s.game.roundNumber} - score ${s.totalScore} (lower is better) - `
+      + `won ${s.handsWon} - cleared ${s.clearedPhases.size}/${app.phaseCap}`
+      + (s.scoreReduction ? ` - ${s.scoreReduction} reduced` : "");
 
   if (hand) {
     el("objective").textContent = `Phase ${hand.phase}: ${phaseDescription(hand.phase)}`;
+  } else if (won) {
+    el("objective").textContent = won.name === "You"
+      ? `You finished phase ${s.phaseCap} on the lowest score. Start a new run below.`
+      : `${won.name} finished phase ${s.phaseCap} first. Start a new run below.`;
   } else {
     el("objective").textContent = "No round in progress -- pick a phase below.";
   }
@@ -729,6 +738,9 @@ function promptFor(hand, live, drawn) {
     const who = activeSeat ? `${activeSeat.name} is playing` : "the table is playing";
     return missingTurn ? `* ${who} -- you are missing a turn *` : `* ${who} *`;
   }
+  // A finished run has no phase to pick, so inviting one is an instruction
+  // that cannot be followed.
+  if (app.session.runOver) return "* The run is over -- start a new one below *";
   if (!hand) return "* Pick a phase below to start a round *";
   if (!live) return "* The round is over *";
   if (hand.digPending) return "* Keep one of the dug cards *";
@@ -1099,7 +1111,7 @@ function renderPhases(session) {
     button.title = phaseDescription(phase);
     if (session.clearedPhases.has(phase)) button.classList.add("cleared");
     else if (unlocked.has(phase)) button.classList.add("open");
-    button.disabled = !unlocked.has(phase) || Boolean(session.hand);
+    button.disabled = !unlocked.has(phase) || Boolean(session.hand) || session.runOver;
     button.addEventListener("click", () => app.startHand(phase));
     box.append(button);
   }

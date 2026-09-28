@@ -9,14 +9,14 @@
 // before the restore lands would overwrite a real one with that empty rebuild.
 // Nothing is saved until restoreState is "done".
 
-import { Client } from "../node_modules/archipelago.js/dist/index.js?v=f0519056";
+import { Client } from "../node_modules/archipelago.js/dist/index.js?v=8767b160";
 
 import { GAME_NAME, MULLIGAN, PHASE_COUNT, WILD_CARD, phaseUnlock }
-  from "./data.js?v=f0519056";
-import { STOCK_SKIPS } from "./cards.js?v=f0519056";
-import { Phase10Game, roundToString } from "./game.js?v=f0519056";
-import { Phase10Session } from "./session.js?v=f0519056";
-import { describeMeldCards } from "./phases.js?v=f0519056";
+  from "./data.js?v=8767b160";
+import { STOCK_SKIPS } from "./cards.js?v=8767b160";
+import { Phase10Game, roundToString } from "./game.js?v=8767b160";
+import { Phase10Session } from "./session.js?v=8767b160";
+import { describeMeldCards } from "./phases.js?v=8767b160";
 
 /**
  * The deck a free-play run is dealt, with no Archipelago to hand items out.
@@ -51,6 +51,10 @@ const FREE_PLAY_SLOT = Object.freeze({
   // grants Skips as items: that is a judgement about what an item is worth,
   // and it was quietly deciding how the printed game deals.
   skips_in_deck: STOCK_SKIPS,
+  // The printed game ends when somebody completes the last phase, whoever it
+  // is. A seed has its own goal and is never ended by a seat: an opponent
+  // finishing is not an Archipelago notion.
+  race_to_end: true,
   checks_per_phase: 0,
   opponents: 3,
   death_link: false,
@@ -193,6 +197,16 @@ export class Phase10Client {
 
   /** Where a run stands, for the line printed when it opens. */
   #whereYouAre() {
+    // A finished run has no next phase to name, whoever finished it. Naming
+    // one anyway is how a run that somebody else had already won still looked
+    // like a run you were part way through.
+    if (this.session.runOver) {
+      const won = this.session.runWinner;
+      return won && won.name === "You"
+        ? `You won this run on ${won.score} points -- start a new one when you like.`
+        : `${won ? won.name : "Somebody"} finished phase ${this.phaseCap} and won `
+          + "this run -- start a new one when you like.";
+    }
     if (this.session.clearedPhases.size >= this.phaseCap) {
       return `All ${this.phaseCap} phases cleared -- start a new run when you like.`;
     }
@@ -200,6 +214,10 @@ export class Phase10Client {
   }
 
   #grantFreePlayItems() {
+    // After the restore, which is where the cap is recovered from. The
+    // session needs it to know how far the seats may climb and when the last
+    // phase has been finished; a seed leaves it at the full set.
+    this.session.phaseCap = this.phaseCap;
     const open = this.#openPhase();
     const items = [...FREE_PLAY_DECK];
     for (let phase = 1; phase <= open; phase += 1) items.push(phaseUnlock(phase));
@@ -356,6 +374,36 @@ export class Phase10Client {
    * the instant somebody goes out -- which is exactly when you want to look at
    * it. The log keeps.
    */
+  /**
+   * How the run ended, and the final standings.
+   *
+   * The seats were racing you the whole time and nothing ever said so: a seat
+   * that finished the last phase simply carried on to a phase that does not
+   * exist, and the run went on forever. Whoever finishes it ends it, and the
+   * lowest score among those who did takes it, which is how the box breaks it.
+   */
+  #announceRun() {
+    const s = this.session;
+    const won = s.runWinner;
+    if (!won) return;
+    this.onLog(won.name === "You"
+      ? `You finished phase ${s.phaseCap} and won the run.`
+      : `${won.name} finished phase ${s.phaseCap}. The run is over.`);
+
+    const standings = [{ name: "You", score: s.totalScore, done: s.playerFinished }];
+    s.opponentPhases.forEach((_, i) => {
+      standings.push({
+        name: s.seatName(i), score: s.opponentScores[i] ?? 0, done: s.seatFinished(i),
+      });
+    });
+    standings.sort((a, b) => a.score - b.score);
+    this.onLog("Final scores, lowest wins:");
+    for (const who of standings) {
+      this.onLog(`  ${who.name.padEnd(4)} ${String(who.score).padStart(4)} pts`
+        + `${who.done ? "  -- finished" : ""}`);
+    }
+  }
+
   #reportFinalTable() {
     const seats = this.session.seats;
     if (!seats.length) return;
@@ -383,6 +431,8 @@ export class Phase10Client {
       this.#grantFreePlayItems();
       const after = this.session.unlockedPhases.size;
       if (after > before) this.onLog(`Phase ${after} is open.`);
+      // Said once: no round can start after this, so settle cannot run again.
+      if (this.session.runOver) this.#announceRun();
     }
     await this.save();
 

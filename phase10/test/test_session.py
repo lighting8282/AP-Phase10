@@ -583,3 +583,61 @@ class TestStore(unittest.TestCase):
         fresh = session(store_slots=6)
         self.assertTrue(fresh.load_payload(payload))
         self.assertEqual(fresh.bought_slots, set())
+
+
+class TestRunEnds(unittest.TestCase):
+    """Mirrors the block of the same name in docs/test/client_test.mjs.
+
+    Reported from a real run: a seat finished phase 10 of a ten-phase run and
+    the game carried on. Two things were wrong. Seats climbed to PHASE_COUNT
+    rather than the run's cap, so one was on phase 16 of a ten-phase run; and
+    nothing ended a free-play run in either direction, ever.
+    """
+
+    def free(self) -> Phase10Session:
+        s = session(starting_draws=0, skip_mode="deny", checks_per_phase=0,
+                    skips_in_deck=4, race_to_end=True, opponents=3)
+        s.phase_cap = 10
+        return s
+
+    def test_a_seed_is_never_ended_by_a_seat(self) -> None:
+        """It has its own goal; an opponent finishing is not an AP notion."""
+        s = session()
+        self.assertFalse(s.race_to_end)
+        self.assertEqual(s.phase_cap, PHASE_COUNT)
+        s.opponent_phases[0] = 99
+        self.assertFalse(s.run_over)
+        self.assertIsNone(s.can_play(1))
+
+    def test_a_seat_past_the_cap_has_finished_and_ends_the_run(self) -> None:
+        s = self.free()
+        self.assertFalse(s.run_over)
+        s.opponent_phases[2] = 11
+        s._opponent_scores = [300, 200, 75]
+        self.assertTrue(s.seat_finished(2))
+        self.assertTrue(s.run_over)
+        self.assertEqual(s.run_winner, ("Cy", 75))
+        self.assertIn("run is over", s.can_play(1) or "")
+
+    def test_the_lowest_score_among_finishers_wins(self) -> None:
+        """More than one can finish in the round that ends it, and the box
+        breaks that tie on score."""
+        s = self.free()
+        # Two finishers: a seat, and a second seat that scored less.
+        s.opponent_phases[0] = 11
+        s.opponent_phases[1] = 11
+        s._opponent_scores = [120, 40, 0]
+        self.assertTrue(s.run_over)
+        self.assertEqual(s.run_winner, ("Bo", 40))
+        # Cy scored least of all but never finished, so it does not win.
+        self.assertFalse(s.seat_finished(2))
+
+    def test_seats_stop_one_past_the_cap(self) -> None:
+        """Not a phase anybody plays: it is where 'finished' is recorded."""
+        s = self.free()
+        s._opponent_phases = [10, 10, 10]
+        for seat in s.seats:
+            seat.laid_down = True
+        s.advance_opponents()
+        for phase in s.opponent_phases:
+            self.assertLessEqual(phase, s.phase_cap + 1)
