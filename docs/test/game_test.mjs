@@ -319,6 +319,39 @@ check(many.scorecard(10)[0].includes("4 earlier round(s)"), "scorecard elides ol
   check(!last.hand.denyPending, "and asks nobody to miss a turn");
 }
 
+// -- every card a seat was dealt is somewhere ---------------------------------
+// Reported from a real run: a seat went out with eight cards showing, having
+// been dealt ten, and the board could not be reconciled. It balanced -- the
+// rest were discarded -- but only because the seat had been shedding a card a
+// turn without drawing, which is not a turn the player can take. Both halves
+// are pinned here: the identity, and that a seat's turn is the player's.
+{
+  const cfg = gameConfig({ handSize: 10, maxDraws: 0, wildsInDeck: 8 });
+  const random = mulberry32(5);
+  const table = new Table();
+  table.seats = buildOpponents(3, [1, 2, 3], cfg, random, MID);
+  const hand = new PhaseHand(1, cfg, { random, table });
+
+  let turns = 0;
+  while (hand.state === HAND_STATE.IN_PROGRESS && turns < 60) {
+    hand.draw();
+    hand.discardCard(hand.hand[hand.hand.length - 1]);
+    turns += 1;
+  }
+
+  for (const seat of table.seats) {
+    eq(cfg.handSize + seat.drew, seat.placed + seat.hand.length + seat.threw,
+      `${seat.name}: dealt + drawn == placed + held + thrown`);
+  }
+  // A seat that never draws would show drew === 0 while still shedding, which
+  // is the shape of the bug rather than of a quiet round.
+  check(table.seats.every((s) => s.drew > 0), "every seat drew on its turns");
+  const down = table.seats.filter((s) => s.laidDown);
+  check(down.length > 0, "and at least one of them got its phase down");
+  check(down.every((s) => s.drew >= s.threw),
+    "a seat never throws more than it drew -- which the free shed did");
+}
+
 // -- paced opponents --------------------------------------------------------
 // The browser client shows the seats moving one at a time, three seconds
 // apart, so a paced hand queues their turns instead of playing them. What is

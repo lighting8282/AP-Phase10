@@ -31,7 +31,7 @@ while to find and would be easy to reintroduce.
   - [Two ID collisions, one caught and one nearly missed](#two-id-collisions-one-caught-and-one-nearly-missed)
   - [The pool could not absorb the locations](#the-pool-could-not-absorb-the-locations)
 - [Opponents](#opponents)
-  - [The two clocks do not layer](#the-two-clocks-do-not-layer)
+  - [The two clocks, and a conclusion that was an artifact](#the-two-clocks-and-a-conclusion-that-was-an-artifact)
   - [A latent bug the trim uncovered](#a-latent-bug-the-trim-uncovered)
   - [Hitting](#hitting)
   - [What the tiers are worth now](#what-the-tiers-are-worth-now)
@@ -436,26 +436,53 @@ Skill is two probabilities over one policy rather than three policies:
 greedy autoplayer exactly. Mid is 0.7/0.25, and costs the player 1 to 13 points
 of clear rate across the ten phases at eight draws.
 
-### The two clocks do not layer
+### The two clocks, and a conclusion that was an artifact
 
 The guess was that the draw budget would bind early and the opponents would
-take over once Extra Draw items piled up. The opposite happens, and it is
-structural rather than a tuning miss:
+take over once Extra Draw items piled up. The measurement said the opposite --
+that the race resolved near turn five, long before a large budget could matter,
+so the two clocks never layered.
+
+**That conclusion was an artifact of a bug in the seats, and it is withdrawn.**
+
+A seat that had laid down used to skip its draw and discard anyway, so its hand
+fell by one every turn for nothing. No other player can take that turn: your
+draw and your discard cancel out, and hitting is the only thing that shortens
+your hand. The seats were going out roughly twice as fast as the rules allow.
+It surfaced from a real game rather than from the suite -- a seat went out
+having laid eight of the ten cards it was dealt, and the board could not be
+reconciled.
+
+Re-measured with the seats taking the player's turn, 500 rounds a cell, no
+draw budget, MID skill, no player at the table (the same shape as before, so
+the columns are comparable):
 
 | fastest of N goes out at turn | 1 seat | 2 seats | 3 seats |
 |---|---|---|---|
-| opponents on phase 1 | 7.8 | 5.6 | **4.9** |
-| opponents on phase 7 | 14.6 | 9.0 | **8.0** |
+| opponents on phase 1 | 42.0 | 17.8 | **10.3** |
+| opponents on phase 7 | 26.5 | 13.6 | **10.8** |
 
-One seat needs about eight turns. Three seats race, and the round ends on the
-*fastest* of them -- a minimum-of-N effect that lands near turn five and barely
-moves with phase or skill. So the race resolves before a large budget can
-matter. Going from 4 draws to 8 buys real clear rate; from 8 to 14 buys nothing
-at all.
+Every cell ended -- 500 of 500, so nothing stalls once the free shed is gone.
 
-That made roughly eight of the twelve Extra Draw items dead, so the pool was
-trimmed to match what the measurements say is worth having: `extra_draw_items`
-now defaults to 5, ranging 5 to 8.
+Two things changed shape, not just magnitude:
+
+1. **The race now lands near turn ten, not turn five.** A draw budget of eight
+   is inside that, so the claim that the budget cannot matter no longer holds.
+   Whether 8 to 14 draws now buys anything is an open question, not a settled
+   one.
+2. **A small phase is now the slow one.** Phase 1 takes longer than phase 7 at
+   one seat, which reads backwards until you notice it is the same effect the
+   tier order already records: a small phase leaves more cards in hand and
+   fewer, smaller groups to hit onto, so going out is harder. The seats now hit
+   that wall exactly as the player does.
+
+**What this leaves stale.** `extra_draw_items` defaults to 5 because roughly
+eight of twelve Extra Draws were judged dead against the old race, and that
+judgement rested on the withdrawn conclusion. The tier percentages in the next
+section but one were also measured with three of the old seats. Neither was
+re-run here, and neither is trusted until it is. The *gates* are unaffected:
+`rules.py` stands on the solo difficulty tables, which were measured with no
+opponents at all.
 
 ### A latent bug the trim uncovered
 
@@ -505,6 +532,14 @@ At 4 wilds and 9 draws, with three opponents:
 | 6 | 35% | 24% | 7% | 20% |
 | 11 | 96% | 7% | 58% | 94% |
 | 20 | 32% | 23% | 6% | 18% |
+
+> **Measured against the old seats, and not re-run.** These three opponents
+> were the ones that skipped their draw once down, so they ended the round
+> about twice as early as they now do. Every number here is therefore a floor:
+> the player has roughly twice as many turns today, so the real rates are
+> higher, and Went Out -- which needs the most turns -- is the one most
+> understated. The tier *order* was chosen partly from this column, so it is
+> worth re-deriving before anything is tuned on it.
 
 ### The tier order is a tuning decision
 

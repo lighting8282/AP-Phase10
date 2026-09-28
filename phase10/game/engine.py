@@ -124,9 +124,20 @@ class Table:
         for seat in self.seats:
             seat.hand = self.deal(count)
             seat.layout = []
+            # Also the melds, which the JS port cleared here and this did not.
+            # Unreachable through a session, which builds fresh seats every
+            # round, but a reused seat kept last round's groups on the table
+            # for anybody to hit onto -- and the two ports disagreeing about
+            # that is exactly what the crosscheck exists to stop.
+            seat.melds = []
             seat.laid_down = False
             seat.went_out = False
             seat.skipped = False
+            # Per round, like everything else here: last round's tally would
+            # make this round's table impossible to reconcile.
+            seat.drew = 0
+            seat.threw = 0
+            seat.placed = 0
 
     @property
     def discard_top(self) -> Card | None:

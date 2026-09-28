@@ -21,10 +21,10 @@ import {
   isWild,
   numberCard,
   COLORS,
-} from "./cards.js?v=69b87009";
+} from "./cards.js?v=c6630edb";
 import {
   GROUP, PHASES, phaseCardCount, solveLayOptions, solveMelds, solvePhase,
-} from "./phases.js?v=69b87009";
+} from "./phases.js?v=c6630edb";
 
 /** How deep into the stock a played Skip lets you look. */
 export const SKIP_DIG_DEPTH = 3;
@@ -162,6 +162,11 @@ export class Table {
       seat.laidDown = false;
       seat.wentOut = false;
       seat.skipped = false;
+      // Per round, like everything else here: last round's tally would make
+      // this round's table impossible to reconcile.
+      seat.drew = 0;
+      seat.threw = 0;
+      seat.placed = 0;
     }
   }
 
