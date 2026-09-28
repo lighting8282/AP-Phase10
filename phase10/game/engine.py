@@ -155,6 +155,32 @@ class Table:
             melds.extend(seat.melds)
         return melds
 
+    def play_seat(self, seat) -> object | None:
+        """Play one seat's turn. Returns the winner once there is one.
+
+        Split out of end_of_turn to match the JS port, where a driver that
+        shows the turns happening one at a time takes them one at a time.
+        Everything a turn means lives here rather than in the loop below --
+        including consuming a Skip -- because a seat played through here has to
+        be played exactly as it is played there.
+
+        The browser's paced walk itself is not ported: it is presentation for a
+        driver the Kivy client does not have, and it changes no rule. This
+        method is, so that the two ports keep a turn in the same place.
+        """
+        if self.winner is not None:
+            return self.winner
+        if seat.skipped:
+            # Consumed where the turn would have happened rather than where
+            # the Skip was played, so it costs exactly one turn however long
+            # it waits for that seat to come round.
+            seat.skipped = False
+            self.say(seat.name, "misses a turn")
+            return self.winner
+        if seat.take_turn(self):
+            self.winner = seat
+        return self.winner
+
     def end_of_turn(self) -> object | None:
         """Run every opponent's turn. Returns the seat that went out, if any.
 
@@ -165,16 +191,8 @@ class Table:
         if self.winner is not None:
             return self.winner
         for seat in self.seats:
-            if seat.skipped:
-                # Consumed where the turn would have happened rather than
-                # where the Skip was played, so it costs exactly one turn
-                # however long it waits for that seat to come round.
-                seat.skipped = False
-                self.say(seat.name, "misses a turn")
-                continue
-            if seat.take_turn(self):
-                self.winner = seat
-                return seat
+            if self.play_seat(seat) is not None:
+                return self.winner
         return None
 
 

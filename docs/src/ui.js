@@ -4,18 +4,18 @@
 // client, and holds no game state of its own. Anything it needed to remember
 // would be a second copy of something the session already owns.
 
-import { SKIP, WILD, cardFilename, isWild, points } from "./cards.js?v=1785951c";
+import { SKIP, WILD, cardFilename, isWild, points } from "./cards.js?v=a5faf97b";
 
 //: Faces used purely as icons in the stat panel.
 const SKIP_FACE = SKIP;
 const WILD_FACE = WILD;
-import { HAND_STATE } from "./engine.js?v=1785951c";
+import { HAND_STATE } from "./engine.js?v=a5faf97b";
 import {
   HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, milestoneLocationName,
   phaseLocationName, storeGate, storeLocationName,
-} from "./data.js?v=1785951c";
-import { PHASE_COUNT, phaseDescription } from "./phases.js?v=1785951c";
-import { Phase10Client } from "./client.js?v=1785951c";
+} from "./data.js?v=a5faf97b";
+import { PHASE_COUNT, phaseDescription } from "./phases.js?v=a5faf97b";
+import { Phase10Client } from "./client.js?v=a5faf97b";
 
 const el = (id) => document.getElementById(id);
 
@@ -23,7 +23,27 @@ const app = new Phase10Client({
   onUpdate: () => render(),
   onLog: (line) => log(line),
   onMessage: (text, nodes) => logMessage(text, nodes),
+  //: The opponents move one at a time here, slowly enough to be watched.
+  paced: true,
 });
+
+/**
+ * How long one seat's turn is left on screen.
+ *
+ * The three seats used to play the instant you discarded: the table simply
+ * arrived in a new state, and the log explained it all at once afterwards. A
+ * pause per seat is what makes those readable, and it is the only reason this
+ * exists -- the engine plays the turn in no time.
+ */
+const OPPONENT_TURN_MS = 3000;
+
+//: Walking the opponents' turns. The table is mid-move while this is set, so
+//: everything the player could touch is held shut until it clears.
+let pacing = false;
+//: The seat whose turn is being shown, so the table can say whose it is.
+let activeSeat = null;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 //: Rooms can be chatty and this feed never scrolls away on its own.
 const MAX_LOG_LINES = 300;
@@ -31,6 +51,10 @@ const MAX_LOG_LINES = 300;
 function appendLine(node) {
   const box = el("log");
   const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  // Only the newest line is marked: with the feed scrolled up, "what just
+  // happened" is otherwise indistinguishable from what happened ten turns ago.
+  for (const stale of box.querySelectorAll(".line.latest")) stale.classList.remove("latest");
+  node.classList.add("latest");
   box.append(node);
   while (box.childElementCount > MAX_LOG_LINES) box.firstElementChild.remove();
   // Only follow the feed if the reader was already at the bottom; yanking the
@@ -214,7 +238,7 @@ async function settle(hand) {
  */
 function hitMeld(meld) {
   const hand = app.session.hand;
-  if (!hand || hand.state !== HAND_STATE.IN_PROGRESS) return;
+  if (pacing || !hand || hand.state !== HAND_STATE.IN_PROGRESS) return;
   if (!hand.laid) {
     log("Lay your own phase down before hitting.");
     return;
@@ -234,8 +258,7 @@ function hitMeld(meld) {
   }
   log(`You play ${describe(playable[0])} onto the table.`);
   reportTable();
-  if (hand.state !== HAND_STATE.IN_PROGRESS) settle(hand);
-  render();
+  afterPlayerAction(hand);
 }
 
 /**
@@ -249,7 +272,58 @@ function reportTable() {
   for (const [who, what] of table.drainLog()) log(`${who} ${what}`);
 }
 
+/**
+ * Walk the opponents' turns, one seat at a time.
+ *
+ * The engine has not moved them yet -- a paced hand queues them and hands them
+ * over here. Each pass names the seat, waits, plays it and then drains what it
+ * said, so a player who looks away for a second can read back what happened
+ * rather than guessing from a table that changed all at once.
+ *
+ * The log is drained per seat rather than once at the end, which is the whole
+ * point: the lines have to arrive beside the pause they belong to.
+ */
+async function runOpponentTurns(hand) {
+  if (pacing) return;
+  pacing = true;
+  try {
+    while (hand.turnPending) {
+      // Whose turn it is, before anything of theirs moves.
+      [activeSeat] = hand.pendingSeats;
+      render();
+      await sleep(OPPONENT_TURN_MS);
+      const seat = hand.stepOpponent();
+      if (seat === null) break;
+      activeSeat = seat;
+      reportTable();
+      render();
+    }
+  } finally {
+    pacing = false;
+    activeSeat = null;
+  }
+  render();
+  if (hand.state !== HAND_STATE.IN_PROGRESS) await settle(hand);
+}
+
+/**
+ * Hand the turn over: let the table play if it is owed a turn, otherwise
+ * settle a round that has just ended.
+ */
+function afterPlayerAction(hand) {
+  render();
+  if (hand.turnPending) {
+    runOpponentTurns(hand);
+    return;
+  }
+  if (hand.state !== HAND_STATE.IN_PROGRESS) settle(hand);
+}
+
 function withHand(fn) {
+  // Mid-pause the table is part-way through its turn, so a click now would
+  // play out of order. The controls are disabled as well; this is the guard for
+  // anything that reaches here another way.
+  if (pacing) return;
   const hand = app.session.hand;
   if (!hand || hand.state !== HAND_STATE.IN_PROGRESS) {
     log("No hand in progress -- pick a phase first.");
@@ -263,11 +337,11 @@ function withHand(fn) {
     return;
   }
   reportTable();
-  if (hand.state !== HAND_STATE.IN_PROGRESS) settle(hand);
-  render();
+  afterPlayerAction(hand);
 }
 
 function mulligan() {
+  if (pacing) return;
   const refusal = app.session.canMulligan();
   if (refusal) {
     log(refusal);
@@ -355,6 +429,10 @@ function render() {
   }
   renderStats(s, hand);
 
+  // Your turn is marked the same way theirs is, on the same badge, so "whose
+  // turn is it" is one question with one answer rather than two halves.
+  const yourTurn = Boolean(hand) && hand.state === HAND_STATE.IN_PROGRESS && !pacing;
+  document.querySelector(".you.seat").classList.toggle("turn", yourTurn);
   el("you-phase").textContent = hand ? `phase ${hand.phase}` : "";
   // Your own total in the same place as theirs: a scoreboard split across two
   // parts of the page is one you have to assemble before you can read it.
@@ -376,7 +454,7 @@ function render() {
   renderChecks(s);
 
   for (const button of document.querySelectorAll("#actions button")) {
-    button.disabled = !hand || hand.state !== HAND_STATE.IN_PROGRESS;
+    button.disabled = pacing || !hand || hand.state !== HAND_STATE.IN_PROGRESS;
   }
   // Narrower than the rest: a Mulligan needs a copy in hand and an untouched
   // deal, so it stays disabled even mid-hand.
@@ -390,7 +468,7 @@ function render() {
     : "Look at the top three of the stock and keep one";
 
   const mull = el("mulligan-button");
-  mull.disabled = s.canMulligan() !== null;
+  mull.disabled = pacing || s.canMulligan() !== null;
   mull.textContent = s.mulligansLeft ? `Mulligan (${s.mulligansLeft})` : "Mulligan";
   // The scorecard reports what each round actually cost; reductions get their
   // own line rather than being folded in, so the history stays honest.
@@ -404,7 +482,7 @@ function render() {
 /** One group on the table. A button when you could play onto it. */
 function meldNode(meld) {
   const hand = app.session.hand;
-  const live = Boolean(hand) && hand.state === HAND_STATE.IN_PROGRESS
+  const live = Boolean(hand) && hand.state === HAND_STATE.IN_PROGRESS && !pacing
     && hand.laid && hand.hand.some((c) => meld.accepts(c));
 
   const node = document.createElement(live ? "button" : "div");
@@ -433,6 +511,9 @@ function renderTable(session) {
     div.className = "seat";
     if (seat.wentOut) div.classList.add("out");
     else if (seat.laidDown) div.classList.add("laid");
+    // Whose turn it is, said where the turn is happening rather than only in
+    // the log: the log is on the other side of the page.
+    if (seat === activeSeat) div.classList.add("turn");
 
     const who = document.createElement("div");
     who.className = "who";
@@ -459,7 +540,8 @@ function renderTable(session) {
 
     const what = document.createElement("div");
     what.className = "what";
-    if (seat.wentOut) what.textContent = "went out";
+    if (seat === activeSeat && !seat.wentOut) what.textContent = "playing...";
+    else if (seat.wentOut) what.textContent = "went out";
     else if (seat.laidDown) what.textContent = `down - ${seat.hand.length} left to shed`;
     else what.textContent = `building - ${seat.hand.length} cards`;
 
@@ -511,7 +593,7 @@ function renderMiddle(hand) {
   const stock = el("stock-pile");
   const discard = el("discard-pile");
   const face = el("discard-face");
-  const live = Boolean(hand) && hand.state === HAND_STATE.IN_PROGRESS;
+  const live = Boolean(hand) && hand.state === HAND_STATE.IN_PROGRESS && !pacing;
   const drawn = live && hand.drewThisTurn;
 
   el("stock-count").textContent = hand ? String(hand.stock.length) : "";
@@ -528,6 +610,8 @@ function renderMiddle(hand) {
 }
 
 function promptFor(hand, live, drawn) {
+  // Said first: while the table is moving, nothing else on this line is true.
+  if (pacing) return `* ${activeSeat ? `${activeSeat.name} is playing` : "the table is playing"} *`;
   if (!hand) return "* Pick a phase below to start a round *";
   if (!live) return "* The round is over *";
   if (hand.digPending) return "* Keep one of the dug cards *";

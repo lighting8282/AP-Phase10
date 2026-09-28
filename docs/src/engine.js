@@ -21,10 +21,10 @@ import {
   isWild,
   numberCard,
   COLORS,
-} from "./cards.js?v=1785951c";
+} from "./cards.js?v=a5faf97b";
 import {
   GROUP, PHASES, phaseCardCount, solveLayOptions, solveMelds, solvePhase,
-} from "./phases.js?v=1785951c";
+} from "./phases.js?v=a5faf97b";
 
 /** How deep into the stock a played Skip lets you look. */
 export const SKIP_DIG_DEPTH = 3;
@@ -195,21 +195,33 @@ export class Table {
     return melds;
   }
 
+  /**
+   * Play one seat's turn. Returns the winner once there is one.
+   *
+   * Split out of endOfTurn so a driver that wants to show the turns happening
+   * one at a time can take them one at a time. Everything a turn means lives
+   * here rather than in the loop below -- including consuming a Skip -- because
+   * a seat played through here has to be played exactly as it is played there.
+   * Pacing is presentation; it may not change what a turn does.
+   */
+  playSeat(seat) {
+    if (this.winner !== null) return this.winner;
+    if (seat.skipped) {
+      // Consumed where the turn would have happened rather than where the
+      // Skip was played, so it costs exactly one turn however long it waits.
+      seat.skipped = false;
+      this.say(seat.name, "misses a turn");
+      return this.winner;
+    }
+    if (seat.takeTurn(this)) this.winner = seat;
+    return this.winner;
+  }
+
   /** Run every opponent's turn. Returns the seat that went out, if any. */
   endOfTurn() {
     if (this.winner !== null) return this.winner;
     for (const seat of this.seats) {
-      if (seat.skipped) {
-        // Consumed where the turn would have happened rather than where the
-        // Skip was played, so it costs exactly one turn however long it waits.
-        seat.skipped = false;
-        this.say(seat.name, "misses a turn");
-        continue;
-      }
-      if (seat.takeTurn(this)) {
-        this.winner = seat;
-        return seat;
-      }
+      if (this.playSeat(seat) !== null) return this.winner;
     }
     return null;
   }
@@ -224,6 +236,9 @@ export class PhaseHand {
    *                                 Used by the differential tests so both
    *                                 engines can be replayed over one deal.
    * @param {Array}    [opts.spec]   Override the phase spec.
+   * @param {boolean}  [opts.paced]  Hand the opponents' turns to the driver
+   *                                 instead of playing them all the instant
+   *                                 the player's turn ends. See stepOpponent.
    */
   constructor(phase, config, opts = {}) {
     this.phase = phase;
@@ -236,6 +251,11 @@ export class PhaseHand {
     this._random = opts.random ?? Math.random;
     //: Shared with the opponents when there are any; private otherwise.
     this.table = opts.table ?? new Table();
+    //: Opt-in: the browser client shows each seat move and so needs to hold
+    //: them, while every headless driver wants the turn resolved on the spot.
+    this.paced = Boolean(opts.paced);
+    //: Seats owed a turn, oldest first. Only ever non-empty when paced.
+    this.pendingSeats = [];
     this._deal(opts.deck);
 
     this.drawsUsed = 0;
@@ -296,6 +316,9 @@ export class PhaseHand {
     }
     if (this.digPending) throw new Error("finish the dig first");
     if (this.skipsPlayed) throw new Error("a Mulligan only works before you play a Skip");
+    // A Mulligan redeals the whole table, so any turn still owed is owed by a
+    // seat that no longer holds the hand it was owed on.
+    this.pendingSeats = [];
     this._deal();
     this._emit("redeal", { hand: this.hand.length });
   }
@@ -481,17 +504,59 @@ export class PhaseHand {
   _endTurn() {
     this._failIfOutOfRoad();
     if (this.state !== HAND_STATE.IN_PROGRESS) return;
-    const winner = this.table.endOfTurn();
-    if (winner !== null) {
-      if (this.laid) {
-        // The phase is down, so it is cleared. Somebody else going out only
-        // stops the shedding; it cannot take the clear back.
-        this.state = HAND_STATE.PHASE_LAID;
-        this._emit("raced_after_laying", { opponent: winner.name, held: this.hand.length });
-      } else {
-        this.markFailed("opponent_out", { opponent: winner.name });
-      }
+    if (this.paced) {
+      // Queued, not played: the driver walks them with stepOpponent so the
+      // player can watch. Nothing is owed once somebody has already gone out.
+      this.pendingSeats = this.table.winner === null ? [...this.table.seats] : [];
+      return;
     }
+    this._settleTableTurn(this.table.endOfTurn());
+  }
+
+  /** Apply what the table's turn did to the hand. */
+  _settleTableTurn(winner) {
+    if (winner === null) return;
+    if (this.laid) {
+      // The phase is down, so it is cleared. Somebody else going out only
+      // stops the shedding; it cannot take the clear back.
+      this.state = HAND_STATE.PHASE_LAID;
+      this._emit("raced_after_laying", { opponent: winner.name, held: this.hand.length });
+    } else {
+      this.markFailed("opponent_out", { opponent: winner.name });
+    }
+  }
+
+  /** Whether any seat is still owed a turn from the player's last one. */
+  get turnPending() {
+    return this.pendingSeats.length > 0;
+  }
+
+  /**
+   * Play the next seat that is owed a turn. Returns the seat, or null.
+   *
+   * Paced mode only -- the seats play themselves otherwise. A seat that goes
+   * out ends the round here exactly as it would have inside _endTurn, and the
+   * seats behind it in the queue never move, which is the same thing endOfTurn
+   * does when it returns early.
+   */
+  stepOpponent() {
+    if (this.state !== HAND_STATE.IN_PROGRESS) {
+      this.pendingSeats = [];
+      return null;
+    }
+    const seat = this.pendingSeats.shift();
+    if (seat === undefined) return null;
+    const winner = this.table.playSeat(seat);
+    if (winner !== null) {
+      this.pendingSeats = [];
+      this._settleTableTurn(winner);
+    }
+    return seat;
+  }
+
+  /** Play out every turn still owed, without pausing. */
+  finishOpponentTurns() {
+    while (this.turnPending) this.stepOpponent();
   }
 
   /**

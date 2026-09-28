@@ -274,5 +274,110 @@ check(many.scorecard(10)[0].includes("4 earlier round(s)"), "scorecard elides ol
   check(refused, "a Skip with nobody to skip is refused");
 }
 
+// -- paced opponents --------------------------------------------------------
+// The browser client shows the seats moving one at a time, three seconds
+// apart, so a paced hand queues their turns instead of playing them. What is
+// tested here is that pacing is presentation only: the same deal, the same
+// rolls and the same player moves have to reach the same table either way,
+// because the seats decide what to do from the state they find.
+{
+  const cfg = gameConfig({ handSize: 10, maxDraws: 20 });
+
+  /** One hand with three seats, dealt off a fixed seed. */
+  const deal = (paced) => {
+    const random = mulberry32(11);
+    const table = new Table();
+    table.seats = buildOpponents(3, [1, 2, 3], cfg, random, MID);
+    return new PhaseHand(1, cfg, { random, table, paced });
+  };
+
+  /** Everything the player can see of the table, as text. */
+  const snapshot = (hand) => JSON.stringify({
+    state: hand.state,
+    hand: hand.hand.length,
+    stock: hand.stock.length,
+    discard: hand.discard.length,
+    seats: hand.table.seats.map((s) => ({
+      hand: s.hand.length, laid: s.laidDown, out: s.wentOut, score: s.score,
+    })),
+  });
+
+  /** Five turns of the dullest possible play: draw, throw what was drawn. */
+  const playFive = (hand, afterTurn = () => {}) => {
+    for (let i = 0; i < 5 && hand.state === HAND_STATE.IN_PROGRESS; i += 1) {
+      hand.draw();
+      hand.discardCard(hand.hand[hand.hand.length - 1]);
+      afterTurn(hand);
+    }
+  };
+
+  const straight = deal(false);
+  const straightLog = [];
+  playFive(straight, (h) => straightLog.push(...h.table.drainLog()));
+
+  const walkedLog = [];
+  const walked = deal(true);
+  playFive(walked, (hand) => {
+    // One seat at a time, the way the UI steps them.
+    check(hand.turnPending || hand.state !== HAND_STATE.IN_PROGRESS,
+      "a paced turn leaves the seats waiting");
+    while (hand.turnPending) {
+      const seat = hand.stepOpponent();
+      if (seat === null) break;
+      // Drained per seat, which is what lets the UI print a seat's lines
+      // beside the pause they belong to.
+      walkedLog.push(...hand.table.drainLog());
+    }
+  });
+
+  eq(snapshot(walked), snapshot(straight), "pacing the seats changes no state");
+  check(!walked.turnPending, "and leaves nothing owed once walked");
+  // The narration is what the pauses are for; an empty feed would make the
+  // wait pure delay. Draining it per seat has to yield what draining it once
+  // at the end of the turn did, or the two clients tell different stories.
+  eq(walkedLog, straightLog, "and says exactly what the unpaced table said");
+  check(walkedLog.length > 0, "every stepped seat reports what it did");
+  check(walkedLog.every(([who]) => ["Ada", "Bo", "Cy"].includes(who)),
+    "each line names a seat");
+
+  // A seat already out is not narrated again every turn.
+  const quiet = deal(true);
+  quiet.table.seats[0].wentOut = true;
+  quiet.draw();
+  quiet.discardCard(quiet.hand[quiet.hand.length - 1]);
+  const first = quiet.stepOpponent();
+  eq(quiet.table.drainLog(), [], "a seat that is already out says nothing");
+  check(first === quiet.table.seats[0], "but it is still the seat that was stepped");
+
+  // The regression this split could most easily cause. Consuming a Skip lives
+  // in playSeat rather than in the endOfTurn loop precisely so the paced walk
+  // cannot lose it -- a denied seat that quietly took its turn anyway is the
+  // bug that is invisible on screen and changes who wins the round.
+  const denied = deal(true);
+  denied.table.seats[0].skipped = true;
+  const heldBefore = denied.table.seats[0].hand.length;
+  denied.draw();
+  denied.discardCard(denied.hand[denied.hand.length - 1]);
+  const skippedSeat = denied.stepOpponent();
+  eq(denied.table.drainLog(), [["Ada", "misses a turn"]],
+    "a denied seat misses its turn in the paced walk too");
+  check(skippedSeat.skipped === false, "and the Skip is spent, not left armed");
+  eq(skippedSeat.hand.length, heldBefore, "and the seat did not play");
+
+  // finishOpponentTurns is the way out when pacing is interrupted.
+  const rushed = deal(true);
+  rushed.draw();
+  rushed.discardCard(rushed.hand[rushed.hand.length - 1]);
+  check(rushed.turnPending, "turns are owed before the rush");
+  rushed.finishOpponentTurns();
+  check(!rushed.turnPending, "and none after it");
+
+  // A Mulligan redeals the table, so a turn owed by the old deal is dropped.
+  const mulled = deal(true);
+  mulled.pendingSeats = [...mulled.table.seats];
+  mulled.redeal();
+  check(!mulled.turnPending, "a Mulligan drops any turn still owed");
+}
+
 console.log(`\n${passed} passed, ${failures.length} failed`);
 process.exit(failures.length ? 1 : 0);
