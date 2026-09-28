@@ -4,18 +4,18 @@
 // client, and holds no game state of its own. Anything it needed to remember
 // would be a second copy of something the session already owns.
 
-import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=91ad3551";
+import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=69b87009";
 
 //: Faces used purely as icons in the stat panel.
 const SKIP_FACE = SKIP;
 const WILD_FACE = WILD;
-import { HAND_STATE } from "./engine.js?v=91ad3551";
+import { HAND_STATE } from "./engine.js?v=69b87009";
 import {
   HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, milestoneLocationName,
   phaseLocationName, storeGate, storeLocationName,
-} from "./data.js?v=91ad3551";
-import { PHASE_COUNT, phaseDescription } from "./phases.js?v=91ad3551";
-import { Phase10Client } from "./client.js?v=91ad3551";
+} from "./data.js?v=69b87009";
+import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=69b87009";
+import { Phase10Client } from "./client.js?v=69b87009";
 
 const el = (id) => document.getElementById(id);
 
@@ -536,9 +536,20 @@ function meldNode(meld) {
   const node = document.createElement(live ? "button" : "div");
   node.className = live ? "meld live" : "meld";
   if (live) {
-    node.title = "Play a card onto this group";
+    node.title = `Play a card onto this ${meldName(meld)}`;
     node.addEventListener("click", () => hitMeld(meld));
   }
+
+  // What the group is, over the cards in it. Two groups of three at this size
+  // are six cards in a row: the outline alone never said where one ended, and
+  // "set of 11s" is the half you need to know whether your spare 11 fits.
+  const name = document.createElement("span");
+  name.className = "meld-name";
+  name.textContent = meldName(meld);
+  node.append(name);
+
+  const row = document.createElement("span");
+  row.className = "meld-cards";
   for (const card of meld.cards) {
     const img = document.createElement("img");
     img.src = `assets/cards/${cardFilename(card)}`;
@@ -547,8 +558,9 @@ function meldNode(meld) {
     // is otherwise a group that looks the same, and "did that seat add on or
     // just discard?" was a question the log alone had to answer.
     if (justHit.has(card)) img.classList.add("hit");
-    node.append(img);
+    row.append(img);
   }
+  node.append(row);
   return node;
 }
 

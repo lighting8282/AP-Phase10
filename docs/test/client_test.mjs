@@ -116,6 +116,66 @@ const packet = { cmd: "PrintJSON", data: [{ text: "one line, one packet" }] };
   check("a round was recorded", app.session.game.rounds.length, 1);
 }
 
+// -- what a reloaded run says about itself -----------------------------------
+// Reported from a real run: three phases cleared, reload, and the line said
+// "Phase 1 is open". The unlocks were right and the phase buttons were right;
+// only the sentence was wrong, which is the kind of thing nothing notices.
+{
+  // A localStorage that lives for this block, so a reload can be simulated.
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  try {
+    const logs = [];
+    const app = new Phase10Client({ onLog: (l) => logs.push(l) });
+    app.client.login = () => { throw new Error("free play must not log in"); };
+
+    await app.startFreePlay({ fresh: true, phases: 10 });
+    check("a fresh run starts at phase 1",
+      logs.some((l) => l.includes("Phase 1 is open")), true);
+
+    for (let phase = 1; phase <= 3; phase += 1) {
+      const hand = app.startHand(phase);
+      hand.state = "went_out";
+      await app.settle(hand);
+    }
+
+    // The reload: a new client over the same storage.
+    const back = [];
+    const reloaded = new Phase10Client({ onLog: (l) => back.push(l) });
+    reloaded.client.login = () => { throw new Error("free play must not log in"); };
+    await reloaded.startFreePlay({});
+
+    check("a reload restores the rounds", reloaded.session.game.rounds.length, 3);
+    check("and says which phase is actually open",
+      back.some((l) => l.includes("Phase 4 is open")), true);
+    check("not the one it started on",
+      back.some((l) => l.includes("Phase 1 is open")), false);
+    // The sentence and the unlocks are the same number, which is the point of
+    // deciding it once.
+    check("and the unlocks agree with it",
+      Math.max(...reloaded.session.unlockedPhases), 4);
+
+    // A finished run has no next phase to name.
+    for (let phase = 4; phase <= 10; phase += 1) {
+      const hand = reloaded.startHand(phase);
+      hand.state = "went_out";
+      await reloaded.settle(hand);
+    }
+    const done = [];
+    const after = new Phase10Client({ onLog: (l) => done.push(l) });
+    after.client.login = () => { throw new Error("free play must not log in"); };
+    await after.startFreePlay({});
+    check("a finished run says so rather than naming an eleventh phase",
+      done.some((l) => l.includes("All 10 phases cleared")), true);
+  } finally {
+    delete globalThis.localStorage;
+  }
+}
+
 // -- ten phases or twenty ----------------------------------------------------
 // Free play only. An Archipelago seed is always the full set, because its
 // locations exist for every phase.
