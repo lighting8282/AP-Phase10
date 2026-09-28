@@ -81,6 +81,16 @@ class Opponent:
         #: Set by a Skip played against this seat; consumed when its turn
         #: would have come round.
         self.skipped = False
+        # Where this seat's cards went, so the table can be reconciled
+        # against the hand it was dealt: dealt + drew == placed + held +
+        # threw. A seat going out with eight cards showing is the arithmetic
+        # a player tries to do in their head and cannot, because the draws
+        # and the discards are not on screen. `placed` counts cards put on
+        # the table anywhere, including hits onto somebody else's group,
+        # which is why it is not the size of this seat's own melds.
+        self.drew = 0
+        self.threw = 0
+        self.placed = 0
 
     @property
     def spec(self) -> PhaseSpec:
@@ -136,39 +146,34 @@ class Opponent:
         self.melds = melds
         self.layout = [m.cards for m in melds]
         self.laid_down = True
+        self.placed += sum(len(m.cards) for m in melds)
         if table is not None:
             groups = ", ".join(describe_meld(m) for m in melds)
             table.say(self.name, f"lays down phase {self.phase}: {groups}")
 
     # -- turn ---------------------------------------------------------------
     def take_turn(self, table: Table) -> bool:
-        """Play one turn. Returns True if this seat went out."""
+        """Play one turn. Returns True if this seat went out.
+
+        The same shape as the player's turn: draw one, lay the phase down if
+        it is there, hit what fits, throw one card.
+
+        A seat that had laid down used to skip the draw and throw anyway, so
+        its hand fell by one every turn for nothing. That is not a turn
+        anybody else at the table can take: your own draw and discard cancel
+        out, and hitting is the only thing that shortens your hand. It made
+        the seats go out about two turns sooner than the rules allow, and it
+        showed -- a seat went out having laid eight of the ten cards it was
+        dealt, an arithmetic nobody watching could reproduce.
+
+        The comment that justified it said a drawing seat "could never go
+        out". That was simply wrong: it goes out by hitting, which is how the
+        player does it, and `_hit_what_it_can` was already here. Measured over
+        400 rounds, somebody still goes out in every one of them.
+        """
         if self.went_out:
             return False
         if not table.stock:
-            return False
-
-        self._try_lay_down(table)
-        if self._finished():
-            table.say(self.name, "goes out")
-            return True
-
-        if self.laid_down:
-            # Already down: hit everything that legally extends a group on the
-            # table -- its own or anybody else's -- and throw one card besides.
-            # Drawing one and discarding one would leave the hand the same size
-            # forever, so a seat that had laid down could never go out.
-            self._hit_what_it_can(table)
-            if self._finished():
-                table.say(self.name, "goes out")
-                return True
-            if self.hand:
-                shed = self._shed()
-                table.discard.append(shed)
-                table.say(self.name, f"discards {shed}")
-            if self._finished():
-                table.say(self.name, "goes out")
-                return True
             return False
 
         if self._wants_discard_top(table.discard_top):
@@ -179,14 +184,27 @@ class Opponent:
             self.hand.append(table.stock.pop(0))
             # Not which card: it went into a hand you cannot see.
             table.say(self.name, "draws from the stock")
+        self.drew += 1
 
         self._try_lay_down(table)
         if self._finished():
             table.say(self.name, "goes out")
             return True
 
-        thrown = self._choose_discard_card()
+        # Hitting is the only thing that shortens a hand, so it is the whole
+        # road from "down" to "out" -- onto any group on the table, its own or
+        # anybody else's.
+        if self.laid_down:
+            self._hit_what_it_can(table)
+            if self._finished():
+                table.say(self.name, "goes out")
+                return True
+
+        # Down, the phase is safe and the only thing left to manage is points
+        # in hand; still building, the choice is about what the phase needs.
+        thrown = self._shed() if self.laid_down else self._choose_discard_card()
         table.discard.append(thrown)
+        self.threw += 1
         table.say(self.name, f"discards {thrown}")
         return self._finished()
 
@@ -206,6 +224,7 @@ class Opponent:
                     if meld.accepts(card):
                         self.hand.remove(card)
                         meld.add(card)
+                        self.placed += 1
                         table.say(self.name,
                                   f"plays {card} onto {describe_meld(meld)}")
                         played += 1

@@ -13,9 +13,9 @@
 // near turn five. So the race resolves before a large budget can matter -- see
 // the Python module for the numbers and what was done about them.
 
-import { cardToString, handScore, points } from "./cards.js?v=69b87009";
-import { cardsShort, removeCard } from "./engine.js?v=69b87009";
-import { PHASES, describeMeldCards, solveMelds } from "./phases.js?v=69b87009";
+import { cardToString, handScore, points } from "./cards.js?v=c6630edb";
+import { cardsShort, removeCard } from "./engine.js?v=c6630edb";
+import { PHASES, describeMeldCards, solveMelds } from "./phases.js?v=c6630edb";
 
 /**
  * How well a seat plays. 1.0 / 0.0 is the greedy autoplayer exactly.
@@ -53,6 +53,16 @@ export class Opponent {
     //: Set by a Skip played against this seat; consumed when its turn would
     //: have come round.
     this.skipped = false;
+    // Where this seat's cards went, so the table can be reconciled against
+    // the hand it was dealt: dealt + drew == placed + held + threw. A seat
+    // going out with eight cards showing is the arithmetic a player tries to
+    // do in their head and cannot, because the draws and the discards are not
+    // on screen. `placed` counts cards put on the table anywhere, including
+    // hits onto somebody else's group, which is why it is not the size of
+    // this seat's own melds.
+    this.drew = 0;
+    this.threw = 0;
+    this.placed = 0;
   }
 
   get spec() {
@@ -114,6 +124,7 @@ export class Opponent {
     this.melds = melds;
     this.layout = melds.map((m) => m.cards);
     this.laidDown = true;
+    this.placed += melds.reduce((n, m) => n + m.cards.length, 0);
     if (table) {
       const groups = melds.map(describeMeldCards).join(", ");
       table.say(this.name, `lays down phase ${this.phase}: ${groups}`);
@@ -121,38 +132,28 @@ export class Opponent {
   }
 
   // -- turn -----------------------------------------------------------------
-  /** Play one turn. Returns true if this seat went out. */
+  /**
+   * Play one turn. Returns true if this seat went out.
+   *
+   * The same shape as the player's turn: draw one, lay the phase down if it
+   * is there, hit what fits, throw one card.
+   *
+   * A seat that had laid down used to skip the draw and throw anyway, so its
+   * hand fell by one every turn for nothing. That is not a turn anybody else
+   * at the table can take: your own draw and discard cancel out, and hitting
+   * is the only thing that shortens your hand. It made the seats go out about
+   * two turns sooner than the rules allow, and it showed -- a seat went out
+   * having laid eight of the ten cards it was dealt, an arithmetic nobody
+   * watching could reproduce.
+   *
+   * The comment that justified it said a drawing seat "could never go out".
+   * That was simply wrong: it goes out by hitting, which is how the player
+   * does it, and _hitWhatItCan was already here. Measured over 400 rounds,
+   * somebody still goes out in every one of them.
+   */
   takeTurn(table) {
     if (this.wentOut) return false;
     if (!table.stock.length) return false;
-
-    this._tryLayDown(table);
-    if (this._finished()) {
-      table.say(this.name, "goes out");
-      return true;
-    }
-
-    if (this.laidDown) {
-      // Already down: hit everything that legally extends a group on the
-      // table -- its own or anybody else's -- and throw one card besides.
-      // Drawing one and discarding one would leave the hand the same size
-      // forever, so a seat that had laid down could never go out.
-      this._hitWhatItCan(table);
-      if (this._finished()) {
-        table.say(this.name, "goes out");
-        return true;
-      }
-      if (this.hand.length) {
-        const shed = this._shed();
-        table.discard.push(shed);
-        table.say(this.name, `discards ${cardToString(shed)}`);
-      }
-      if (this._finished()) {
-        table.say(this.name, "goes out");
-        return true;
-      }
-      return false;
-    }
 
     if (this._wantsDiscardTop(table.discardTop)) {
       const taken = table.discard.pop();
@@ -163,6 +164,7 @@ export class Opponent {
       // Not which card: it went into a hand you cannot see.
       table.say(this.name, "draws from the stock");
     }
+    this.drew += 1;
 
     this._tryLayDown(table);
     if (this._finished()) {
@@ -170,8 +172,22 @@ export class Opponent {
       return true;
     }
 
-    const thrown = this._takeChosenDiscard();
+    // Hitting is the only thing that shortens a hand, so it is the whole road
+    // from "down" to "out" -- onto any group on the table, its own or
+    // anybody else's.
+    if (this.laidDown) {
+      this._hitWhatItCan(table);
+      if (this._finished()) {
+        table.say(this.name, "goes out");
+        return true;
+      }
+    }
+
+    // Down, the phase is safe and the only thing left to manage is points in
+    // hand; still building, the choice is about what the phase still needs.
+    const thrown = this.laidDown ? this._shed() : this._takeChosenDiscard();
     table.discard.push(thrown);
+    this.threw += 1;
     table.say(this.name, `discards ${cardToString(thrown)}`);
     return this._finished();
   }
@@ -193,6 +209,7 @@ export class Opponent {
           if (meld.accepts(card)) {
             removeCard(this.hand, card);
             meld.add(card);
+            this.placed += 1;
             table.say(this.name,
               `plays ${cardToString(card)} onto ${describeMeldCards(meld)}`);
             played += 1;

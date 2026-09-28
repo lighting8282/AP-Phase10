@@ -485,6 +485,17 @@ pre {
   background: rgba(255, 255, 255, 0.07);
   border: 1px solid var(--line);
 }
+/* The card accounting. Quiet and small -- it is a footnote you read once when
+   a seat goes out and the table looks short, not something to compete with
+   the cards. */
+.tally {
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.35;
+  margin-top: 0.25rem;
+  opacity: 0.85;
+}
+
 .meld-cards { display: flex; gap: 2px; }
 /* The caption. Quiet, because the cards are the thing being read -- but it is
    what turns "six cards" into "a set of 11s and a set of 4s". */

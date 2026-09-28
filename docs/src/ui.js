@@ -4,18 +4,18 @@
 // client, and holds no game state of its own. Anything it needed to remember
 // would be a second copy of something the session already owns.
 
-import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=69b87009";
+import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=c6630edb";
 
 //: Faces used purely as icons in the stat panel.
 const SKIP_FACE = SKIP;
 const WILD_FACE = WILD;
-import { HAND_STATE } from "./engine.js?v=69b87009";
+import { HAND_STATE } from "./engine.js?v=c6630edb";
 import {
   HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, milestoneLocationName,
   phaseLocationName, storeGate, storeLocationName,
-} from "./data.js?v=69b87009";
-import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=69b87009";
-import { Phase10Client } from "./client.js?v=69b87009";
+} from "./data.js?v=c6630edb";
+import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=c6630edb";
+import { Phase10Client } from "./client.js?v=c6630edb";
 
 const el = (id) => document.getElementById(id);
 
@@ -614,6 +614,24 @@ function renderTable(session) {
     else what.textContent = `building - ${seat.hand.length} cards`;
 
     div.append(who, needs, what);
+
+    // Where its cards went. A seat goes out with eight of the ten it was
+    // dealt showing, and the two that are missing are on the discard pile
+    // under everything thrown since -- which is not somewhere you can count.
+    // The sum is spelled out rather than implied, because the question it
+    // answers is arithmetic.
+    const tally = document.createElement("div");
+    tally.className = "tally";
+    // The hand's own config, not the session's: an item arriving mid-round
+    // changes what the next deal will be, not what this one was.
+    const dealt = session.hand?.config?.handSize ?? 0;
+    tally.textContent = `${dealt} dealt + ${seat.drew} drawn = `
+      + `${seat.placed} down + ${seat.hand.length} held + ${seat.threw} thrown`;
+    // Wrong is worse than absent: if this ever stops adding up, say nothing
+    // rather than print a sum that does not.
+    if (dealt + seat.drew === seat.placed + seat.hand.length + seat.threw) {
+      div.append(tally);
+    }
 
     // Their hand, face down. A count is information; a row of backs is the
     // table, and it reads at a glance how close somebody is to going out.
