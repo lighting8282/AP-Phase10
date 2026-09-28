@@ -13,6 +13,7 @@
 import { SKIP, WILD, numberCard } from "../src/cards.js";
 import { HAND_STATE, PhaseHand, Table, gameConfig, mulberry32 } from "../src/engine.js";
 import { Phase10Game, SAVE_VERSION, roundToString } from "../src/game.js";
+import { buildOpponents } from "../src/opponents.js";
 
 let passed = 0;
 const failures = [];
@@ -200,6 +201,95 @@ check(many.scorecard(10)[0].includes("4 earlier round(s)"), "scorecard elides ol
   spent.discard.splice(0, spent.discard.length - 1);
   try { spent.draw(); } catch { /* expected */ }
   check(spent.state === HAND_STATE.FAILED, "nothing to shuffle back still fails");
+}
+
+// -- paced opponents --------------------------------------------------------
+// The browser client shows the seats moving one at a time, three seconds
+// apart, so a paced hand queues their turns instead of playing them. What is
+// tested here is that pacing is presentation only: the same deal, the same
+// rolls and the same player moves have to reach the same table either way,
+// because the seats decide what to do from the state they find.
+{
+  const cfg = gameConfig({ handSize: 10, maxDraws: 20 });
+
+  /** One hand with three seats, dealt off a fixed seed. */
+  const deal = (paced) => {
+    const random = mulberry32(11);
+    const table = new Table();
+    table.seats = buildOpponents(3, [1, 2, 3], cfg, random);
+    return new PhaseHand(1, cfg, { random, table, paced });
+  };
+
+  /** Everything the player can see of the table, as text. */
+  const snapshot = (hand) => JSON.stringify({
+    state: hand.state,
+    hand: hand.hand.length,
+    stock: hand.stock.length,
+    discard: hand.discard.length,
+    seats: hand.table.seats.map((s) => ({
+      hand: s.hand.length, laid: s.laidDown, out: s.wentOut, score: s.score,
+    })),
+  });
+
+  /** Five turns of the dullest possible play: draw, throw what was drawn. */
+  const playFive = (hand, afterTurn = () => {}) => {
+    for (let i = 0; i < 5 && hand.state === HAND_STATE.IN_PROGRESS; i += 1) {
+      hand.draw();
+      hand.discardCard(hand.hand[hand.hand.length - 1]);
+      afterTurn(hand);
+    }
+  };
+
+  const straight = deal(false);
+  playFive(straight);
+
+  const lines = [];
+  const walked = deal(true);
+  playFive(walked, (hand) => {
+    // One seat at a time, the way the UI steps them.
+    check(hand.turnPending || hand.state !== HAND_STATE.IN_PROGRESS,
+      "a paced turn leaves the seats waiting");
+    while (hand.turnPending) {
+      const seat = hand.stepOpponent();
+      if (seat === null) break;
+      const line = seat.turnSummary();
+      if (line) lines.push(line);
+    }
+  });
+
+  eq(snapshot(walked), snapshot(straight), "pacing the seats changes no state");
+  check(!walked.turnPending, "and leaves nothing owed once walked");
+
+  // The narration is what the pauses are for; an empty feed would make the
+  // wait pure delay.
+  check(lines.length > 0, "every stepped seat reports what it did");
+  check(lines.every((l) => /^(Ada|Bo|Cy) .+\.$/.test(l)),
+    "each line names a seat and ends as a sentence");
+  check(lines.some((l) => /drew from the stock|off the discard pile/.test(l)),
+    "and says where the card came from");
+  check(lines.some((l) => /discarded /.test(l)), "and what was thrown");
+
+  // A seat already out is not narrated again every turn.
+  const quiet = deal(true);
+  quiet.table.seats[0].wentOut = true;
+  quiet.draw();
+  quiet.discardCard(quiet.hand[quiet.hand.length - 1]);
+  const first = quiet.stepOpponent();
+  eq(first.turnSummary(), null, "a seat that is already out says nothing");
+
+  // finishOpponentTurns is the way out when pacing is interrupted.
+  const rushed = deal(true);
+  rushed.draw();
+  rushed.discardCard(rushed.hand[rushed.hand.length - 1]);
+  check(rushed.turnPending, "turns are owed before the rush");
+  rushed.finishOpponentTurns();
+  check(!rushed.turnPending, "and none after it");
+
+  // A Mulligan redeals the table, so a turn owed by the old deal is dropped.
+  const mulled = deal(true);
+  mulled.pendingSeats = [...mulled.table.seats];
+  mulled.redeal();
+  check(!mulled.turnPending, "a Mulligan drops any turn still owed");
 }
 
 console.log(`\n${passed} passed, ${failures.length} failed`);

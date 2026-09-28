@@ -251,6 +251,17 @@ pre {
 .log .line { color: var(--muted); }
 .log .line.local { color: var(--ink); }
 
+/* The line that just arrived. A feed where every line looks the same is one
+   you have to re-read from the bottom up to find the new part, so the newest
+   one is marked -- and only the newest: two highlights are no highlight. */
+.log .line.latest {
+  color: var(--ink);
+  background: rgba(63, 111, 208, 0.22);
+  border-left: 3px solid var(--accent);
+  margin-left: -0.75rem;
+  padding: 1px 0.75rem 1px calc(0.75rem - 3px);
+}
+
 /* Item classification, the way Archipelago colours its own logs: a player
    scanning the feed cares far more about what kind of item moved than who
    phrased the sentence. */
@@ -342,6 +353,24 @@ pre {
    threat -- worth reading at a glance rather than from the text. */
 .seat.laid { border-color: var(--accent); }
 .seat.out { border-color: #ff9a9a; }
+
+/* Whose turn it is -- yours between moves, theirs while the table plays. The
+   ring is drawn with a shadow rather than a border so the seat does not change
+   size as the turn moves round the table, which reads as the layout twitching.
+   Colour alone would not do it: the seat colours are already four colours. */
+.seat.turn {
+  box-shadow: 0 0 0 2px var(--accent), 0 0 14px rgba(63, 111, 208, 0.45);
+}
+.seat.turn .what { color: var(--ink); }
+
+/* A slow pulse says the turn is in progress rather than merely marked. */
+@media (prefers-reduced-motion: no-preference) {
+  .seat.turn { animation: turn-pulse 1.5s ease-in-out infinite; }
+}
+@keyframes turn-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--accent), 0 0 10px rgba(63, 111, 208, 0.35); }
+  50%      { box-shadow: 0 0 0 3px var(--accent), 0 0 20px rgba(63, 111, 208, 0.6); }
+}
 
 /* A colour per seat, so "who just laid down" is answered by where you are
    looking rather than by re-reading names. Yours is the accent blue. */

@@ -47,7 +47,9 @@ const FREE_PLAY_SLOT = Object.freeze({
 const FREE_PLAY_KEY = "ap10_free_play";
 
 export class Phase10Client {
-  constructor({ onUpdate = () => {}, onLog = () => {}, onMessage = () => {} } = {}) {
+  constructor({
+    onUpdate = () => {}, onLog = () => {}, onMessage = () => {}, paced = false,
+  } = {}) {
     this.client = new Client();
     this.session = new Phase10Session();
     this.onUpdate = onUpdate;
@@ -56,6 +58,9 @@ export class Phase10Client {
     // chat. Without it the browser client can see its own game and
     // nothing of the multiworld it is part of.
     this.onMessage = onMessage;
+    //: Hold the opponents' turns for the driver to walk one at a time. The DOM
+    //: client sets it so the table can be watched; nothing headless wants it.
+    this.paced = paced;
 
     this.connected = false;
     //: Playing with no server at all. Not the same as disconnected: a
@@ -271,7 +276,7 @@ export class Phase10Client {
       this.onLog(refusal);
       return null;
     }
-    const hand = this.session.startHand(phase);
+    const hand = this.session.startHand(phase, { paced: this.paced });
     this.onUpdate();
     return hand;
   }

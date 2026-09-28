@@ -48,6 +48,7 @@ while to find and would be easy to reintroduce.
   - [Checking it](#checking-it)
 - [Persistence](#persistence)
 - [Browser version](#browser-version)
+  - [Watching the table play](#watching-the-table-play)
   - [Free play, with no server](#free-play-with-no-server)
   - [Verified against a live server](#verified-against-a-live-server-1)
   - [One bug that only a browser could have found](#one-bug-that-only-a-browser-could-have-found)
@@ -756,6 +757,37 @@ The card faces exist twice, under `phase10/` and under `docs/`, because the
 apworld ships as a zip of `phase10/` and Pages cannot reach above `docs/`. One
 run of `tools/generate_cards.py` writes both rather than leaving the second to
 be remembered.
+
+### Watching the table play
+
+The three seats used to move in the same instant you discarded: the table
+simply arrived in a new state, and nothing on the page said which seat had
+taken your discard, which had laid down, or which of them had ended the round.
+The browser client now shows them one at a time, three seconds a seat
+(`OPPONENT_TURN_MS` in `ui.js`), and says what each one did.
+
+Three pieces, none of them in the rules:
+
+- `Opponent.lastTurn` records what a seat did as it does it -- drew, took the
+  discard, laid down, hit, threw, went out -- and `turnSummary()` writes it as
+  one sentence. Recorded rather than derived, because once the table has been
+  redrawn a draw and a pick-up are indistinguishable. A seat that was already
+  out returns `null` rather than "passed", so the feed is not one line per seat
+  per turn.
+- A hand built with `paced: true` queues the seats in `pendingSeats` instead of
+  playing them, and the driver walks them with `stepOpponent()`. `Table.playSeat`
+  is the body of the old `endOfTurn` loop, so a seat played one at a time is
+  played exactly as it was played all at once -- `game_test.mjs` asserts the two
+  reach identical state off one seed, and the Python crosscheck still passes
+  because nothing in the policy moved. Headless drivers leave it off and the
+  turn resolves on the spot as before.
+- `ui.js` holds the player's controls shut for the length of the walk, marks
+  the seat whose turn it is (and your own seat between turns) with a ring on
+  the seat itself, and marks the newest line in the log. Only the newest: two
+  highlights are no highlight.
+
+The pacing is presentation, which is why it lives above the engine rather than
+in it. Turning it off is one argument, and the round plays out identically.
 
 ### Free play, with no server
 

@@ -5,6 +5,10 @@
 // than to read idiomatically -- opponents_test.mjs replays recorded Python
 // turns through this to prove they still do.
 //
+// The one thing here that Python has no counterpart for is the turn narration
+// (`lastTurn`, `turnSummary`): it records what a seat did, it decides nothing,
+// and it exists for a browser log the Kivy client does not have.
+//
 // They exist to put a clock on the round that is not your draw budget. A round
 // ends on whichever comes first: your draws running out, or somebody going out.
 //
@@ -32,6 +36,24 @@ export const MID = opponentSkill("mid", 0.7, 0.25);
 
 const NAMES = ["Ada", "Bo", "Cy", "Del", "Eve", "Fen"];
 
+/**
+ * A card as a person would say it, for the turn narration.
+ *
+ * Not cardToString: "9B" is a trace format, and the log is read at the speed
+ * of a sentence.
+ */
+function spell(card) {
+  if (card.kind === "wild") return "a Wild";
+  if (card.kind === "skip") return "a Skip";
+  return `the ${card.rank} ${card.color}`;
+}
+
+/** "a, b and c" -- one sentence rather than a list of three. */
+function joinParts(parts) {
+  if (parts.length <= 1) return parts.join("");
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
 export class Opponent {
   constructor(name, phase, config, random, skill = MID) {
     this.name = name;
@@ -50,6 +72,12 @@ export class Opponent {
     this.melds = [];
     this.laidDown = false;
     this.wentOut = false;
+    // What this seat did on its most recent turn, in the order it did it.
+    // Recorded rather than derived: by the time the table has been redrawn the
+    // draw and the discard are indistinguishable from each other, and a player
+    // watching three seats move needs to be told which of them took their card
+    // off the discard pile.
+    this.lastTurn = [];
   }
 
   get spec() {
@@ -111,13 +139,18 @@ export class Opponent {
     this.melds = melds;
     this.layout = melds.map((m) => m.cards);
     this.laidDown = true;
+    this.lastTurn.push(`laid phase ${this.phase} down`);
   }
 
   // -- turn -----------------------------------------------------------------
   /** Play one turn. Returns true if this seat went out. */
   takeTurn(table) {
-    if (this.wentOut) return false;
-    if (!table.stock.length) return false;
+    this.lastTurn = [];
+    if (this.wentOut) return false; // already out: nothing to narrate
+    if (!table.stock.length) {
+      this.lastTurn.push("could not move -- the stock is empty");
+      return false;
+    }
 
     this._tryLayDown();
     if (this._finished()) return true;
@@ -127,23 +160,45 @@ export class Opponent {
       // table -- its own or anybody else's -- and throw one card besides.
       // Drawing one and discarding one would leave the hand the same size
       // forever, so a seat that had laid down could never go out.
-      this._hitWhatItCan(table);
+      const hits = this._hitWhatItCan(table);
+      if (hits) this.lastTurn.push(`hit ${hits} card${hits === 1 ? "" : "s"} onto the table`);
       if (this._finished()) return true;
-      if (this.hand.length) table.discard.push(this._shed());
+      if (this.hand.length) {
+        const shed = this._shed();
+        table.discard.push(shed);
+        this.lastTurn.push(`discarded ${spell(shed)}`);
+      }
       return this._finished();
     }
 
     if (this._wantsDiscardTop(table.discardTop)) {
-      this.hand.push(table.discard.pop());
+      const taken = table.discard.pop();
+      this.hand.push(taken);
+      this.lastTurn.push(`took ${spell(taken)} off the discard pile`);
     } else {
       this.hand.push(table.stock.shift());
+      this.lastTurn.push("drew from the stock");
     }
 
     this._tryLayDown();
     if (this._finished()) return true;
 
-    table.discard.push(this._takeChosenDiscard());
+    const thrown = this._takeChosenDiscard();
+    table.discard.push(thrown);
+    this.lastTurn.push(`discarded ${spell(thrown)}`);
     return this._finished();
+  }
+
+  /**
+   * The last turn as one line of the log, or null if the seat did nothing.
+   *
+   * null rather than "Ada passed": a seat that is already out sits out every
+   * remaining turn of the round, and a line per seat per turn saying so buries
+   * the ones that moved.
+   */
+  turnSummary() {
+    if (!this.lastTurn.length) return null;
+    return `${this.name} ${joinParts(this.lastTurn)}.`;
   }
 
   /**
@@ -189,7 +244,13 @@ export class Opponent {
   }
 
   _finished() {
-    if (this.laidDown && !this.hand.length) this.wentOut = true;
+    // Recorded here rather than in takeTurn: a seat goes out at whichever of
+    // four points in the turn empties its hand, and this is the one line all
+    // four pass through, so the narration lands in the right order once.
+    if (this.laidDown && !this.hand.length) {
+      if (!this.wentOut) this.lastTurn.push("went out");
+      this.wentOut = true;
+    }
     return this.wentOut;
   }
 }
