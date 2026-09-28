@@ -9,13 +9,14 @@
 // before the restore lands would overwrite a real one with that empty rebuild.
 // Nothing is saved until restoreState is "done".
 
-import { Client } from "../node_modules/archipelago.js/dist/index.js?v=c6630edb";
+import { Client } from "../node_modules/archipelago.js/dist/index.js?v=8612bdea";
 
-import { GAME_NAME, MULLIGAN, PHASE_COUNT, SKIP_CARD, WILD_CARD, phaseUnlock }
-  from "./data.js?v=c6630edb";
-import { Phase10Game, roundToString } from "./game.js?v=c6630edb";
-import { Phase10Session } from "./session.js?v=c6630edb";
-import { describeMeldCards } from "./phases.js?v=c6630edb";
+import { GAME_NAME, MULLIGAN, PHASE_COUNT, WILD_CARD, phaseUnlock }
+  from "./data.js?v=8612bdea";
+import { STOCK_SKIPS } from "./cards.js?v=8612bdea";
+import { Phase10Game, roundToString } from "./game.js?v=8612bdea";
+import { Phase10Session } from "./session.js?v=8612bdea";
+import { describeMeldCards } from "./phases.js?v=8612bdea";
 
 /**
  * The deck a free-play run is dealt, with no Archipelago to hand items out.
@@ -25,9 +26,13 @@ import { describeMeldCards } from "./phases.js?v=c6630edb";
  * player who never touches Archipelago would otherwise never see. No Extra
  * Draws, because free play has no draw budget for them to extend.
  */
+// No Skip Cards. Those are the Archipelago item, which puts a Skip in your
+// hand at the start of every round -- a handout nobody else at the table gets,
+// and not how the box deals. Free play shuffles the four Skips into the draw
+// pile instead (`skips_in_deck` below) and everybody is dealt ten cards off
+// the same deck.
 const FREE_PLAY_DECK = [
   ...Array(8).fill(WILD_CARD),
-  ...Array(2).fill(SKIP_CARD),
   ...Array(3).fill(MULLIGAN),
 ];
 
@@ -41,6 +46,11 @@ const FREE_PLAY_SLOT = Object.freeze({
   // The printed rule: a Skip denies the next player a turn. Archipelago keeps
   // the dig, whose clear rates its access rules are built on.
   skip_mode: "deny",
+  // The four Skips the box has, shuffled in, so a hand here is ten cards off
+  // the same deck everybody else is dealt from. A seed leaves this at zero and
+  // grants Skips as items: that is a judgement about what an item is worth,
+  // and it was quietly deciding how the printed game deals.
+  skips_in_deck: STOCK_SKIPS,
   checks_per_phase: 0,
   opponents: 3,
   death_link: false,

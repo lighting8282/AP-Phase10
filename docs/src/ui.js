@@ -4,18 +4,18 @@
 // client, and holds no game state of its own. Anything it needed to remember
 // would be a second copy of something the session already owns.
 
-import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=c6630edb";
+import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=8612bdea";
 
 //: Faces used purely as icons in the stat panel.
 const SKIP_FACE = SKIP;
 const WILD_FACE = WILD;
-import { HAND_STATE } from "./engine.js?v=c6630edb";
+import { HAND_STATE } from "./engine.js?v=8612bdea";
 import {
   HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, milestoneLocationName,
   phaseLocationName, storeGate, storeLocationName,
-} from "./data.js?v=c6630edb";
-import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=c6630edb";
-import { Phase10Client } from "./client.js?v=c6630edb";
+} from "./data.js?v=8612bdea";
+import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=8612bdea";
+import { Phase10Client } from "./client.js?v=8612bdea";
 
 const el = (id) => document.getElementById(id);
 
@@ -203,7 +203,12 @@ function renderStats(session, hand) {
       ? iconTile(ICON_DRAW, "∞", "draws -- no limit")
       : iconTile(ICON_DRAW, c.maxDraws, "draws per hand"));
     box.append(iconTile(ICON_STOCK, c.handSize, "cards dealt"));
-    box.append(cardTile(SKIP_FACE, c.startingSkips, "skips per hand"));
+    // Two ways a Skip reaches you, and the tile has to say which. Free play
+    // shuffles them into the deck like the box does, so "skips per hand" in
+    // front of a zero would read as a game with no Skips in it at all.
+    box.append(c.skipsInDeck
+      ? cardTile(SKIP_FACE, c.skipsInDeck, "skips in the deck")
+      : cardTile(SKIP_FACE, c.startingSkips, "skips per hand"));
     box.append(cardTile(WILD_FACE, c.wildsInDeck, "wilds in the deck"));
   }
 

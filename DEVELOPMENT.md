@@ -314,6 +314,15 @@ So Skip Cards are granted, never shuffled in: each item puts a Skip in your hand
 at the start of every hand, dealt on top of your hand size so holding one costs
 no room to build the phase in.
 
+**That is a claim about an item, and it spent a while deciding how the game
+deals.** `skipsInDeck` defaults to zero and the session never overrode it, so
+free play — which grants no items at all — ran on a deck with no Skips in it
+and handed the player two a round that nobody else at the table could get. The
+measurement above says a shuffled Skip is a poor *item*; it says nothing about
+how the printed game deals, and the two were conflated. Free play now sends
+`skips_in_deck: 4` and no grant, so the opening hand is ten random cards off
+the box's deck. A seed is unchanged, because its numbers are the ones above.
+
 Success rate at 8 draws with stock wilds:
 
 | phase | none | 1 Skip | 2 Skips | 4 Skips |
@@ -856,9 +865,11 @@ heard of Archipelago — and the game underneath it is a perfectly good game of
 Phase 10 on its own. **Just play** starts a run with no room, no slot and no
 login.
 
-It is the printed game rather than a sandbox: the full eight wilds, two Skips,
-three Mulligans, three opponents — and **the phases open one at a time as they
-are cleared**. A run is ten phases or twenty, chosen when it starts: ten is
+It is the printed game rather than a sandbox: the full eight wilds, the box's
+four Skips shuffled into the deck, three Mulligans, three opponents — and **the
+phases open one at a time as they are cleared**. The opening hand is ten random
+cards off that deck, the same as every seat gets; the Skip *item*, which hands
+you one a round, belongs to a seed and stays there. A run is ten phases or twenty, chosen when it starts: ten is
 what the box holds, and a ten-phase run shows ten buttons rather than twenty
 with half of them permanently dark. The cap is saved with the run, so a reload
 does not quietly turn a ten into a twenty, and a saved run from before the
