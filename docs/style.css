@@ -118,6 +118,15 @@ header.slim #free-play-offer { display: none; }
 .card img { width: 76px; height: 114px; border-radius: 8px; display: block; }
 .card:hover img { outline: 2px solid var(--accent); }
 
+/* A Skip you could dig with. Every other card in the hand is a discard, and
+   this one is not -- which is worth saying before the click rather than in the
+   log afterwards. */
+.card.diggable img { outline: 2px solid var(--cleared); }
+.card.diggable:hover img { outline: 2px solid var(--accent); }
+
+/* A Skip asked to be thrown away, waiting for the second click to mean it. */
+.card.armed img { outline: 2px dashed #ff9a9a; }
+
 /* --- what a phase needs ------------------------------------------------ */
 .needs { color: var(--muted); font-size: 13px; margin-top: 0.15rem; }
 .needs:empty { display: none; }

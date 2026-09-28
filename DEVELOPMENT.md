@@ -325,6 +325,17 @@ Success rate at 8 draws with stock wilds:
 Skip Card is classified `useful`, not `progression`, so no access rule depends
 on it and the fill balance is unchanged.
 
+**Clicking one digs with it.** Every other card in the hand is a discard, so a
+Skip clicked in the browser client used to go on the pile: fifteen points thrown
+away and the dig with it, off a click that looked like every other click. A dig
+and a discard are never both legal -- a dig is a whole turn and so only happens
+before you draw, a discard only after -- so the first click is unambiguous, and
+a Skip clicked after the draw asks for a second click before it goes. The hand
+says which is which before the click rather than in the log afterwards: green
+outline for a Skip you could dig with, dashed red for one waiting on its second
+click. The Dig button is disabled outside its turn for the same reason, instead
+of existing to explain afterwards that it could not be pressed.
+
 ## Twenty phases
 
 The stock ten, plus ten measured at the same baseline (0 wilds, 8 draws, greedy

@@ -4,7 +4,7 @@
 // client, and holds no game state of its own. Anything it needed to remember
 // would be a second copy of something the session already owns.
 
-import { SKIP, WILD, cardFilename, isWild, points } from "./cards.js";
+import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js";
 
 //: Faces used purely as icons in the stat panel.
 const SKIP_FACE = SKIP;
@@ -42,6 +42,10 @@ const OPPONENT_TURN_MS = 3000;
 let pacing = false;
 //: The seat whose turn is being shown, so the table can say whose it is.
 let activeSeat = null;
+//: A Skip the player has asked to throw away, held until they say it twice.
+//: Cleared by any move that lands, so it never survives the turn it was armed
+//: on. By identity, not index: a draw renumbers the hand.
+let armedSkip = null;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -258,6 +262,9 @@ async function runOpponentTurns(hand) {
  * settle a round that has just ended.
  */
 function afterPlayerAction(hand) {
+  // Any move that lands disarms the Skip: the second click has to be the very
+  // next thing you do, or it is not a confirmation of anything.
+  armedSkip = null;
   render();
   if (hand.turnPending) {
     runOpponentTurns(hand);
@@ -384,6 +391,11 @@ function render() {
   for (const button of document.querySelectorAll("#actions button")) {
     button.disabled = pacing || !hand || hand.state !== HAND_STATE.IN_PROGRESS;
   }
+  // A dig is a turn of its own, so it is only there before you draw and only
+  // with a Skip to spend. Left enabled it was a button whose whole function
+  // was to explain, afterwards, that it could not be pressed.
+  const dig = document.querySelector('#actions [data-action="skip"]');
+  dig.disabled = dig.disabled || !hand.skipsInHand || hand.drewThisTurn || hand.digPending;
   // Narrower than the rest: a Mulligan needs a copy in hand and an untouched
   // deal, so it stays disabled even mid-hand.
   const mull = el("mulligan-button");
@@ -538,14 +550,58 @@ function promptFor(hand, live, drawn) {
   return "* Play what you can, then discard a card *";
 }
 
+/**
+ * Click a card in your hand.
+ *
+ * Every card there is a discard except a Skip, which is a card you play: it
+ * digs three deep into the stock and keeps one. Throwing one away is legal,
+ * costs you fifteen points if the round ends on it, and is almost never what
+ * the click meant -- so a Skip digs when a dig is available, and otherwise
+ * takes a second click before it goes on the pile.
+ *
+ * The two are never both available, which is what makes the first click
+ * unambiguous: a dig is your whole turn and so only happens before you draw,
+ * and a discard only happens after.
+ */
+function playFromHand(index) {
+  const hand = app.session.hand;
+  if (pacing || !hand || hand.state !== HAND_STATE.IN_PROGRESS) return;
+  const card = hand.hand[index];
+
+  if (isSkip(card)) {
+    if (!hand.drewThisTurn) {
+      withHand((h) => h.playSkip());
+      return;
+    }
+    if (armedSkip !== card) {
+      armedSkip = card;
+      log("A Skip digs three cards down the stock -- click it again to throw it away.");
+      render();
+      return;
+    }
+  }
+  withHand((h) => h.discardCard(h.hand[index]));
+}
+
 function renderHand(hand) {
   const box = el("hand");
   box.replaceChildren();
   if (!hand) return;
   hand.hand.forEach((card, index) => {
-    const button = cardButton(card, () => withHand((h) => h.discardCard(h.hand[index])));
+    const button = cardButton(card, () => playFromHand(index));
     // Your cards are not playable while the table is mid-turn.
     button.disabled = pacing;
+    if (isSkip(card)) {
+      if (!hand.drewThisTurn) {
+        button.classList.add("diggable");
+        button.title = "Dig: look three cards down the stock and keep one";
+      } else if (card === armedSkip) {
+        button.classList.add("armed");
+        button.title = "Click again to throw this Skip away";
+      } else {
+        button.title = "A Skip is for digging -- clicking it twice throws it away";
+      }
+    }
     box.append(button);
   });
 }
