@@ -847,6 +847,30 @@ rather than recording a second account of the same turn -- draining per seat
 instead of once per turn is the only difference, and `game_test.mjs` asserts the
 paced walk produces byte-identical lines to the unpaced one.
 
+**A card played onto a group is ringed in the colour of whoever played it**, and
+the group's caption gains `+1 Ada`. Three things were wrong with the first
+attempt at this, and each of them made it useless in a different way:
+
+- **It cleared per seat**, so a mark survived about three seconds -- gone before
+  anybody looked at it, which is the same as not marking at all. It now holds
+  everything played since the table last started moving, and clears when the
+  table next moves rather than on a timer, so there is as long as you like to
+  read it. Not on your own move either: a hit and the discard that follows it
+  are one turn, and clearing on the discard would erase the mark on the card
+  you had just played, in the same breath as playing it.
+- **It said nothing about who.** A seat can hit onto anybody's group, so what is
+  recorded is who *played* the card, not whose group it landed in -- which is
+  the whole question when Ada's card turns up in Cy's set. The seat palette
+  moved to `:root` so the ring and the seat border cannot drift apart.
+- **Your own hits were not marked.** Hitting is the one move whose result lands
+  somewhere other than your own hand, so it is the hardest to see you made.
+
+Two details that are not decoration. The ring is drawn with `outline-offset`,
+because the seat colours and the card colours are both green/red/yellow -- flush
+against the card, a green ring on a green card disappears, exactly on the card
+it exists to point at. And the count is written out beside the group name,
+because four similar rings is a lot to ask of colour alone.
+
 **The turn moved into `Table.playSeat`, and that is the part worth remembering.**
 It is the body of the old `endOfTurn` loop, so a seat played one at a time is
 played exactly as it was played all at once -- including consuming a Skip, which
