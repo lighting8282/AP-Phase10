@@ -155,7 +155,7 @@ header.slim #free-play-offer { display: none; }
 .meld img.by-2 { --hit: var(--seat-2); }
 .meld img.by-3 { --hit: var(--seat-3); }
 .meld img.by-4 { --hit: var(--seat-4); }
-.meld img.by-you { --hit: var(--accent); }
+.meld img.by-you { --hit: var(--seat-you); }
 
 /* And said, not only shown: four similar rings is a lot to ask of colour, and
    "+1 Cy" is the whole answer in three characters. */
@@ -561,17 +561,22 @@ pre {
   --seat-2: #d9695f;
   --seat-3: #d6b348;
   --seat-4: #b07fd0;
+  /* Yours. Brighter than --accent, which is a button colour and only reaches
+     3.6:1 as text on the panel -- this is one colour doing two jobs, so it has
+     to clear the bar for the harder one. 6.3:1, inside the range the other
+     four already sit in. */
+  --seat-you: #6b9bff;
 }
 .seat { border-top: 3px solid var(--seat, var(--line)); }
 .seats .seat:nth-child(1) { --seat: var(--seat-1); }
 .seats .seat:nth-child(2) { --seat: var(--seat-2); }
 .seats .seat:nth-child(3) { --seat: var(--seat-3); }
 .seats .seat:nth-child(4) { --seat: var(--seat-4); }
-.seats .seat:nth-child(1) .who { color: #8ade9b; }
-.seats .seat:nth-child(2) .who { color: #ff9a9a; }
-.seats .seat:nth-child(3) .who { color: #ffd479; }
-.seats .seat:nth-child(4) .who { color: #dcb6f5; }
-.seat.out .who { color: #ff9a9a; }
+/* A name is its own seat's colour, exactly -- the same value the bar above it
+   is drawn with, not a lighter cousin of it. One rule rather than a colour per
+   seat, so a name cannot drift from the box it belongs to.
+   Every value clears 4.5:1 on the panel; that was checked, not assumed. */
+.seat .who { color: var(--seat); }
 
 /* --- the middle of the table ------------------------------------------ */
 .middle {
@@ -613,8 +618,7 @@ pre {
 /* --- your own side ----------------------------------------------------- */
 /* In a column the seat's flex basis would become a height; it is a block
    here, sized by its cards. */
-.you { flex: 0 0 auto; --seat: var(--accent); }
-.you .who { color: #8ab4ff; }
+.you { flex: 0 0 auto; --seat: var(--seat-you); }
 .you .cards { margin-top: 0.5rem; }
 .you .melds:empty { display: none; }
 
