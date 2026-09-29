@@ -884,6 +884,29 @@ one seed, and pins the denied seat on its own.
 the same place in both ports -- though the paced walk itself is not, being
 presentation for a driver the Kivy client does not have.
 
+**A group has no width limit, and a seat does.** A run of seven laid down is
+twelve cards by the time everybody has hit it, and a set has no ceiling at all.
+Reported from a real game: the row ran on past the edge of the seat and drew
+underneath the next player's panel, on the desktop and on a phone both. A flex
+item does not shrink below its own content unless it is told it may, so the row
+was simply wider than the box it was in and nothing clipped it.
+
+Fanning the cards over each other was the first fix and it was measured rather
+than admired: at the width a seat actually gets -- about a hundred pixels on a
+phone, three of them across -- nine cards leave seven pixels of each. On a run,
+where the rank is the entire content, that says a card is there without saying
+which one. So the row wraps instead and every card stays whole; the seat grows
+downwards, and height is the one thing a phone has and a seat has not. A seat's
+cards drop to 20px there for the same reason its backs did: at 26px a group
+wraps every third card and reads as a column rather than a group. Your own
+groups keep the full size, having the width of the page.
+
+**The stylesheet is stamped too**, and was not. Half the layout lives in
+`style.css`, Pages serves it with the same ten-minute cache as everything else,
+and a CSS-only deploy left the old rules in place with nothing in the markup to
+say so -- the exact failure `stamp_build.py` exists to prevent, on the one file
+it did not cover.
+
 ### Free play, with no server
 
 The page opens on a connection form, which is a wall for anyone who has never
