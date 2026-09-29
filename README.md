@@ -50,6 +50,11 @@ Start a run at **10 phases** for the game as it comes in the box, or **20** for
 those ten plus the ten measured to fill the gap they leave. There is also a
 **Quick tutorial** button that walks through the screen a step at a time.
 
+The opponents play one at a time so you can watch them, and the **Speed**
+button on the table sets how long each of their turns stays on screen — `1x`,
+`2x`, `4x`, or `Off` for no pause at all. It works while they are playing, so
+you can hurry a turn along once it has started, and your choice is remembered.
+
 ### In a browser, connected to a room
 
 Same page. Put in the server address, your slot name and any password, and

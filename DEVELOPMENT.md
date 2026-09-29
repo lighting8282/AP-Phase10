@@ -841,6 +841,23 @@ Two pieces, neither of them in the rules:
   itself, and marks the newest line in the log. Only the newest: two highlights
   are no highlight.
 
+**Three seconds a seat is a guess about the player, so it is a setting.** It is
+right the first time somebody watches a table play and long by the tenth round,
+and the page has no way to tell which of those it is in. The **Speed** button
+divides `OPPONENT_TURN_MS` by 1, 2 or 4, or skips the pause entirely; the
+choice is kept in `localStorage` under the speed's own name rather than its
+position, so adding a speed later cannot silently turn somebody's saved choice
+into a different one.
+
+Two details it would be easy to get wrong. The button is not in `#actions` and
+so is not disabled with the rest of the controls while the table plays --
+speeding the table up during the table's turn is the whole point of it. And the
+pause is waited out in tenth-of-a-second slices that re-read the setting rather
+than as one timer, so a press shortens the pause already running instead of the
+one after it; `Off` ends the current one within a tick. None of this reaches the
+engine, and there is nothing to mirror into Python: the paced walk is
+presentation for a driver the Kivy client does not have.
+
 The narration is the one main already had. `Table.log` and `say()` were added
 with the opponents and are mirrored in the Python port, so the walk reuses them
 rather than recording a second account of the same turn -- draining per seat

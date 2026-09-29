@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AP_10</title>
-<link rel="stylesheet" href="style.css?v=2295df76">
+<link rel="stylesheet" href="style.css?v=16a613b7">
 </head>
 <body>
 <header>
@@ -54,6 +54,13 @@
     <div class="felt">
       <!-- Across the table. -->
       <div id="table" class="seats"></div>
+
+      <!-- How long each seat's turn is left on screen. Here rather than with
+           the moves below, because it is not one: it stays live while the
+           table is playing, which is the moment anybody wants it. -->
+      <div class="felt-tools">
+        <button type="button" id="speed" title="How fast the other players take their turns"></button>
+      </div>
 
       <!-- The middle of the table: the two piles, and what to do with them. -->
       <div class="middle">
@@ -196,6 +203,6 @@
   </div>
 </div>
 
-<script type="module" src="src/ui.js?v=2295df76"></script>
+<script type="module" src="src/ui.js?v=16a613b7"></script>
 </body>
 </html>
