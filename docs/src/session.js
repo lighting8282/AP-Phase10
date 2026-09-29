@@ -18,11 +18,11 @@ import {
   SCORE_REDUCTION_VALUE, SKIP_CARD, TIERS, WILD_CARD,
   WILD_THEFT, milestoneLocationName, phaseLocationName, phaseUnlock,
   storeGate, storeLocationName, storePrices,
-} from "./data.js?v=7cfd187b";
-import { STOCK_WILDS } from "./cards.js?v=7cfd187b";
-import { HAND_STATE, Table, gameConfig } from "./engine.js?v=7cfd187b";
-import { MID, NAMES as OPPONENT_NAMES, buildOpponents } from "./opponents.js?v=7cfd187b";
-import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js?v=7cfd187b";
+} from "./data.js?v=49ba8887";
+import { STOCK_WILDS } from "./cards.js?v=49ba8887";
+import { HAND_STATE, Table, gameConfig } from "./engine.js?v=49ba8887";
+import { MID, NAMES as OPPONENT_NAMES, buildOpponents } from "./opponents.js?v=49ba8887";
+import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js?v=49ba8887";
 
 export const LEAN_DEAL_PENALTY = 2;
 

@@ -539,20 +539,27 @@ class PhaseHand:
         self._fail_if_out_of_road()
         if self.state is not HandState.IN_PROGRESS:
             return
-        # A turn you have been denied is spent here, where it would have
-        # happened -- the same bargain a seat's own Skip makes -- and it costs
-        # you exactly one turn however long it waited. Losing it means the
-        # seats come round again before you act, which is what a lost turn
-        # *is*: the table plays twice and you play once.
-        lost = self.skipped
-        if lost:
-            self.skipped = False
-            self.turns_missed += 1
-            self.table.say("You", "miss a turn")
-            self._emit("turn_missed")
         self._settle_table_turn(self.table.end_of_turn())
-        if lost and self.state is HandState.IN_PROGRESS:
+        # Then, if a seat threw a Skip at you while it played, the turn it
+        # costs you is *this* one -- the one that would have come next. A
+        # while loop because two seats can deny you in the same round.
+        while self.skipped and self.state is HandState.IN_PROGRESS:
+            self._lose_turn()
             self._settle_table_turn(self.table.end_of_turn())
+
+    def _lose_turn(self) -> None:
+        """Spend a turn that has been taken off you.
+
+        Read *after* the table has played, never before. The flag is set by a
+        seat during the table's turn, so a check at the top of `_end_turn` is
+        reading the previous round's news: it let you play the turn you had
+        been denied and then charged the miss to the turn after, which is
+        neither the rule nor anything a player could make sense of.
+        """
+        self.skipped = False
+        self.turns_missed += 1
+        self.table.say("You", "miss a turn")
+        self._emit("turn_missed")
 
     def _settle_table_turn(self, winner) -> None:
         """Apply what the table's turn did to the hand."""

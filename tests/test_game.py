@@ -224,24 +224,33 @@ def test_the_thrower_is_never_a_target_and_nobody_is_denied_twice():
     assert names == [table.seats[1].name, table.seats[2].name], names
 
 
-def test_a_lost_turn_is_the_table_coming_round_again():
-    """Counted from the log rather than from seat turns, because a seat can
-    itself be denied in between -- which is the mechanic working."""
+def test_a_lost_turn_is_the_very_next_turn():
+    """Reported from a real game: a seat denied the player, the player was
+    handed their turn anyway, and the miss was charged a turn late. The cause
+    was reading the flag at the *top* of _end_turn, before the table had played
+    and so before any seat could have set it.
+
+    Asserted as the order people acted in. A seat says several lines per turn,
+    so consecutive speakers are collapsed: what is left is who played. The
+    player is set up as the unambiguous threat -- down, holding few cards --
+    so Ada's Skip goes to them rather than to another seat.
+    """
     hand, table = deny_table(seed=7)
-    hand.skipped = True
+    hand.laid = True
+    hand.hand = hand.hand[:4]
+    for seat in table.seats:
+        seat.laid_down = False
+    table.seats[0].hand.append(SKIP)        # Ada throws it, at the player
     hand.draw()
     hand.discard_card(hand.hand[-1])
-    said = table.drain_log()
-    assert said[0] == ("You", "miss a turn"), said[:2]
-    acted, cycles = set(), 0
-    for who, _ in said:
-        if who == "You":
-            continue
-        if who in acted:
-            cycles += 1
-            acted.clear()
-        acted.add(who)
-    assert cycles >= 1, said
+
+    turns: list[str] = []
+    for who, _ in table.drain_log():
+        if not turns or turns[-1] != who:
+            turns.append(who)
+    assert turns == ["Ada", "Bo", "Cy", "You", "Ada", "Bo", "Cy"], turns
+    assert hand.turns_missed == 1
+    assert not hand.skipped
 
 
 def test_the_table_says_what_each_seat_did():

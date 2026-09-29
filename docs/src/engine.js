@@ -21,10 +21,10 @@ import {
   isWild,
   numberCard,
   COLORS,
-} from "./cards.js?v=7cfd187b";
+} from "./cards.js?v=49ba8887";
 import {
   GROUP, PHASES, phaseCardCount, solveLayOptions, solveMelds, solvePhase,
-} from "./phases.js?v=7cfd187b";
+} from "./phases.js?v=49ba8887";
 
 /** How deep into the stock a played Skip lets you look. */
 export const SKIP_DIG_DEPTH = 3;
@@ -592,34 +592,36 @@ export class PhaseHand {
   _endTurn() {
     this._failIfOutOfRoad();
     if (this.state !== HAND_STATE.IN_PROGRESS) return;
-    // A turn you have been denied is spent here, where it would have happened
-    // -- the same bargain a seat's own Skip makes -- and it costs you exactly
-    // one turn however long it waited. Losing it means the seats come round
-    // again before you act, which is what a lost turn *is*: the table plays
-    // twice and you play once.
-    const lost = this.skipped;
-    if (lost) {
-      this.skipped = false;
-      this.turnsMissed += 1;
-      this.table.say("You", "miss a turn");
-      this._emit("turn_missed", {});
-    }
     if (this.paced) {
       // Queued, not played: the driver walks them with stepOpponent so the
       // player can watch. Nothing is owed once somebody has already gone out.
-      if (this.table.winner !== null) {
-        this.pendingSeats = [];
-        return;
-      }
-      this.pendingSeats = lost
-        ? [...this.table.seats, ...this.table.seats]
-        : [...this.table.seats];
+      this.pendingSeats = this.table.winner === null ? [...this.table.seats] : [];
       return;
     }
     this._settleTableTurn(this.table.endOfTurn());
-    if (lost && this.state === HAND_STATE.IN_PROGRESS) {
+    // Then, if a seat threw a Skip at you while it played, the turn it costs
+    // you is *this* one -- the one that would have come next. A while loop
+    // because two seats can deny you in the same round of the table.
+    while (this.skipped && this.state === HAND_STATE.IN_PROGRESS) {
+      this._loseTurn();
       this._settleTableTurn(this.table.endOfTurn());
     }
+  }
+
+  /**
+   * Spend a turn that has been taken off you.
+   *
+   * Read *after* the table has played, never before. The flag is set by a seat
+   * during the table's turn, so a check at the top of `_endTurn` is reading
+   * the previous round's news: it let you play the turn you had been denied
+   * and then charged the miss to the turn after, which is neither the rule nor
+   * anything a player could make sense of.
+   */
+  _loseTurn() {
+    this.skipped = false;
+    this.turnsMissed += 1;
+    this.table.say("You", "miss a turn");
+    this._emit("turn_missed", {});
   }
 
   /** Apply what the table's turn did to the hand. */
@@ -659,6 +661,16 @@ export class PhaseHand {
     if (winner !== null) {
       this.pendingSeats = [];
       this._settleTableTurn(winner);
+      return seat;
+    }
+    // The walk has reached the end of the table. If one of them threw a Skip
+    // at you on the way round, your turn goes now rather than being handed to
+    // you and charged later, and they come round again. The queue refilling
+    // keeps turnPending true, so a driver walking it notices nothing special.
+    if (!this.pendingSeats.length && this.skipped
+      && this.state === HAND_STATE.IN_PROGRESS) {
+      this._loseTurn();
+      this.pendingSeats = [...this.table.seats];
     }
     return seat;
   }

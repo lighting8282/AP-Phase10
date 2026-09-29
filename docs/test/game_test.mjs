@@ -366,23 +366,38 @@ check(many.scorecard(10)[0].includes("4 earlier round(s)"), "scorecard elides ol
     [list.table.seats[1].name, list.table.seats[2].name],
     "and somebody already denied is not worth a second Skip");
 
-  // A lost turn is the table coming round again before you act. Counted from
-  // the log rather than from seat draws, because a seat can itself be denied
-  // in between -- which is the mechanic working, not a miscount.
-  const lost = deal(7);
-  lost.skipped = true;
-  lost.draw();
-  lost.discardCard(lost.hand[lost.hand.length - 1]);
-  const said = lost.table.drainLog();
-  eq(said[0], ["You", "miss a turn"], "losing a turn says so first");
-  const acted = new Set();
-  let cycles = 0;
-  for (const [who] of said) {
-    if (who === "You") continue;
-    if (acted.has(who)) { cycles += 1; acted.clear(); }
-    acted.add(who);
+  // The turn a Skip costs you is the one that would have come next -- not the
+  // one after it. Reported from a real game: a seat denied the player, the
+  // player was handed their turn anyway, and the miss was charged a turn late.
+  // The cause was reading the flag at the *top* of _endTurn, before the table
+  // had played and so before any seat could have set it.
+  //
+  // Asserted as the order people acted in. A seat says several lines per turn,
+  // so consecutive speakers are collapsed first; what is left is who played.
+  const order = (log) => {
+    const turns = [];
+    for (const [who] of log) if (turns[turns.length - 1] !== who) turns.push(who);
+    return turns;
+  };
+  // No Skips in the deck for this one: the only one in play is the one handed
+  // to Ada, so the sequence is the mechanic and nothing else.
+  const one = gameConfig({ handSize: 10, maxDraws: 0, wildsInDeck: 8, skipMode: "deny" });
+  for (const paced of [false, true]) {
+    const random = mulberry32(4);
+    const table = new Table();
+    table.seats = buildOpponents(3, [1, 2, 3], one, random, MID);
+    const lost = new PhaseHand(1, one, { random, table, paced });
+    table.seats[0].hand.push(SKIP);       // Ada throws it, at the player
+
+    lost.draw();
+    lost.discardCard(lost.hand[lost.hand.length - 1]);
+    if (paced) while (lost.turnPending) lost.stepOpponent();
+
+    eq(order(lost.table.drainLog()), ["Ada", "Bo", "Cy", "You", "Ada", "Bo", "Cy"],
+      `${paced ? "paced" : "unpaced"}: the table comes round twice and your turn is gone`);
+    eq(lost.turnsMissed, 1, `${paced ? "paced" : "unpaced"}: charged exactly one turn`);
+    check(!lost.skipped, `${paced ? "paced" : "unpaced"}: and the flag is spent`);
   }
-  check(cycles >= 1, "and the table comes round again before you play");
 }
 
 // -- every card a seat was dealt is somewhere ---------------------------------
