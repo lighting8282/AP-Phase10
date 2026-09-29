@@ -156,6 +156,11 @@ header.slim #free-play-offer { display: none; }
 .meld img.by-3 { --hit: var(--seat-3); }
 .meld img.by-4 { --hit: var(--seat-4); }
 .meld img.by-you { --hit: var(--accent); }
+/* And it keeps its whole ring. The outline stands 4px clear of the card,
+   wider than the gap between two of them, so without this the next card in
+   the group paints over the right-hand side of the ring -- on the one card in
+   the group the ring exists to point at. */
+.meld img.hit { position: relative; z-index: 1; }
 
 /* And said, not only shown: four similar rings is a lot to ask of colour, and
    "+1 Cy" is the whole answer in three characters. */
@@ -495,7 +500,7 @@ pre {
 /* A gap wide enough to read as a gap. Two sets of three at this size are six
    cards in a row, and a hairline between them is not a boundary anybody
    notices while the table is moving. */
-.melds { display: flex; flex-wrap: wrap; gap: 0.55rem; margin-top: 0.45rem; }
+.melds { display: flex; flex-wrap: wrap; gap: 0.55rem; margin-top: 0.45rem; min-width: 0; }
 .meld {
   display: inline-flex;
   flex-direction: column;
@@ -505,6 +510,10 @@ pre {
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.07);
   border: 1px solid var(--line);
+  /* A flex item will not shrink below its own content unless it is told it
+     may, and a group is content with no ceiling on it. */
+  min-width: 0;
+  max-width: 100%;
 }
 /* The card accounting. Quiet and small -- it is a footnote you read once when
    a seat goes out and the table looks short, not something to compete with
@@ -517,7 +526,18 @@ pre {
   opacity: 0.85;
 }
 
-.meld-cards { display: flex; gap: 2px; }
+/* A group grows all round: a run of seven laid down can be twelve cards by the
+   time everybody has hit it, and a set has no ceiling at all. Reported from a
+   real game -- a run of nine ran out of its seat and underneath the next
+   player's panel, on the desktop and on a phone both.
+
+   So the row wraps rather than running on. Fanning the cards over each other
+   was tried first and measured: at the width a seat actually gets, nine cards
+   leave seven pixels of each, which on a run -- where the rank is the entire
+   content -- says a card is there without saying which one. Wrapped, every
+   card stays whole and the seat grows downwards instead. Height is what a
+   phone has and a seat has not. */
+.meld-cards { display: flex; flex-wrap: wrap; gap: 2px; min-width: 0; max-width: 100%; }
 /* The caption. Quiet, because the cards are the thing being read -- but it is
    what turns "six cards" into "a set of 11s and a set of 4s". */
 .meld-name {
@@ -716,6 +736,12 @@ button.meld .meld-name::after { content: " +"; }
   .seats .seat-hand { padding-left: 12px; }
   .seats .seat-hand img { width: 18px; height: 27px; margin-left: -12px; }
   .seats .melds { gap: 0.3rem; }
+  /* Smaller cards in a seat's groups, for the same reason the backs are
+     smaller: a seat is about a hundred pixels wide here, and at 26px a group
+     wraps every third card, which reads as a column rather than a group. At
+     20px it is four across and the rank is still perfectly legible. Your own
+     groups keep the full size -- they have the width of the page. */
+  .seats .meld img { width: 20px; height: 30px; }
   #prompt { flex: 1 1 100%; text-align: center; }
 
   /* Rem heights are a large slice of a phone screen. Cap by viewport so the

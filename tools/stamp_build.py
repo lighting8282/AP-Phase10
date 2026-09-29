@@ -37,14 +37,20 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = ROOT / "docs" / "src"
 INDEX = ROOT / "docs" / "index.html"
-#: Everything the page loads, in a fixed order so the hash is stable.
-SOURCES = sorted(SRC.glob("*.js"))
+STYLE = ROOT / "docs" / "style.css"
+#: Everything the page loads, in a fixed order so the hash is stable. The
+#: stylesheet counts: it is served with the same ten-minute cache, and half the
+#: layout lives in it, so a CSS-only deploy left the old rules in place with
+#: nothing in the markup to say so.
+SOURCES = sorted(SRC.glob("*.js")) + [STYLE]
 
 #: `from "./engine.js"` and `from "../node_modules/..."`, with or without a
 #: stamp already on them.
 IMPORT = re.compile(r'(from\s+")(\.{1,2}/[^"?]+\.js)(\?v=[^"]*)?(")')
 #: The page's own entry point.
 SCRIPT = re.compile(r'(<script type="module" src=")([^"?]+)(\?v=[^"]*)?(")')
+#: And its stylesheet.
+SHEET = re.compile(r'(<link rel="stylesheet" href=")([^"?]+)(\?v=[^"]*)?(")')
 
 
 def build_id() -> str:
@@ -87,7 +93,10 @@ def main() -> int:
     stamped = 0
 
     targets = [(path, IMPORT) for path in sorted(SRC.glob("*.js"))]
+    # Two passes over the page: the entry point and the stylesheet are
+    # different tags, and one regex for both would match neither cleanly.
     targets.append((INDEX, SCRIPT))
+    targets.append((INDEX, SHEET))
     # index.html also carries module imports if any are ever inlined.
     for path, pattern in targets:
         text = path.read_text(encoding="utf-8")
