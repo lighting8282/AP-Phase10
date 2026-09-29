@@ -102,6 +102,23 @@ from the code with nothing failing.
 where it is not obvious, why — `Stamp the module URLs so a deploy cannot arrive
 half old`, `Free play has no draw budget`. No prefixes, no type tags.
 
+**One branch per batch, not per fix.** Pages is served straight off `main`
+("deploy from branch", `/docs`) with no workflow in front of it, so every push
+to `main` is a deployment — including pushes that touch nothing the site
+serves. Merges and deployments are the same number, and that number was
+reaching the high teens on a busy day.
+
+So finished work waits on the working branch rather than going to `main` on its
+own. Keep adding commits to the branch already open, open one pull request for
+the batch, and merge when there is a reason to *ship* — not each time something
+is finished. Each commit still stands on its own and still runs the full
+battery; what changes is when they go out, not how they are made.
+
+Two exceptions, both narrow. Something broken for players right now goes on its
+own and merges immediately — a deploy is cheap next to a board nobody can read.
+And if the batch grows big enough that a bad merge would be hard to unpick,
+split it rather than holding it.
+
 **No attribution lines.** Do not add `Co-Authored-By`, `Generated with`,
 session links or any other trailer naming an AI tool to commit messages or pull
 request descriptions. The repository owner does not want such tools appearing in
