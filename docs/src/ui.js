@@ -4,18 +4,18 @@
 // client, and holds no game state of its own. Anything it needed to remember
 // would be a second copy of something the session already owns.
 
-import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=7cfd187b";
+import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=49ba8887";
 
 //: Faces used purely as icons in the stat panel.
 const SKIP_FACE = SKIP;
 const WILD_FACE = WILD;
-import { HAND_STATE } from "./engine.js?v=7cfd187b";
+import { HAND_STATE } from "./engine.js?v=49ba8887";
 import {
   HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, milestoneLocationName,
   phaseLocationName, storeGate, storeLocationName,
-} from "./data.js?v=7cfd187b";
-import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=7cfd187b";
-import { Phase10Client } from "./client.js?v=7cfd187b";
+} from "./data.js?v=49ba8887";
+import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=49ba8887";
+import { Phase10Client } from "./client.js?v=49ba8887";
 
 const el = (id) => document.getElementById(id);
 
@@ -361,6 +361,11 @@ async function runOpponentTurns(hand) {
         if (!had) continue;
         for (const card of meld.cards) if (!had.has(card)) justHit.set(card, who);
       }
+      // A turn a Skip took off you is spent inside this walk, at the end of the
+      // round the Skip was thrown in -- not before it started. So the banner
+      // lights up here rather than up front, and it stays lit for the second
+      // pass, which is otherwise the seats going round twice for no reason.
+      missingTurn = hand.turnsMissed > missedBefore;
       reportTable();
       render();
     }
@@ -382,9 +387,9 @@ function afterPlayerAction(hand) {
   // Any move that lands disarms the Skip: the second click has to be the very
   // next thing you do, or it is not a confirmation of anything.
   armedSkip = null;
-  // A turn a Skip took off you: the walk about to run is two passes of the
-  // table rather than one, and without saying so it reads as the seats going
-  // round twice for no reason.
+  // A turn already gone before the walk starts -- which is only the unpaced
+  // path, since a seat throws its Skip during the walk. runOpponentTurns keeps
+  // this up to date from there.
   missingTurn = hand.turnsMissed > missedBefore;
   render();
   if (hand.turnPending) {

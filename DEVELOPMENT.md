@@ -995,6 +995,21 @@ exactly one turn however long it waited. Losing it means the table comes round
 because the flag is gone the instant the turn is spent and a client that only
 looks between moves would never see it.
 
+**Which turn it costs is the next one, and reading the flag too early moves it.**
+`_end_turn` checked `skipped` at the top, *before* letting the table play. But a
+seat sets that flag while it plays, so the check was always a round behind: you
+were handed the turn you had just been denied, played it, and the miss was
+charged to the turn after. Reported from a real game as being skipped and
+allowed to go again, which is exactly what it was. The table's turn is settled
+first now, and then `while skipped` spends the turn that would have come next --
+a loop rather than an `if`, because two seats can deny you in one round of the
+table and each one costs a turn.
+
+The paced walk has to agree, and it is the same rule arriving in pieces: the
+denial lands somewhere inside the queue, so `step_opponent` spends the turn when
+the queue empties and refills it. Both orders are pinned by one test that runs
+paced and unpaced and compares who acted, in order.
+
 `_deny_somebody` aims at whoever is closest to going out: down first, then
 fewest cards held, everybody included. That is usually you, and denying the next
 seat round the table instead would be the safe-looking choice and the wrong one.
