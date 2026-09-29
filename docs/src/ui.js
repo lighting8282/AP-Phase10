@@ -4,18 +4,18 @@
 // client, and holds no game state of its own. Anything it needed to remember
 // would be a second copy of something the session already owns.
 
-import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=2295df76";
+import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=16a613b7";
 
 //: Faces used purely as icons in the stat panel.
 const SKIP_FACE = SKIP;
 const WILD_FACE = WILD;
-import { HAND_STATE } from "./engine.js?v=2295df76";
+import { HAND_STATE } from "./engine.js?v=16a613b7";
 import {
   HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, milestoneLocationName,
   phaseLocationName, storeGate, storeLocationName,
-} from "./data.js?v=2295df76";
-import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=2295df76";
-import { Phase10Client } from "./client.js?v=2295df76";
+} from "./data.js?v=16a613b7";
+import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=16a613b7";
+import { Phase10Client } from "./client.js?v=16a613b7";
 
 const el = (id) => document.getElementById(id);
 
@@ -36,6 +36,30 @@ const app = new Phase10Client({
  * exists -- the engine plays the turn in no time.
  */
 const OPPONENT_TURN_MS = 3000;
+
+/**
+ * How much of that pause the player wants.
+ *
+ * Three seconds a seat is right the first time you watch a table play and
+ * long by the tenth round, and which of those you are in is not something the
+ * page can know. So it is a setting, and `Off` is one of the options: somebody
+ * who has read enough tables is entitled to have the turn simply happen.
+ *
+ * Divisors rather than milliseconds, so the one number that says how long a
+ * turn is readable for stays in one place.
+ */
+const SPEEDS = [
+  { label: "1x", times: 1, says: "normal" },
+  { label: "2x", times: 2, says: "twice as fast" },
+  { label: "4x", times: 4, says: "four times as fast" },
+  { label: "Off", times: 0, says: "no pause at all" },
+];
+const SPEED_KEY = "ap10_table_speed";
+//: How long the pause is checked against while it runs, so a change made
+//: during one takes effect in it rather than in the next.
+const SPEED_TICK_MS = 100;
+
+let speedIndex = 0;
 
 //: Walking the opponents' turns. The table is mid-move while this is set, so
 //: everything the player could touch is held shut until it clears.
@@ -69,6 +93,25 @@ let missingTurn = false;
 let missedBefore = 0;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Wait out one seat's turn at whatever speed is currently set.
+ *
+ * In slices rather than one sleep, because the moment somebody wants this
+ * faster is the moment they are sat watching a pause -- and a single timer
+ * started at the old speed would make them sit through that one first. Each
+ * slice re-reads the setting, so turning it up shortens the pause already
+ * running, and `Off` ends it on the spot.
+ */
+async function pauseForTurn() {
+  let waited = 0;
+  for (;;) {
+    const { times } = SPEEDS[speedIndex];
+    if (times === 0 || waited >= OPPONENT_TURN_MS / times) return;
+    await sleep(SPEED_TICK_MS);
+    waited += SPEED_TICK_MS;
+  }
+}
 
 //: Rooms can be chatty and this feed never scrolls away on its own.
 const MAX_LOG_LINES = 300;
@@ -346,7 +389,7 @@ async function runOpponentTurns(hand) {
       const before = new Map(
         hand.table.allMelds().map((meld) => [meld, new Set(meld.cards)]),
       );
-      await sleep(OPPONENT_TURN_MS);
+      await pauseForTurn();
       if (!current()) break;
       const seat = hand.stepOpponent();
       if (seat === null) break;
@@ -1218,6 +1261,39 @@ el("edit-connection").addEventListener("click", () => setConnectionFormOpen(true
   });
 }
 
+// How fast the table plays. A cycle rather than a menu: the tap that wants it
+// is made mid-pause, with a turn running, and picking from a list is three
+// interactions where this is one. The button never goes dark with the rest of
+// the controls -- being able to speed the table up while it is the table's
+// turn is the entire point of it.
+{
+  const button = el("speed");
+  const show = () => {
+    const { label, says } = SPEEDS[speedIndex];
+    button.textContent = `Speed ${label}`;
+    button.setAttribute("aria-label", `Table speed: ${says}. Press to change.`);
+  };
+  try {
+    const saved = SPEEDS.findIndex((s) => s.label === localStorage.getItem(SPEED_KEY));
+    if (saved >= 0) speedIndex = saved;
+  } catch {
+    /* a private window is not a reason to fail to draw the page */
+  }
+  button.addEventListener("click", () => {
+    speedIndex = (speedIndex + 1) % SPEEDS.length;
+    show();
+    try {
+      // Stored by name rather than by position, so reordering or adding a
+      // speed later cannot silently turn somebody's saved choice into a
+      // different one.
+      localStorage.setItem(SPEED_KEY, SPEEDS[speedIndex].label);
+    } catch {
+      /* nothing to do about it */
+    }
+  });
+  show();
+}
+
 // -- free play ---------------------------------------------------------------
 async function startFreePlay(fresh, phases = null) {
   const status = el("status");
@@ -1308,6 +1384,13 @@ const TUTORIAL = [
     text: "Once your own phase is down you can add spare cards to any group on "
       + "the table, including theirs. A run takes either end; a set takes its "
       + "own number.",
+  },
+  {
+    target: "#speed",
+    title: "And set how fast they play",
+    text: "The three of them take their turns one at a time so you can see "
+      + "what each one did. Press this to run them faster, or to drop the "
+      + "pause altogether -- it works while they are playing, too.",
   },
   {
     target: "#hand",
