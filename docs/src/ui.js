@@ -4,18 +4,18 @@
 // client, and holds no game state of its own. Anything it needed to remember
 // would be a second copy of something the session already owns.
 
-import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=8767b160";
+import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=7cfd187b";
 
 //: Faces used purely as icons in the stat panel.
 const SKIP_FACE = SKIP;
 const WILD_FACE = WILD;
-import { HAND_STATE } from "./engine.js?v=8767b160";
+import { HAND_STATE } from "./engine.js?v=7cfd187b";
 import {
   HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, milestoneLocationName,
   phaseLocationName, storeGate, storeLocationName,
-} from "./data.js?v=8767b160";
-import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=8767b160";
-import { Phase10Client } from "./client.js?v=8767b160";
+} from "./data.js?v=7cfd187b";
+import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=7cfd187b";
+import { Phase10Client } from "./client.js?v=7cfd187b";
 
 const el = (id) => document.getElementById(id);
 
@@ -50,10 +50,16 @@ let armedSkip = null;
 //: one. Decided before the turn happens, because afterwards the flag that said
 //: so has been consumed.
 let activeMissed = false;
-//: Cards a seat added to a group on its most recent turn, so the group can say
-//: it grew. Only ever holds the last seat's, which is the point -- marking
-//: every card ever hit would mark most of the table.
-let justHit = new Set();
+//: Every card added to a group since your last move, and who added it. Cards
+//: are the key, a seat index (or "you") the value, so a group can say both
+//: that it grew and who grew it.
+//:
+//: It holds the whole of the table's turn rather than one seat's, and clears
+//: when you next act. Per seat it lasted about three seconds -- the mark was
+//: gone before anybody looked at it, which is the same as not marking at all.
+//: Cleared on your move rather than by a timer, so you have exactly as long as
+//: you want to read the table.
+let justHit = new Map();
 //: Whether the walk now running is one you are sitting out. The flag on the
 //: hand is consumed the moment the turn is lost, so by the time anything is
 //: drawn it is already false; this is read off turnsMissed instead.
@@ -280,6 +286,10 @@ function hitMeld(meld) {
     log(err.message);
     return;
   }
+  // Yours is marked the same way theirs is, and added to what the table did
+  // rather than replacing it. Hitting is the one move whose result lands
+  // somewhere other than your own hand, so it is the hardest to see you made.
+  justHit.set(playable[0], "you");
   log(`You play ${describe(playable[0])} onto the table.`);
   reportTable();
   afterPlayerAction(hand);
@@ -315,6 +325,11 @@ function reportTable() {
 async function runOpponentTurns(hand) {
   if (pacing) return;
   const current = () => app.session.hand === hand;
+  // The table is about to move, so the last round of marks has been seen.
+  // Cleared here rather than on your own move: a hit and the discard that
+  // follows it are one turn, and clearing on the discard would erase the mark
+  // on the card you had just played, in the same breath as playing it.
+  justHit.clear();
   pacing = true;
   try {
     while (hand.turnPending && current()) {
@@ -323,7 +338,6 @@ async function runOpponentTurns(hand) {
       // Read now: playSeat consumes the flag, so after the turn there is no
       // way left to tell a seat that missed from one that played.
       activeMissed = activeSeat.skipped;
-      justHit = new Set();
       render();
       // What each group held before the turn, so what it gains can be marked.
       // Per meld rather than one flat set: a group that did not exist before is
@@ -337,11 +351,15 @@ async function runOpponentTurns(hand) {
       const seat = hand.stepOpponent();
       if (seat === null) break;
       activeSeat = seat;
-      justHit = new Set();
+      // Added to, not added by: a seat can hit onto anybody's group, so what
+      // is recorded is who played the card rather than whose group it landed
+      // in. Accumulated across the walk, so a card Ada played is still marked
+      // when Cy has finished playing.
+      const who = hand.table.seats.indexOf(seat);
       for (const meld of hand.table.allMelds()) {
         const had = before.get(meld);
         if (!had) continue;
-        for (const card of meld.cards) if (!had.has(card)) justHit.add(card);
+        for (const card of meld.cards) if (!had.has(card)) justHit.set(card, who);
       }
       reportTable();
       render();
@@ -565,6 +583,11 @@ function render() {
 }
 
 /** One group on the table. A button when you could play onto it. */
+/** Who played a card, as a name: a seat index, or "you". */
+function whoPlayed(who) {
+  return who === "you" ? "you" : app.session.seatName(who);
+}
+
 function meldNode(meld) {
   const hand = app.session.hand;
   const live = Boolean(hand) && hand.state === HAND_STATE.IN_PROGRESS && !pacing
@@ -587,17 +610,34 @@ function meldNode(meld) {
 
   const row = document.createElement("span");
   row.className = "meld-cards";
+  const added = [];
   for (const card of meld.cards) {
     const img = document.createElement("img");
     img.src = `assets/cards/${cardFilename(card)}`;
     img.alt = describe(card);
-    // The card a seat just added. A group that grew by one between two redraws
-    // is otherwise a group that looks the same, and "did that seat add on or
-    // just discard?" was a question the log alone had to answer.
-    if (justHit.has(card)) img.classList.add("hit");
+    // Cards played onto this group since the table last started moving, ringed
+    // in the colour of whoever played them. A group that grew by one between
+    // two redraws is otherwise a group that looks the same, and the colour
+    // answers "who" without reading the log on the far side of the page.
+    if (justHit.has(card)) {
+      const who = justHit.get(card);
+      img.classList.add("hit", who === "you" ? "by-you" : `by-${who + 1}`);
+      img.alt = `${describe(card)} -- just played by ${whoPlayed(who)}`;
+      added.push(who);
+    }
     row.append(img);
   }
   node.append(row);
+
+  // Said as well as shown. Colour alone would leave the one thing you most
+  // need to notice resting on telling four similar rings apart.
+  if (added.length) {
+    const grew = document.createElement("span");
+    grew.className = "meld-grew";
+    const names = [...new Set(added.map(whoPlayed))];
+    grew.textContent = `+${added.length} ${names.join(" & ")}`;
+    name.append(" ", grew);
+  }
   return node;
 }
 

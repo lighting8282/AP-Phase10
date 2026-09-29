@@ -135,13 +135,34 @@ header.slim #free-play-offer { display: none; }
 /* A Skip asked to be thrown away, waiting for the second click to mean it. */
 .card.armed img { outline: 2px dashed #ff9a9a; }
 
-/* The card a seat just added to a group. Groups are small and identical at a
-   glance, so growth is invisible without this -- and it is what answers "is
-   that seat adding on, or only discarding?" where the question is asked,
-   rather than in a log column on the other side of the page. */
+/* A card played onto a group since the table last started moving, ringed in
+   the colour of whoever played it. Groups are small and identical at a glance,
+   so growth is invisible without this -- and the colour answers "who" where
+   the question is asked, rather than in a log column on the other side of the
+   page. The ring outlives the turn: it clears when the table next moves, so
+   there is as long as you like to read it. */
+/* Offset by a pixel so the panel shows through between card and ring. The
+   seat colours and the card colours are both green/red/yellow, so a ring drawn
+   flush against the card it marks can land green-on-green and disappear --
+   exactly on the card it exists to point at. */
 .meld img.hit {
-  outline: 2px solid var(--cleared);
-  box-shadow: 0 0 10px rgba(46, 139, 87, 0.75);
+  outline: 3px solid var(--hit, var(--cleared));
+  outline-offset: 1px;
+  box-shadow: 0 0 9px var(--hit, var(--cleared));
+  border-radius: 3px;
+}
+.meld img.by-1 { --hit: var(--seat-1); }
+.meld img.by-2 { --hit: var(--seat-2); }
+.meld img.by-3 { --hit: var(--seat-3); }
+.meld img.by-4 { --hit: var(--seat-4); }
+.meld img.by-you { --hit: var(--accent); }
+
+/* And said, not only shown: four similar rings is a lot to ask of colour, and
+   "+1 Cy" is the whole answer in three characters. */
+.meld-grew {
+  color: var(--ink);
+  font-weight: 700;
+  white-space: nowrap;
 }
 @media (prefers-reduced-motion: no-preference) {
   .meld img.hit { animation: hit-land 0.5s ease-out; }
@@ -532,12 +553,20 @@ pre {
 }
 
 /* A colour per seat, so "who just laid down" is answered by where you are
-   looking rather than by re-reading names. Yours is the accent blue. */
+   looking rather than by re-reading names. Yours is the accent blue.
+   Named on :root because the cards a seat plays onto the table are ringed in
+   the same colours, and two copies of the palette would drift. */
+:root {
+  --seat-1: #55b976;
+  --seat-2: #d9695f;
+  --seat-3: #d6b348;
+  --seat-4: #b07fd0;
+}
 .seat { border-top: 3px solid var(--seat, var(--line)); }
-.seats .seat:nth-child(1) { --seat: #55b976; }
-.seats .seat:nth-child(2) { --seat: #d9695f; }
-.seats .seat:nth-child(3) { --seat: #d6b348; }
-.seats .seat:nth-child(4) { --seat: #b07fd0; }
+.seats .seat:nth-child(1) { --seat: var(--seat-1); }
+.seats .seat:nth-child(2) { --seat: var(--seat-2); }
+.seats .seat:nth-child(3) { --seat: var(--seat-3); }
+.seats .seat:nth-child(4) { --seat: var(--seat-4); }
 .seats .seat:nth-child(1) .who { color: #8ade9b; }
 .seats .seat:nth-child(2) .who { color: #ff9a9a; }
 .seats .seat:nth-child(3) .who { color: #ffd479; }
