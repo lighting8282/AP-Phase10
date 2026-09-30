@@ -117,9 +117,36 @@ def store_gate(slot: int) -> int:
     return sum(STORE_PRICES[:slot])
 
 
-def store_points(slots: int) -> int:
+#: What the store sells that is not a check: a card, once, now. Bought any
+#: number of times while the points last, and gone the moment it is played or
+#: discarded -- the point of them is the run where you are three rounds into
+#: phase 17 and the deck will not give you a fourth nine.
+#:
+#: Priced against what the card is worth to be caught holding, which is also
+#: what it is worth to hold: a Wild is 25 points of penalty and the most useful
+#: card in the deck, a Skip is 15 and buys a turn off whoever is closest to
+#: going out.
+BUFF_WILD = "One-Use Wild"
+BUFF_SKIP = "One-Use Skip"
+BUFF_PRICES = {BUFF_WILD: 2, BUFF_SKIP: 1}
+BUFFS = [BUFF_WILD, BUFF_SKIP]
+
+#: Points the pool carries beyond the ladder so there is something to spend on
+#: them. Trimmed before the slack and before any slot when the pool is tight,
+#: so a seed that could only just fit its store still gets the store it got
+#: before these existed.
+DEFAULT_BUFF_POINTS = 4
+
+
+def buff_price(buff: str) -> int:
+    return BUFF_PRICES[buff]
+
+
+def store_points(slots: int, buff_points: int = 0) -> int:
     """How many points the pool carries for a store of this size."""
-    return sum(store_prices(slots)) + STORE_SLACK if slots else 0
+    if not slots:
+        return 0
+    return sum(store_prices(slots)) + STORE_SLACK + buff_points
 
 
 def store_location_name(slot: int) -> str:

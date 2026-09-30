@@ -21,10 +21,10 @@ import {
   isWild,
   numberCard,
   COLORS,
-} from "./cards.js?v=537a67e1";
+} from "./cards.js?v=2af7fd90";
 import {
   GROUP, PHASES, phaseCardCount, solveLayOptions, solveMelds, solvePhase,
-} from "./phases.js?v=537a67e1";
+} from "./phases.js?v=2af7fd90";
 
 /** How deep into the stock a played Skip lets you look. */
 export const SKIP_DIG_DEPTH = 3;
@@ -317,6 +317,10 @@ export class PhaseHand {
     this.drewThisTurn = false;
     this.usedWildsInLayout = 0;
     this.skipsPlayed = 0;
+    //: Cards bought from the store into this hand. Counted so the card
+    //: accounting still balances: dealt + drawn + bought = down + held +
+    //: thrown.
+    this.boughtCards = 0;
     this.digOptions = null;
     //: A discarded Skip waiting to be aimed, as the seats it could be aimed
     //: at. Null when there is nothing to aim. Deny mode only.
@@ -413,6 +417,32 @@ export class PhaseHand {
   }
 
   // -- actions --------------------------------------------------------------
+  /**
+   * Put a card the player bought into their hand.
+   *
+   * Not a draw. It costs no draw from the budget, it comes from nowhere rather
+   * than off the stock, and it can be taken at any point in a turn -- the deck
+   * is not short of Wilds, the player is. What it does cost is the ordinary
+   * thing: the turn still ends on a discard, so a bought card is one more card
+   * to shed and one more to be caught holding. A Wild is twenty-five points if
+   * the round ends on you.
+   *
+   * Refused once the hand is over, and refused mid-move: a card arriving while
+   * a Skip is waiting to be aimed or a dig is waiting to be picked from would
+   * change the hand underneath a decision already in flight.
+   */
+  takeBoughtCard(card) {
+    if (this.state !== HAND_STATE.IN_PROGRESS) {
+      throw new Error(`hand is ${this.state}`);
+    }
+    if (this.digPending) throw new Error("finish the dig first");
+    if (this.denyPending) throw new Error("say who misses their turn first");
+    this.hand.push(card);
+    this.boughtCards += 1;
+    this._emit("bought_card", { card: cardToString(card) });
+    return card;
+  }
+
   draw(fromDiscard = false) {
     if (this.state !== HAND_STATE.IN_PROGRESS) throw new Error(`hand is ${this.state}`);
     if (this.drewThisTurn) throw new Error("already drew this turn; discard first");

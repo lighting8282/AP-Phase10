@@ -97,6 +97,18 @@ export const storePrices = (slots) => STORE_PRICES.slice(0, slots);
 export const storeGate = (slot) =>
   STORE_PRICES.slice(0, slot).reduce((total, price) => total + price, 0);
 
+/**
+ * What the store sells that is not a check: a card, once, now. See data.py for
+ * the pricing -- a Wild is the most useful card in the deck and the worst one
+ * to be caught holding, and a Skip buys a turn off whoever is closest to out.
+ */
+export const BUFF_WILD = "One-Use Wild";
+export const BUFF_SKIP = "One-Use Skip";
+export const BUFF_PRICES = Object.freeze({ [BUFF_WILD]: 2, [BUFF_SKIP]: 1 });
+export const BUFFS = Object.freeze([BUFF_WILD, BUFF_SKIP]);
+
+export const buffPrice = (buff) => BUFF_PRICES[buff];
+
 export const phaseLocationName = (phase, tier) => `Phase ${phase} - ${tier}`;
 export const milestoneLocationName = (hands) => `Hands Won: ${hands}`;
 export const storeLocationName = (slot) => `Store Slot ${slot}`;

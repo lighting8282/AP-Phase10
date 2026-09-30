@@ -42,6 +42,7 @@ while to find and would be easy to reintroduce.
 - [The store](#the-store)
   - [The gate is not the price](#the-gate-is-not-the-price)
   - [Sizing it, measured](#sizing-it-measured)
+  - [The rebuyable half](#the-rebuyable-half)
   - [It runs alongside the phases](#it-runs-alongside-the-phases)
 - [Game and scoring](#game-and-scoring)
 - [UI](#ui)
@@ -694,6 +695,44 @@ power items are sized. Otherwise the store's own new locations are swallowed by
 power items that were previously being trimmed away, and the points have
 nowhere to go — the store silently pays for Wild Cards.
 
+### The rebuyable half
+
+The store also sells a card rather than a check: a **One-Use Wild** for two
+points, a **One-Use Skip** for one, as often as the points allow. The card goes
+into your hand, costs no draw, and is gone the moment it is played or
+discarded. It is for the run where you are three rounds into phase 17 and the
+deck will not give you a fourth nine — which is a real place to be, and until
+now the only answer to it was to keep losing rounds.
+
+It is one currency, because two would be a second economy to learn for no gain.
+That has one hazard, and it is the only thing here that could break a seed
+rather than a round: **Archipelago's logic reasons about points *received*, and
+cannot model one being spent.** A player who spent the store's own money on
+cards would leave locations the seed was generated as reachable with nothing
+left to reach them with — in a multiworld, somebody else's progression sitting
+in a slot nobody can buy.
+
+**So the store reserves what the unbought slots cost and sells out of the rest.**
+`points_reserved` is the sum of the prices of the slots you have not bought;
+`buff_points_left` is what is left after it. Buying a card can therefore never
+make a slot unaffordable, whatever order you do anything in. The invariant is
+tested the way the ladder's own is — every purse a default store can hold,
+spent down to the last card the store will sell, then all 720 orders the six
+slots can be bought in — in both ports.
+
+Two consequences worth stating. The **slack is spendable**: it existed so the
+last slot was not hostage to where the final point landed, and the reservation
+now does that job outright, so holding it back as well would make it a point
+nobody could ever use. And the refusal **says where the points went** rather
+than reporting a flat no, because "8 unspent, but 8 of those are held for the 6
+slots you have not bought" is the difference between a rule and a bug.
+
+`store_buff_points` is how much spending money the seed carries beyond the
+ladder. It is trimmed **first** when the pool is tight — before the slack and
+before any slot — so a seed that could only just fit its store still gets the
+store it would have got without these: at one check a phase the planner still
+lands on five slots with nothing spare, exactly where it landed before.
+
 ### It runs alongside the phases
 
 Measured over fifteen seeds at the default, six slots and ten points:
@@ -887,6 +926,28 @@ because the seat colours and the card colours are both green/red/yellow -- flush
 against the card, a green ring on a green card disappears, exactly on the card
 it exists to point at. And the count is written out beside the group name,
 because four similar rings is a lot to ask of colour alone.
+
+**The mark outlives the flash.** Those two are answering different questions and
+were doing only the first. The ring says *what just changed*, and it has to
+clear or everything is ringed by the end of a round. Whose card a card is does
+not change, and it is the thing you want two turns later: a run of nine with
+two of your cards and one of Ada's in it is a different thing from a run of
+nine Cy built alone, and counting back through the log is not reading the
+table. So a card played onto a group that was already down keeps a border in
+the player's colour for the rest of the round, under the flash while the flash
+lasts.
+
+`playedBy` is a second map beside `justHit`, written at the same two points and
+cleared when a round starts rather than when the table moves. It lives in the
+UI rather than the engine because it can: `toPayload` keeps finished rounds and
+nothing else, so a hand in progress is never restored and a round always begins
+with the table empty. Nothing to mirror into Python, and no `SAVE_VERSION` bump.
+
+The border is drawn *inside* the card, at `outline-offset: -1px`. Outside it
+would cost no layout either but would reach the card beside it -- groups pack
+at a 2px gap -- so a group with three marked cards in it would read as one
+smear. Two pixels of card art is a cheap price for a border that is still
+unambiguous at the 20px a seat's cards are drawn at on a phone.
 
 **The turn moved into `Table.playSeat`, and that is the part worth remembering.**
 It is the body of the old `endOfTurn` loop, so a seat played one at a time is

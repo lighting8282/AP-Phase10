@@ -81,6 +81,8 @@ plays through commands in the client console:
     /mulligan   throw back a dead opening hand
     /store      what the store sells and what you can afford
     /buy <n>    buy a store slot with AP Points
+    /buy wild   buy a One-Use Wild into your hand
+    /buy skip   buy a One-Use Skip into your hand
     /table      what the opponents have down
     /score      the scorecard: recent rounds and the running total
     /auto       play the current hand out with the built-in player
@@ -246,6 +248,7 @@ explanation; these are the ones that change the shape of a run most.
 | `goal` | all phases | Clear every phase, or just Phase 10 |
 | `checks_per_phase` | 2 | 1–4 checks per phase: cleared, under par, no wilds, went out |
 | `store_slots` | 6 | Checks you can buy outright with AP Points; 0 for none |
+| `store_buff_points` | 4 | Spending money for the store's one-use cards; 0 for none |
 | `starting_phases` | 2 | How many phases you open with |
 | `opponents` | 3 | Computer players at the table; 0 for the pure solo game |
 | `starting_draws` | 4 | Draws per hand before Extra Draw items |
@@ -265,6 +268,18 @@ build both back up.
 **AP Point** buys a check outright in the store. Each slot has a price, and a
 slot opens once you hold enough points to have afforded every cheaper one — so
 you can buy them in any order.
+
+The store also sells a **card** rather than a check: a **One-Use Wild** for two
+points or a **One-Use Skip** for one, as often as you can afford them. The card
+goes straight into your hand, it costs you no draw, and it is gone the moment
+you play or discard it — it is one more card to shed, and one more to be caught
+holding. They are there for the round where the deck will not give you the one
+card you need.
+
+**Buying cards can never cost you a check.** The store holds back what your
+unbought slots still cost and only lets you spend what is left over, so no
+amount of buying can strand a location. `store_buff_points` sets how much
+spending money the seed carries beyond the slots; 0 turns the cards off.
 
 **Filler.** A **Mulligan** throws back a dead opening hand before your first
 draw. A **Score Reduction** takes 25 points off your total, which is what a

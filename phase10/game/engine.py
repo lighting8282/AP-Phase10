@@ -274,6 +274,10 @@ class PhaseHand:
         self.drew_this_turn = False
         self.used_wilds_in_layout = 0
         self.skips_played = 0
+        #: Cards bought from the store into this hand. Counted so the card
+        #: accounting still balances: dealt + drawn + bought = down + held +
+        #: thrown.
+        self.bought_cards = 0
         self.dig_options: list[Card] | None = None
         #: A discarded Skip waiting to be aimed, as the seats it could be
         #: aimed at. None when there is nothing to aim. Deny mode only.
@@ -359,6 +363,31 @@ class PhaseHand:
         return self.solution() is not None
 
     # -- actions -----------------------------------------------------------
+    def take_bought_card(self, card: Card) -> Card:
+        """Put a card the player bought into their hand.
+
+        Not a draw. It costs no draw from the budget, it comes from nowhere
+        rather than off the stock, and it can be taken at any point in a turn
+        -- the deck is not short of Wilds, the player is. What it does cost is
+        the ordinary thing: the turn still ends on a discard, so a bought card
+        is one more card to shed, and one more to be caught holding. A Wild is
+        twenty-five points if the round ends on you.
+
+        Refused once the hand is over, and refused mid-move: a card arriving
+        while a Skip is waiting to be aimed or a dig is waiting to be picked
+        from would change the hand underneath a decision already in flight.
+        """
+        if self.state is not HandState.IN_PROGRESS:
+            raise RuntimeError(f"hand is {self.state.value}")
+        if self.dig_pending:
+            raise RuntimeError("finish the dig first")
+        if self.deny_pending:
+            raise RuntimeError("say who misses their turn first")
+        self.hand.append(card)
+        self.bought_cards += 1
+        self._emit("bought_card", card=str(card))
+        return card
+
     def draw(self, from_discard: bool = False) -> Card:
         if self.state is not HandState.IN_PROGRESS:
             raise RuntimeError(f"hand is {self.state.value}")

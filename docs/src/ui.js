@@ -4,18 +4,18 @@
 // client, and holds no game state of its own. Anything it needed to remember
 // would be a second copy of something the session already owns.
 
-import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=537a67e1";
+import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=2af7fd90";
 
 //: Faces used purely as icons in the stat panel.
 const SKIP_FACE = SKIP;
 const WILD_FACE = WILD;
-import { HAND_STATE } from "./engine.js?v=537a67e1";
+import { HAND_STATE } from "./engine.js?v=2af7fd90";
 import {
-  HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, milestoneLocationName,
-  phaseLocationName, storeGate, storeLocationName,
-} from "./data.js?v=537a67e1";
-import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=537a67e1";
-import { Phase10Client } from "./client.js?v=537a67e1";
+  BUFFS, HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, buffPrice,
+  milestoneLocationName, phaseLocationName, storeGate, storeLocationName,
+} from "./data.js?v=2af7fd90";
+import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=2af7fd90";
+import { Phase10Client } from "./client.js?v=2af7fd90";
 
 const el = (id) => document.getElementById(id);
 
@@ -84,6 +84,17 @@ let activeMissed = false;
 //: Cleared on your move rather than by a timer, so you have exactly as long as
 //: you want to read the table.
 let justHit = new Map();
+//: Every card played onto a group that was already down, and who played it --
+//: for the whole round, not just the last move. `justHit` is the flash that
+//: says a group grew *now*; this is the record that says whose card that is,
+//: and it is the one you read two turns later when you are working out who is
+//: about to go out. Cards are the key, so nothing here depends on a group
+//: keeping its order or its identity as it grows.
+//:
+//: A hand in progress is not saved -- `toPayload` keeps finished rounds and
+//: nothing else -- so a round always starts with the table empty and this can
+//: live here rather than in the engine and the save format.
+let playedBy = new Map();
 //: Whether the walk now running is one you are sitting out. The flag on the
 //: hand is consumed the moment the turn is lost, so by the time anything is
 //: drawn it is already false; this is read off turnsMissed instead.
@@ -333,6 +344,7 @@ function hitMeld(meld) {
   // rather than replacing it. Hitting is the one move whose result lands
   // somewhere other than your own hand, so it is the hardest to see you made.
   justHit.set(playable[0], "you");
+  playedBy.set(playable[0], "you");
   log(`You play ${describe(playable[0])} onto the table.`);
   reportTable();
   afterPlayerAction(hand);
@@ -402,7 +414,11 @@ async function runOpponentTurns(hand) {
       for (const meld of hand.table.allMelds()) {
         const had = before.get(meld);
         if (!had) continue;
-        for (const card of meld.cards) if (!had.has(card)) justHit.set(card, who);
+        for (const card of meld.cards) {
+          if (had.has(card)) continue;
+          justHit.set(card, who);
+          playedBy.set(card, who);
+        }
       }
       // A turn a Skip took off you is spent inside this walk, at the end of the
       // round the Skip was thrown in -- not before it started. So the banner
@@ -663,10 +679,21 @@ function meldNode(meld) {
     const img = document.createElement("img");
     img.src = `assets/cards/${cardFilename(card)}`;
     img.alt = describe(card);
-    // Cards played onto this group since the table last started moving, ringed
-    // in the colour of whoever played them. A group that grew by one between
-    // two redraws is otherwise a group that looks the same, and the colour
-    // answers "who" without reading the log on the far side of the page.
+    // Two marks, and they answer two different questions.
+    //
+    // A card played onto a group that was already down keeps a border in the
+    // colour of whoever played it, for the rest of the round. That is the one
+    // you read later: a run of nine with two of your cards and one of Ada's in
+    // it is a different thing from a run of nine Cy built alone, and the
+    // border is what says so without counting back through the log.
+    if (playedBy.has(card)) {
+      const who = playedBy.get(card);
+      img.classList.add("played", who === "you" ? "by-you" : `by-${who + 1}`);
+      img.alt = `${describe(card)} -- played by ${whoPlayed(who)}`;
+    }
+    // And a card played since the table last started moving is ringed and lit
+    // as well, which is the question "what just changed". A group that grew by
+    // one between two redraws is otherwise a group that looks the same.
     if (justHit.has(card)) {
       const who = justHit.get(card);
       img.classList.add("hit", who === "you" ? "by-you" : `by-${who + 1}`);
@@ -1012,6 +1039,62 @@ function renderStore(session) {
     button.addEventListener("click", () => buy(slot));
     box.append(button);
   }
+
+  renderStoreBuffs(session);
+}
+
+/**
+ * The rebuyable half of the store.
+ *
+ * Shown with what is actually spendable rather than with what is unspent, and
+ * the difference is the whole safety of the thing: the slots you have not
+ * bought are owed their prices, because Archipelago's logic reasons about
+ * points *received* and cannot model a currency being spent. So the store
+ * reserves them, and what is left over is yours to turn into cards.
+ */
+function renderStoreBuffs(session) {
+  const wrap = el("store-buffs-wrap");
+  const box = el("store-buffs");
+  box.replaceChildren();
+  // No points beyond what the checks are owed means nothing to sell, and a row
+  // of permanently dark buttons explains itself worse than no row.
+  const budget = session.buffPointsLeft;
+  const reserved = session.pointsReserved;
+  wrap.hidden = !budget && !session.buffPointsSpent;
+  if (wrap.hidden) return;
+
+  el("store-buffs-note").textContent = reserved
+    ? `${budget} point(s) to spend on cards -- ${reserved} held for the `
+      + `${session.slotsLeft} slot(s) left`
+    : `${budget} point(s) to spend on cards`;
+
+  for (const buff of BUFFS) {
+    const price = buffPrice(buff);
+    const refusal = session.canBuyBuff(buff);
+    const bought = session.buffsBought.get(buff) ?? 0;
+    const button = document.createElement("button");
+    button.className = `chk buy ${refusal ? "locked" : "open"}`;
+    button.textContent = `${buff} - ${price}${bought ? ` (x${bought})` : ""}`;
+    button.title = refusal ?? `Buy a ${buff} for ${price} point(s) -- it goes `
+      + "straight into your hand, and it is gone once you play it";
+    button.disabled = Boolean(refusal);
+    button.addEventListener("click", () => buyBuff(buff));
+    box.append(button);
+  }
+}
+
+async function buyBuff(buff) {
+  let card;
+  try {
+    card = await app.buyBuff(buff);
+  } catch (err) {
+    log(err.message);
+    return;
+  }
+  log(`Bought a ${buff}. ${describe(card)} is in your hand;`
+    + ` ${app.session.buffPointsLeft} point(s) left to spend on cards.`);
+  reportTable();
+  render();
 }
 
 // -- the check list ----------------------------------------------------------
@@ -1200,7 +1283,14 @@ function renderPhases(session) {
     if (session.clearedPhases.has(phase)) button.classList.add("cleared");
     else if (unlocked.has(phase)) button.classList.add("open");
     button.disabled = !unlocked.has(phase) || Boolean(session.hand) || session.runOver;
-    button.addEventListener("click", () => app.startHand(phase));
+    button.addEventListener("click", () => {
+      // A new round deals a new deck, so nothing on the table belongs to the
+      // last one. Cleared here rather than left to be overwritten: the cards
+      // are the keys, and a map that only ever grows holds every card of
+      // every round for as long as the tab is open.
+      playedBy.clear();
+      app.startHand(phase);
+    });
     box.append(button);
   }
 }

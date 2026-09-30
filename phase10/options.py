@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from Options import Choice, DeathLink, OptionGroup, PerGameCommonOptions, Range, Toggle
 
-from .data import MAX_STORE_SLOTS
+from .data import DEFAULT_BUFF_POINTS, MAX_STORE_SLOTS
 
 
 class Goal(Choice):
@@ -207,6 +207,34 @@ class StoreSlots(Range):
     default = 6
 
 
+class StoreBuffPoints(Range):
+    """
+    Extra AP Points the seed carries for the store's one-use cards.
+
+    The store also sells a card rather than a check: a One-Use Wild for two
+    points or a One-Use Skip for one, any number of times, gone the moment it
+    is played. They exist for the run where you are three rounds into phase 17
+    and the deck will not give you a fourth nine.
+
+    This is how many points are added *beyond* what the slots need, so the
+    buffs are not paid for out of the checks. Buying one can never cost you a
+    slot: the store refuses a buff that would leave you unable to afford every
+    slot you have not bought yet, which is the only way spending could strand
+    a location the seed was generated as reachable.
+
+    Trimmed first when the pool is tight -- before the store's slack and
+    before any slot -- so a seed that could only just fit its store still gets
+    the store it would have got without these.
+
+    0 turns the one-use cards off and leaves the store selling checks alone.
+    """
+
+    display_name = "Store Buff Points"
+    range_start = 0
+    range_end = 12
+    default = DEFAULT_BUFF_POINTS
+
+
 @dataclass
 class Phase10Options(PerGameCommonOptions):
     goal: Goal
@@ -218,13 +246,15 @@ class Phase10Options(PerGameCommonOptions):
     hand_size_upgrades: HandSizeUpgrades
     checks_per_phase: ChecksPerPhase
     store_slots: StoreSlots
+    store_buff_points: StoreBuffPoints
     skip_card_items: SkipCardItems
     trap_chance: TrapChance
     death_link: Phase10DeathLink
 
 
 option_groups = [
-    OptionGroup("Goal", [Goal, ChecksPerPhase, StoreSlots, StartingPhases]),
+    OptionGroup("Goal", [Goal, ChecksPerPhase, StoreSlots, StoreBuffPoints,
+                         StartingPhases]),
     OptionGroup("Difficulty", [Opponents, StartingDraws, ExtraDrawItems,
                                WildCardItems, HandSizeUpgrades, SkipCardItems]),
     OptionGroup("Deck", [TrapChance, Phase10DeathLink]),

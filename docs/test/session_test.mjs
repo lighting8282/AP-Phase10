@@ -14,9 +14,11 @@ import { dirname, join } from "node:path";
 import { Phase10Session } from "../src/session.js";
 import { Phase10Game } from "../src/game.js";
 import {
-  AP_POINT, LOCATION_NAME_TO_ID, MULLIGAN, PHASE_COUNT, SCORE_REDUCTION,
-  SCORE_REDUCTION_VALUE, phaseUnlock, storeGate, storeLocationName,
+  AP_POINT, BUFF_SKIP, BUFF_WILD, LOCATION_NAME_TO_ID, MULLIGAN, PHASE_COUNT,
+  SCORE_REDUCTION, SCORE_REDUCTION_VALUE, phaseUnlock, storeGate,
+  storeLocationName,
 } from "../src/data.js";
+import { isWild } from "../src/cards.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = JSON.parse(readFileSync(join(here, "session_fixtures.json"), "utf8"));
@@ -382,6 +384,98 @@ fixtures.sequences.forEach((script, index) => {
   const legacy = store(6, POINTS);
   check("a save without purchases still loads", legacy.loadPayload(older), true);
   check("with nothing bought", legacy.boughtSlots.size, 0);
+
+  // -- the one-use cards ------------------------------------------------------
+  // The other half of the store, and the half that could break a seed rather
+  // than a round. Archipelago's logic reasons about points *received* and
+  // cannot model one being spent, so a player who spent the store's own money
+  // on cards would leave locations the seed was generated as reachable with no
+  // way left to reach them. The store reserves what the unbought slots cost;
+  // everything here is that reservation.
+  const BUDGET = 4;
+  const WITH_BUFFS = POINTS + BUDGET;
+  const buying = (points = WITH_BUFFS, slots = 6) => {
+    const s = store(slots, points);
+    s.items.set(phaseUnlock(1), 1);
+    s.startHand(1);
+    return s;
+  };
+
+  const bought = buying();
+  const heldBefore = bought.hand.hand.length;
+  const card = bought.canBuyBuff(BUFF_WILD) === null ? bought.buyBuff(BUFF_WILD) : null;
+  check("a one-use card lands in your hand", card !== null && isWild(card), true);
+  check("and the hand is one card bigger", bought.hand.hand.length, heldBefore + 1);
+  check("and the engine counted it", bought.hand.boughtCards, 1);
+  check("and it cost no draw", bought.hand.drawsUsed, 0);
+
+  // Every point the ladder does not need, not just the buff budget: the slack
+  // is spendable too, and deliberately. It existed so the last slot was not
+  // hostage to where the final point landed, and the reservation now does that
+  // job outright -- so held back on top of it, it would only be a point nobody
+  // could ever use.
+  const LADDER = 8;               // sum([1, 1, 1, 1, 2, 2])
+  const again = buying();
+  const spare = again.buffPointsLeft;
+  check("everything the ladder does not need is spendable", spare, WITH_BUFFS - LADDER);
+  let times = 0;
+  while (again.canBuyBuff(BUFF_SKIP) === null) { again.buyBuff(BUFF_SKIP); times += 1; }
+  check("a one-use card is rebuyable while the spare points last", times, spare);
+  check("and then the budget is gone", again.buffPointsLeft, 0);
+
+  // The whole point: every purse a default store can hold, spent down to the
+  // last card the store will sell, then all 720 orders for the six slots.
+  let strandedByBuff = null;
+  for (let points = 0; points <= WITH_BUFFS && !strandedByBuff; points += 1) {
+    const spent = buying(points);
+    while (spent.canBuyBuff(BUFF_SKIP) === null) spent.buyBuff(BUFF_SKIP);
+    const spentMap = new Map(spent.buffsBought);
+    for (const order of orders) {
+      const s = store(6, points);
+      s.buffsBought = new Map(spentMap);
+      for (const slot of order) {
+        const refusal = s.canBuy(slot);
+        if (refusal === null) s.buySlot(slot);
+        else if (refusal.includes("costs")) {
+          strandedByBuff = `${points} points, spent ${[...spentMap]}, ${order}: ${refusal}`;
+          break;
+        }
+      }
+      if (strandedByBuff) break;
+    }
+  }
+  check("buying cards can never strand a slot, at any purse or order",
+    strandedByBuff, null);
+
+  // The dearest-first order is the one that strands the cheap slots, so it is
+  // the one worth spending against.
+  const drained = buying();
+  while (drained.canBuyBuff(BUFF_WILD) === null) drained.buyBuff(BUFF_WILD);
+  for (const slot of [6, 5, 4, 3, 2, 1]) {
+    if (drained.canBuy(slot) === null) drained.buySlot(slot);
+  }
+  check("and a drained purse still buys every slot dearest-first",
+    drained.boughtSlots.size, 6);
+
+  const broke = buying(LADDER);   // exactly what the six slots cost, and no more
+  check("the refusal says where the points went",
+    (broke.canBuyBuff(BUFF_WILD) ?? "").includes("held for"), true);
+
+  check("a card needs a hand to land in",
+    (store(6, WITH_BUFFS).canBuyBuff(BUFF_WILD) ?? "").includes("start a round first"), true);
+
+  const kept = buying();
+  if (kept.canBuyBuff(BUFF_WILD) === null) kept.buyBuff(BUFF_WILD);
+  const reloaded = store(6, WITH_BUFFS);
+  check("cards bought survive a reconnect", reloaded.loadPayload(kept.toPayload()), true);
+  check("with the same purchases", reloaded.buffsBought.get(BUFF_WILD), 1);
+  check("and the same balance", reloaded.pointsLeft, kept.pointsLeft);
+
+  const beforeBuffs = kept.toPayload();
+  delete beforeBuffs.buffs_bought;
+  const old = store(6, WITH_BUFFS);
+  check("a save from before the cards existed still loads", old.loadPayload(beforeBuffs), true);
+  check("with none bought", old.buffsBought.size, 0);
 }
 
 for (const line of failures) console.log(`  FAIL ${line}`);
