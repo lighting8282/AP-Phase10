@@ -918,6 +918,27 @@ cards drop to 20px there for the same reason its backs did: at 26px a group
 wraps every third card and reads as a column rather than a group. Your own
 groups keep the full size, having the width of the page.
 
+**The middle of the table was most of the table, on a phone.** Measured
+mid-round at 412x872: the felt came to 815px of an 872px viewport, so the seats
+across from you and your own cards could not be on screen together — and 188px
+of that was the middle, for two piles and a line of text. The piles gave up the
+most for the least: at 54px a pile is still a 76px button, comfortably over the
+44px floor everything else on a touch screen is held to, and a card face reads
+perfectly at two thirds. With them that size the prompt fits *beside* them
+rather than taking a row of its own, which was the other half of it. The middle
+is now 117px — exactly the height of a pile — at every width from 320 to 768,
+and on the board this was measured on the whole table fits one screen.
+
+One trap in that, found by measuring rather than by reading. `#prompt` is given
+a 4rem basis, and the basis is set for the *wrap* rather than for the width:
+flex decides what fits from the basis and only then lets the prompt grow into
+whatever the piles leave. At 7rem it fit on every phone tested and then came
+apart at 320px, putting the prompt and the stock on one line and the discard
+alone on the next — worse than the row it replaced.
+
+All of it sits inside the existing `max-width: 768px`/`pointer: coarse` block,
+so the desktop page is untouched, and the Kivy client reads no CSS at all.
+
 **The stylesheet is stamped too**, and was not. Half the layout lives in
 `style.css`, Pages serves it with the same ten-minute cache as everything else,
 and a CSS-only deploy left the old rules in place with nothing in the markup to

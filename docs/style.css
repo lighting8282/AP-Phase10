@@ -757,7 +757,32 @@ button.meld .meld-name::after { content: " +"; }
      20px it is four across and the rank is still perfectly legible. Your own
      groups keep the full size -- they have the width of the page. */
   .seats .meld img { width: 20px; height: 30px; }
-  #prompt { flex: 1 1 100%; text-align: center; }
+  /* The middle of the table, on the screen where the middle was most of it.
+     Measured mid-round on a 412x872 phone: the felt came to 815px, so the
+     seats across from you and your own cards could not be on screen at the
+     same time -- and the middle was 188px of it, for two piles and a line of
+     text.
+
+     The piles give up the most for the least. They are a target and a state,
+     and both read perfectly at two thirds the size: 54px is still a 76px
+     button, comfortably over the 44px floor everything else here is held to.
+     The felt's own padding and the gaps between its three rows come in as
+     well, because at 0.85rem each they were another 68px of nothing. */
+  .middle { gap: 0.55rem; }
+  .pile img { width: 54px; height: 81px; }
+  .felt { padding: 0.55rem; gap: 0.55rem; margin-top: 0.5rem; }
+
+  /* And with the piles that size the prompt fits beside them, where before it
+     took a whole row of its own to itself. Centred still, because what is
+     left of the row is narrow enough that ragged-right would read as a
+     column of fragments.
+
+     A small basis, and it is the wrap that it is set for rather than the
+     width: flex decides what fits from the basis and only then lets the
+     prompt grow into whatever the piles leave. At 7rem the two piles came
+     apart on a 320px screen -- prompt and stock on one line, discard alone on
+     the next -- which is worse than the row it replaced. */
+  #prompt { flex: 1 1 4rem; text-align: center; }
 
   /* Rem heights are a large slice of a phone screen. Cap by viewport so the
      log and scorecard stay panels rather than pages. */
