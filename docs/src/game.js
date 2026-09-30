@@ -17,8 +17,8 @@
  * ones you played round one with.
  */
 
-import { handScore } from "./cards.js?v=7d88f0bc";
-import { HAND_STATE, PhaseHand } from "./engine.js?v=7d88f0bc";
+import { handScore } from "./cards.js?v=35be1704";
+import { HAND_STATE, PhaseHand } from "./engine.js?v=35be1704";
 
 /**
  * Bumped when the saved shape changes. A payload from a different version is

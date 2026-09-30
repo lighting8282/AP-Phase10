@@ -478,6 +478,59 @@ fixtures.sequences.forEach((script, index) => {
   check("with none bought", old.buffsBought.size, 0);
 }
 
+// -- the goal ----------------------------------------------------------------
+// The mirror of TestGoal in phase10/test/test_session.py. The client and the
+// world have to agree about what finishes a slot: a client that declares
+// victory on a different count than the seed was generated for sends the goal
+// early, and the server believes it.
+{
+  const goal = (slot) => Phase10Session.fromSlotData(
+    { goal: 0, starting_draws: 4, checks_per_phase: 4, ...slot },
+    new Phase10Game({ seed: 1 }),
+  );
+  const clearUpTo = (s, upto) => {
+    for (let phase = 1; phase <= upto; phase += 1) {
+      s.game.rounds.push({
+        number: phase, phase, state: "went_out", score: 0,
+        drawsUsed: 1, wildsUsed: 0, skipsPlayed: 0,
+      });
+    }
+    return s;
+  };
+
+  // The bug this block exists for: ten was hardcoded when there were ten
+  // phases and never moved when the other ten arrived, so a default seed --
+  // whose own rule is HasAll(Phase 1..20 Clear) -- was won at half.
+  check("ten of twenty is not the default goal", clearUpTo(goal({}), 10).goalMet, false);
+  check("twenty of twenty is", clearUpTo(goal({}), 20).goalMet, true);
+
+  check("phases_to_win 10 finishes at ten",
+    clearUpTo(goal({ phases_to_win: 10 }), 10).goalMet, true);
+  check("phases_to_win 14 does not finish at ten",
+    clearUpTo(goal({ phases_to_win: 14 }), 10).goalMet, false);
+  check("phases_to_win 14 finishes at fourteen",
+    clearUpTo(goal({ phases_to_win: 14 }), 14).goalMet, true);
+
+  // Named phases, not a count. Any ten standing in for the first ten is not
+  // what HasAll(Phase 1..N Clear) says, and the seed is generated on that.
+  const skipped = goal({ phases_to_win: 3 });
+  for (const phase of [1, 2, 7]) {
+    skipped.game.rounds.push({
+      number: phase, phase, state: "went_out", score: 0,
+      drawsUsed: 1, wildsUsed: 0, skipsPlayed: 0,
+    });
+  }
+  check("three cleared is not the first three", skipped.goalMet, false);
+  check("and the count alone would have said it was", skipped.clearedPhases.size, 3);
+
+  // A seed from before the option carries no key, and its rule asked for all.
+  const older = goal({});
+  check("a seed without the key wants every phase", older.phasesToWin, PHASE_COUNT);
+
+  check("phase_ten is untouched by any of it",
+    clearUpTo(goal({ goal: 1, phases_to_win: 20 }), 10).goalMet, true);
+}
+
 for (const line of failures) console.log(`  FAIL ${line}`);
 console.log(`\n${passed} passed, ${failures.length} failed`);
 process.exit(failures.length ? 1 : 0);

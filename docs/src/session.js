@@ -18,11 +18,11 @@ import {
   SCORE_REDUCTION_VALUE, SKIP_CARD, TIERS, WILD_CARD,
   WILD_THEFT, milestoneLocationName, phaseLocationName, phaseUnlock,
   buffPrice, storeGate, storeLocationName, storePrices,
-} from "./data.js?v=7d88f0bc";
-import { SKIP, STOCK_WILDS, WILD } from "./cards.js?v=7d88f0bc";
-import { HAND_STATE, Table, gameConfig } from "./engine.js?v=7d88f0bc";
-import { MID, NAMES as OPPONENT_NAMES, buildOpponents } from "./opponents.js?v=7d88f0bc";
-import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js?v=7d88f0bc";
+} from "./data.js?v=35be1704";
+import { SKIP, STOCK_WILDS, WILD } from "./cards.js?v=35be1704";
+import { HAND_STATE, Table, gameConfig } from "./engine.js?v=35be1704";
+import { MID, NAMES as OPPONENT_NAMES, buildOpponents } from "./opponents.js?v=35be1704";
+import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js?v=35be1704";
 
 export const LEAN_DEAL_PENALTY = 2;
 
@@ -45,6 +45,7 @@ export class Phase10Session {
     //: the player's choice; a seed is always the full set, because its
     //: locations exist for every phase.
     this.phaseCap = opts.phaseCap ?? PHASE_COUNT;
+    this.phasesToWin = opts.phasesToWin ?? PHASE_COUNT;
     //: Whether finishing the last phase ends the run for everybody, which is
     //: the printed game. A seed has its own goal instead and must not be
     //: ended by a seat -- an opponent finishing is not an Archipelago notion.
@@ -77,6 +78,9 @@ export class Phase10Session {
       startingDraws: Number(slotData.starting_draws ?? 4),
       checksPerPhase: Number(slotData.checks_per_phase ?? 4),
       storeSlots: Number(slotData.store_slots ?? 0),
+      // Absent in seeds generated before the option existed, where the
+      // world's own rule asked for every phase.
+      phasesToWin: Number(slotData.phases_to_win ?? PHASE_COUNT),
       skipMode: slotData.skip_mode === "deny" ? "deny" : "dig",
       skipsInDeck: Number(slotData.skips_in_deck ?? 0),
       raceToEnd: Boolean(slotData.race_to_end ?? false),
@@ -653,8 +657,22 @@ export class Phase10Session {
   }
 
   // -- goal ----------------------------------------------------------------
+  /**
+   * Whether this slot is finished, by the seed's own reckoning.
+   *
+   * Counted against `phasesToWin` and against the *named* phases, not against
+   * a total. Two bugs lived here. The count was ten while the world's
+   * completion rule asked for every one of twenty, so a client declared
+   * victory at half the seed and the server believed it -- the number was
+   * written when there were ten phases and never moved when the other ten
+   * arrived. And a total would let any ten phases stand in for the first ten,
+   * which is not what `HasAll(Phase 1..N Clear)` says.
+   */
   get goalMet() {
     if (this.goal === 1) return this.clearedPhases.has(10);
-    return this.clearedPhases.size === 10;
+    for (let phase = 1; phase <= this.phasesToWin; phase += 1) {
+      if (!this.clearedPhases.has(phase)) return false;
+    }
+    return true;
   }
 }

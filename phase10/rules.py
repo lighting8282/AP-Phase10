@@ -126,6 +126,11 @@ def set_completion_condition(world: Phase10World) -> None:
     if world.options.goal == Goal.option_phase_ten:
         goal_rule: Rule = Has("Phase 10 Clear")
     else:
-        goal_rule = HasAll(*(f"Phase {p} Clear" for p in range(1, PHASE_COUNT + 1)))
+        # Up to `phases_to_win`, not to PHASE_COUNT. The clients read the same
+        # number out of slot data, and they have to agree: a client that
+        # declares victory on a different count than the seed was generated
+        # for sends the goal early, and the server believes it.
+        wanted = int(world.options.phases_to_win)
+        goal_rule = HasAll(*(f"Phase {p} Clear" for p in range(1, wanted + 1)))
     world.set_rule(world.get_entrance("Menu to Victory"), goal_rule)
     world.set_completion_rule(Has("Victory"))

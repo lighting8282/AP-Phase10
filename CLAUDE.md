@@ -61,9 +61,22 @@ original author's machine, so set it:
     AP_ROOT=/path/to/Archipelago python tools/check_store_balance.py
     AP_ROOT=/path/to/Archipelago python tools/check_multiworld.py
 
-The world's own tests (73 of them, `phase10/test/`) run from the AP root:
+The world's own tests run from the AP root, and that run is the authority:
 
     SKIP_REQUIREMENTS_UPDATE=1 python -m unittest discover -s worlds/phase10/test -t .
+
+**Most of them run here too**, which this file used to deny:
+
+    python tools/run_world_tests.py
+
+`phase10/__init__.py` reaches for `worlds.AutoWorld`, and that is the only
+reason the session, store, data and persistence tests would not import — so
+the runner mounts `worlds.phase10` at the real directory without executing
+that `__init__`. The five modules that build a multiworld still cannot run,
+and are named as needing a checkout rather than counted as passing. 99 of them
+do run. They had gone three batches unrun on the strength of the old claim,
+and the first run found a `NameError` that crashed the Python client whenever
+a seat won a run, and a goal that fired at half the seed.
 
 `SKIP_REQUIREMENTS_UPDATE=1` is not optional dressing, and the reason is in
 DEVELOPMENT.md — without it a run fails while naming whichever unrelated world

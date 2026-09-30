@@ -45,6 +45,7 @@ while to find and would be easy to reintroduce.
   - [The slots say what they hold](#the-slots-say-what-they-hold)
   - [The rebuyable half](#the-rebuyable-half)
   - [It runs alongside the phases](#it-runs-alongside-the-phases)
+- [The goal, and two ways it was wrong](#the-goal-and-two-ways-it-was-wrong)
 - [Game and scoring](#game-and-scoring)
 - [UI](#ui)
   - [Checking it](#checking-it)
@@ -793,6 +794,43 @@ Measured over fifteen seeds at the default, six slots and ten points:
 
 So it opens early and finishes before the endgame, rather than being six checks
 that all come due at once.
+
+## The goal, and two ways it was wrong
+
+`goal: all_phases` now means *clear phases 1 up to `phases_to_win`*, a range
+option defaulting to 20. Ten is the game the box ships; twenty is everything
+here; and because it is a range, the YAML's own `random-range-10-20` covers a
+random goal length with no new machinery. The world builds its completion rule
+from it and slot data carries it, so the clients ask for the same phases the
+seed was generated around.
+
+That last clause is the point, because it was not true. **The clients declared
+victory at ten phases while the world's rule required all twenty.** `goal_met`
+read `len(cleared_phases) == 10`, written when there were ten phases and never
+moved when the other ten arrived. The client sends `CLIENT_GOAL` the first
+time that turns true, and the server believes the client — so a default seed
+finished at half its length. Worse in detail than in summary: `== 10` is false
+again at eleven, so the flag fired once and then unset itself.
+
+The second was subtler and would have survived a naive fix. A *count* lets any
+ten phases stand in for the first ten, and `HasAll(Phase 1..N Clear)` does not
+say that. It is the named phases now, in both ports, with a test that clears
+1, 2 and 7 against a goal of three and expects it not to count.
+
+Both are pinned by `TestGoal` in `phase10/test/test_session.py` and the block
+of the same name in `docs/test/session_test.mjs`, and the recorded session
+fixtures were re-exported: exactly two values moved, both `goalMet`, which is
+what a narrow fix should look like.
+
+**A `NameError` came out of the same run.** `Phase10Session.seat_name` used
+`OPPONENT_NAMES`, which the Python port never defined — the names lived inside
+`build_opponents` as a local, while the JS port had exported them all along.
+Any run won by a seat crashed the Kivy client on the spot. `NAMES` is a module
+constant now, in both ports.
+
+Neither bug was reachable from the runnable suite, and both were found the
+first time `phase10/test/` was executed in a cloud session — see
+`tools/run_world_tests.py`, which is what made that possible.
 
 ## Game and scoring
 

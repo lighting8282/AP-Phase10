@@ -43,7 +43,7 @@ from ..data import (
 )
 from ..game.cards import SKIP, STOCK_WILDS, WILD, Card
 from ..game.engine import GameConfig, HandState, PhaseHand, Table
-from ..game.opponents import MID, build_opponents
+from ..game.opponents import MID, NAMES as OPPONENT_NAMES, build_opponents
 from ..game.game import SAVE_VERSION, Phase10Game, RoundResult
 
 #: Traps are one-shot. Received counts only ever grow, so pending effects are
@@ -75,6 +75,7 @@ class Phase10Session:
     #: the player's choice; a seed is always the full set, because its
     #: locations exist for every phase.
     phase_cap: int = PHASE_COUNT
+    phases_to_win: int = PHASE_COUNT
     #: Whether finishing the last phase ends the run for everybody, which is
     #: the printed game. A seed has its own goal instead and must not be
     #: ended by a seat -- an opponent finishing is not an Archipelago notion.
@@ -107,6 +108,9 @@ class Phase10Session:
             death_link=bool(slot_data.get("death_link", False)),
             opponents=int(slot_data.get("opponents", 3)),
             store_slots=int(slot_data.get("store_slots", 0)),
+            # Absent in seeds generated before the option existed, where the
+            # world's own rule asked for every phase.
+            phases_to_win=int(slot_data.get("phases_to_win", PHASE_COUNT)),
             skip_mode="deny" if slot_data.get("skip_mode") == "deny" else "dig",
             skips_in_deck=int(slot_data.get("skips_in_deck", 0)),
             race_to_end=bool(slot_data.get("race_to_end", False)),
@@ -634,6 +638,17 @@ class Phase10Session:
     # -- goal --------------------------------------------------------------
     @property
     def goal_met(self) -> bool:
+        """Whether this slot is finished, by the seed's own reckoning.
+
+        Counted against `phases_to_win` and against the *named* phases, not
+        against a total. Two bugs lived here. The count was ten while the
+        world's completion rule asked for every one of twenty, so a client
+        declared victory at half the seed and the server believed it -- the
+        number was written when there were ten phases and never moved when the
+        other ten arrived. And a total would let any ten phases stand in for
+        the first ten, which is not what `HasAll(Phase 1..N Clear)` says.
+        """
         if self.goal == 1:  # phase_ten
             return 10 in self.cleared_phases
-        return len(self.cleared_phases) == 10
+        return all(phase in self.cleared_phases
+                   for phase in range(1, self.phases_to_win + 1))
