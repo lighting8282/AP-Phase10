@@ -51,8 +51,27 @@ CHECKS: list[tuple[str, list[str]]] = [
 ]
 
 
+def program(name: str) -> str:
+    """The full path to a command, or a refusal naming it.
+
+    Resolved rather than passed through, because of Windows. `npm` there is
+    `npm.cmd`, and CreateProcess only ever appends `.exe` -- so a bare "npm"
+    is not found, and what comes back is a FileNotFoundError from deep inside
+    subprocess with a traceback that says nothing about npm. `shutil.which`
+    honours PATHEXT and finds the `.cmd`, and a missing program now says which
+    one it was. Reported from a real run on Windows, having only been tested on
+    Linux, where "npm" resolves and the bug does not exist.
+    """
+    found = shutil.which(name)
+    if found is None:
+        raise SystemExit(f"! {name} is not on PATH. Install it, or open a "
+                         f"terminal where it is, and run this again.")
+    return found
+
+
 def run(args: list[str], *, capture: bool = True) -> str:
     """Run a command in the repository, raising on failure."""
+    args = [program(args[0]), *args[1:]]
     result = subprocess.run(
         args, cwd=ROOT, text=True,
         stdout=subprocess.PIPE if capture else None,
@@ -60,7 +79,8 @@ def run(args: list[str], *, capture: bool = True) -> str:
     )
     if result.returncode != 0:
         output = (result.stdout or "").strip()
-        raise SystemExit(f"! {' '.join(args)} failed\n{output}")
+        shown = [pathlib.Path(args[0]).name, *args[1:]]
+        raise SystemExit(f"! {' '.join(shown)} failed\n{output}")
     return (result.stdout or "").strip()
 
 
@@ -74,9 +94,12 @@ def version() -> str:
 
 def refuse_unless_ready(tag: str) -> None:
     """Every reason not to cut, checked before anything is published."""
+    # Checked here as well as at first use: it is the one whose absence should
+    # stop the run before ten seconds of tests, not after them.
     if shutil.which("gh") is None:
         raise SystemExit(
             "! the gh CLI is not on PATH. Install it and `gh auth login`.\n"
+            "  On Windows: winget install GitHub.cli\n"
             "  This script cannot run from a cloud session -- see the module "
             "docstring."
         )
