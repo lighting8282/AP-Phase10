@@ -21,10 +21,10 @@ import {
   isWild,
   numberCard,
   COLORS,
-} from "./cards.js?v=3de9109e";
+} from "./cards.js?v=537a67e1";
 import {
   GROUP, PHASES, phaseCardCount, solveLayOptions, solveMelds, solvePhase,
-} from "./phases.js?v=3de9109e";
+} from "./phases.js?v=537a67e1";
 
 /** How deep into the stock a played Skip lets you look. */
 export const SKIP_DIG_DEPTH = 3;

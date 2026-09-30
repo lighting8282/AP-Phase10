@@ -114,6 +114,18 @@ the batch, and merge when there is a reason to *ship* — not each time somethin
 is finished. Each commit still stands on its own and still runs the full
 battery; what changes is when they go out, not how they are made.
 
+**Open that pull request without being asked**, as soon as the batch is clean —
+the full battery green, the stamp and doc checks run, nothing known to be
+broken. Do not sit on finished work waiting for permission to raise it. Say so
+instead of opening one if something is unresolved: a check that will not pass, a
+decision still open, a change that wants a look before it is written up.
+
+Raising a pull request is not shipping. The **merge** is the deployment and it
+stays the repository owner's, so opening one costs nothing and having it sit
+there ready costs nothing either. While it is open, more commits pushed to the
+same branch join it — a second pull request for the same batch is the thing to
+avoid.
+
 Two exceptions, both narrow. Something broken for players right now goes on its
 own and merges immediately — a deploy is cheap next to a board nobody can read.
 And if the batch grows big enough that a bad merge would be hard to unpick,

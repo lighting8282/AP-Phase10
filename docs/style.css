@@ -391,7 +391,19 @@ pre {
 }
 
 @media (max-width: 480px) {
-  .card img { width: 58px; height: 87px; }
+  /* Your hand is the tallest thing left on a phone, and at 58px it was five
+     cards to a row -- so ten cards cost two rows and 182px whatever the
+     screen was. At 48px it is six to a row on anything from 360px up, which
+     is the same two rows 30px shorter, and a 48px card is still a 48px
+     button: over the 44px floor the rest of the touch layout is held to, with
+     room to spare on a move that ends your turn.
+     Not smaller than that. These are the cards you tap, not the ones you
+     read across the table, and a mis-tap here discards. */
+  .card img { width: 48px; height: 72px; }
+  /* The floor under the row exists so the panel does not jump as cards leave
+     your hand. It was a card and a half at the old size and should stay a
+     card and a half at this one. */
+  .cards { min-height: 7rem; }
 }
 
 /* --- log feed -------------------------------------------------------- */
