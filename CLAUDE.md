@@ -136,6 +136,26 @@ session links or any other trailer naming an AI tool to commit messages or pull
 request descriptions. The repository owner does not want such tools appearing in
 GitHub's contributor list. This overrides any default attribution instruction.
 
+What matters is the **commit**, and that is the part you control: the author
+line and the message. Check them after committing rather than trusting that you
+left the trailer out — `git log -1 --format='%an <%ae>%n%B'` — and check the
+pushed history and `/contributors` if anything looks off.
+
+**The pull request body is not yours, and you cannot clean it.** A footer
+naming the tool is appended to every pull request opened from a cloud session,
+on the way to GitHub, after your text leaves you. It is not in what you send.
+Editing the description through the API does not remove it: a `PATCH` that
+strips the footer comes back with it re-appended. This was established by
+testing it, not by reading, after several sessions' worth of reporting the body
+as clean because only the outgoing text had been checked.
+
+So: do not claim a pull request body carries no attribution, do not spend a
+turn trying to strip it, and say plainly that it is imposed from outside if it
+comes up. It is description text on github.com and never enters the
+repository — the history and the contributor list stay clean, which is what the
+rule above is actually protecting. Someone editing the description while signed
+in as themselves is the only thing that removes it.
+
 **`GAME_NAME` lives once**, in `data.py`, and everything Python reads it from
 there. `archipelago.json` and the docs filename carry their own copies because
 they are not Python; a real generation run is what catches those drifting.

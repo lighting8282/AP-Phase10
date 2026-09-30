@@ -384,6 +384,11 @@ h3 { margin: 1rem 0 0.4rem; font-size: 0.85rem; color: var(--muted); font-weight
 .chk.done { background: var(--cleared); border-color: var(--cleared); color: #eafff2; }
 .chk.open { border-color: var(--accent); color: var(--ink); }
 .chk.locked { color: var(--muted); opacity: 0.5; }
+/* A slot holding somebody's progression. Worth telling apart from a slot
+   holding a filler item, because it is the one that unsticks a whole seed --
+   and the reason to spend a point on that slot rather than the cheaper one. */
+.chk.buy.progression { font-weight: 700; }
+.chk.buy.progression::after { content: " *"; color: var(--cleared); }
 /* A tier this seed does not have: a gap, not a thing you have missed. */
 .chk.absent { border-color: transparent; }
 

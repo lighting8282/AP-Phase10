@@ -269,6 +269,10 @@ build both back up.
 slot opens once you hold enough points to have afforded every cheaper one — so
 you can buy them in any order.
 
+Connected to a room, each slot **says what it is holding** — the item's own
+name, and whose it is when it is not yours. That is a scout, not a hint: it
+costs no hint points and tells the room nothing.
+
 The store also sells a **card** rather than a check: a **One-Use Wild** for two
 points or a **One-Use Skip** for one, as often as you can afford them. The card
 goes straight into your hand, it costs you no draw, and it is gone the moment

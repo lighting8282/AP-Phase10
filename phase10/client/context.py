@@ -20,11 +20,12 @@ from CommonClient import (
     logger,
     server_loop,
 )
+from Utils import async_start
 from NetUtils import ClientStatus
 
 from ..data import (
-    BUFF_SKIP, BUFF_WILD, BUFFS, GAME_NAME, PHASE_COUNT, buff_price,
-    store_gate,
+    BUFF_SKIP, BUFF_WILD, BUFFS, GAME_NAME, LOCATION_NAME_TO_ID, PHASE_COUNT,
+    buff_price, store_gate, store_location_name,
 )
 from ..game.autoplay import play_out
 from ..game.engine import HandState
@@ -303,8 +304,18 @@ class Phase10CommandProcessor(ClientCommandProcessor):
                 refusal = s.can_buy(slot)
                 mark = "  --" if refusal else " buy"
                 why = f"  ({refusal})" if refusal else ""
+            # What is on the shelf, when the room has said. Without it the
+            # slots differ only by price, and which slot to spend on *is* the
+            # item behind it.
+            stock = self.ctx.store_stock.get(
+                LOCATION_NAME_TO_ID.get(store_location_name(slot)))
+            shelf = ""
+            if stock:
+                who = "" if stock["mine"] else f" -> {stock['receiver']}"
+                star = " *" if stock["progression"] else ""
+                shelf = f"  [{stock['name']}{who}{star}]"
             self.output(f"  {mark}  Slot {slot}: {price} point(s)"
-                        f"  opens at {store_gate(slot)}{why}")
+                        f"  opens at {store_gate(slot)}{shelf}{why}")
         # The rebuyable half, reported with what is actually spendable rather
         # than with what is unspent: the slots you have not bought are owed
         # their prices, because the seed's logic reasons about points received
@@ -486,6 +497,10 @@ class Phase10Context(CommonContext):
         self.save_pending = False
         self.death_link_pending = False
         self.tags_pending = False
+        #: What each store slot is holding, by location id, once the room has
+        #: been asked. Empty until the scout lands, and the store reads that as
+        #: "not known yet" rather than as "nothing there".
+        self.store_stock: dict[int, dict[str, Any]] = {}
 
     @property
     def save_key(self) -> str:
@@ -508,11 +523,56 @@ class Phase10Context(CommonContext):
             self.save_pending = False
             self.tags_pending = self.session.death_link
             self.sync_items()
+            self.scout_store()
             logger.info("Connected. /phases to see what you can play, /play <n> to start.")
         elif cmd == "ReceivedItems":
             self.sync_items()
+        elif cmd == "LocationInfo":
+            self.read_store_stock(args.get("locations", []))
         elif cmd == "Retrieved":
             self.restore_from(args.get("keys", {}))
+
+    def scout_store(self) -> None:
+        """Ask the room what each store slot is holding.
+
+        A shop that will not say what is on the shelf is a shop you cannot shop
+        in: the decision the store offers -- which slot to spend a point on --
+        *is* the item behind it, and without this the slots differ only by
+        price. This is the ordinary Archipelago shop pattern.
+
+        `create_as_hint` is 0, so nothing is hinted: no hint points are spent,
+        nothing is broadcast, and no other player learns anything. It tells
+        this client what it is being asked to buy and nothing else.
+        """
+        ids = [LOCATION_NAME_TO_ID[store_location_name(slot)]
+               for slot in range(1, self.session.store_slots + 1)
+               if store_location_name(slot) in LOCATION_NAME_TO_ID]
+        if not ids:
+            return
+        async_start(self.send_msgs([{
+            "cmd": "LocationScouts", "locations": ids, "create_as_hint": 0,
+        }]), name="phase10-scout-store")
+
+    def read_store_stock(self, locations: list[Any]) -> None:
+        """Remember what a scout said, for the slots it was about.
+
+        LocationInfo answers scouts this client did not necessarily send -- the
+        server replies to hints too -- so anything that is not a store slot is
+        left alone rather than guessed at.
+        """
+        wanted = {LOCATION_NAME_TO_ID[store_location_name(slot)]: slot
+                  for slot in range(1, self.session.store_slots + 1)
+                  if store_location_name(slot) in LOCATION_NAME_TO_ID}
+        for item in locations:
+            location = getattr(item, "location", None)
+            if location not in wanted:
+                continue
+            self.store_stock[location] = {
+                "name": self.item_names.lookup_in_slot(item.item, item.player),
+                "receiver": self.player_names.get(item.player, f"Player {item.player}"),
+                "mine": item.player == self.slot,
+                "progression": bool(item.flags & 0b001),
+            }
 
     def sync_items(self) -> None:
         """Re-tally received items.
