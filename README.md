@@ -361,6 +361,15 @@ Packaging:
     python tools/build_apworld.py                          # dist/phase10.apworld
     python tools/build_apworld.py --verify dist/phase10.apworld
 
+    python tools/cut_release.py --dry-run                  # what a release would do
+    python tools/cut_release.py                            # and do it
+
+`cut_release.py` takes the version from `phase10/archipelago.json`, runs the
+whole battery, builds and verifies the apworld, tags, publishes, and then
+retires every older release and tag -- only the current one should exist. It
+needs the `gh` CLI and refuses on a dirty tree, the wrong branch, a branch that
+is not level with origin, a failing check, or a tag that already exists.
+
 Every number and every "always" or "never" in the rules section above is
 asserted against the engine, because prose is where a rule drifts from the code
 with nothing failing:
