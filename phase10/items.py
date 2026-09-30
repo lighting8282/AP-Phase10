@@ -107,21 +107,31 @@ def choose_starting_phases(world: Phase10World) -> list[int]:
     return (easy + rest)[: int(world.options.starting_phases)]
 
 
-def plan_store(base_locations: int, slots: int, floor: int) -> tuple[int, int]:
+def plan_store(base_locations: int, slots: int, floor: int,
+               buff_points: int = 0) -> tuple[int, int]:
     """The largest store that still fits, as (slots, points).
 
     A store of S slots brings S locations with it, so it pays for itself up to
-    one point per slot; only the ladder's steeper end and the slack cost the
-    pool anything. When it does not fit, the slack goes first -- it is comfort
-    -- and only then does a slot come off.
+    one point per slot; only the ladder's steeper end and whatever spare points
+    ride along cost the pool anything. When it does not fit, the spare points
+    go first -- they are comfort, and the buff budget is the most optional
+    comfort there is -- and only then does a slot come off.
+
+    Slack and buff budget are one number here on purpose. Both are simply
+    points the ladder does not need, and at the table they are the same thing:
+    the store reserves what the unbought slots cost and lets you spend the
+    rest, so a point held back for the last slot and a point earmarked for a
+    One-Use Wild are indistinguishable until you spend one.
 
     Measured: at one check a phase there are thirty locations and a floor of
-    twenty-nine, so this lands on five slots with no slack. At two checks and
-    up nothing is trimmed.
+    twenty-nine, so this lands on five slots with nothing spare -- exactly
+    where it landed before the buffs existed. At two checks and up the ladder,
+    the slack and the buff budget all survive.
     """
     for count in range(slots, 0, -1):
-        for slack in (STORE_SLACK, 0):
-            points = sum(STORE_PRICES[:count]) + slack
+        ladder = sum(STORE_PRICES[:count])
+        for spare in range(STORE_SLACK + buff_points, -1, -1):
+            points = ladder + spare
             if floor + points <= base_locations + count:
                 return count, points
     return 0, 0

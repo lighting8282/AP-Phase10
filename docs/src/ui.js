@@ -4,18 +4,18 @@
 // client, and holds no game state of its own. Anything it needed to remember
 // would be a second copy of something the session already owns.
 
-import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=b0dd71f1";
+import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=2af7fd90";
 
 //: Faces used purely as icons in the stat panel.
 const SKIP_FACE = SKIP;
 const WILD_FACE = WILD;
-import { HAND_STATE } from "./engine.js?v=b0dd71f1";
+import { HAND_STATE } from "./engine.js?v=2af7fd90";
 import {
-  HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, milestoneLocationName,
-  phaseLocationName, storeGate, storeLocationName,
-} from "./data.js?v=b0dd71f1";
-import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=b0dd71f1";
-import { Phase10Client } from "./client.js?v=b0dd71f1";
+  BUFFS, HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, buffPrice,
+  milestoneLocationName, phaseLocationName, storeGate, storeLocationName,
+} from "./data.js?v=2af7fd90";
+import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=2af7fd90";
+import { Phase10Client } from "./client.js?v=2af7fd90";
 
 const el = (id) => document.getElementById(id);
 
@@ -1039,6 +1039,62 @@ function renderStore(session) {
     button.addEventListener("click", () => buy(slot));
     box.append(button);
   }
+
+  renderStoreBuffs(session);
+}
+
+/**
+ * The rebuyable half of the store.
+ *
+ * Shown with what is actually spendable rather than with what is unspent, and
+ * the difference is the whole safety of the thing: the slots you have not
+ * bought are owed their prices, because Archipelago's logic reasons about
+ * points *received* and cannot model a currency being spent. So the store
+ * reserves them, and what is left over is yours to turn into cards.
+ */
+function renderStoreBuffs(session) {
+  const wrap = el("store-buffs-wrap");
+  const box = el("store-buffs");
+  box.replaceChildren();
+  // No points beyond what the checks are owed means nothing to sell, and a row
+  // of permanently dark buttons explains itself worse than no row.
+  const budget = session.buffPointsLeft;
+  const reserved = session.pointsReserved;
+  wrap.hidden = !budget && !session.buffPointsSpent;
+  if (wrap.hidden) return;
+
+  el("store-buffs-note").textContent = reserved
+    ? `${budget} point(s) to spend on cards -- ${reserved} held for the `
+      + `${session.slotsLeft} slot(s) left`
+    : `${budget} point(s) to spend on cards`;
+
+  for (const buff of BUFFS) {
+    const price = buffPrice(buff);
+    const refusal = session.canBuyBuff(buff);
+    const bought = session.buffsBought.get(buff) ?? 0;
+    const button = document.createElement("button");
+    button.className = `chk buy ${refusal ? "locked" : "open"}`;
+    button.textContent = `${buff} - ${price}${bought ? ` (x${bought})` : ""}`;
+    button.title = refusal ?? `Buy a ${buff} for ${price} point(s) -- it goes `
+      + "straight into your hand, and it is gone once you play it";
+    button.disabled = Boolean(refusal);
+    button.addEventListener("click", () => buyBuff(buff));
+    box.append(button);
+  }
+}
+
+async function buyBuff(buff) {
+  let card;
+  try {
+    card = await app.buyBuff(buff);
+  } catch (err) {
+    log(err.message);
+    return;
+  }
+  log(`Bought a ${buff}. ${describe(card)} is in your hand;`
+    + ` ${app.session.buffPointsLeft} point(s) left to spend on cards.`);
+  reportTable();
+  render();
 }
 
 // -- the check list ----------------------------------------------------------

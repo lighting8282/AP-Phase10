@@ -9,7 +9,8 @@ from ..data import (
     BASE_HAND_SIZE, EXTRA_DRAW, HAND_SIZE_UPGRADE, LEAN_DEAL, LOCATION_NAME_TO_ID,
     MAX_SKIPS, MULLIGAN, PHASE_COUNT, PHASE_LOCK, PHASE_UNLOCK, SCORE_REDUCTION,
     SCORE_REDUCTION_VALUE, SKIP_CARD, WILD_CARD, WILD_THEFT,
-    store_gate, store_location_name, store_points,
+    BUFF_SKIP, BUFF_WILD, DEFAULT_BUFF_POINTS,
+    store_gate, store_location_name, store_points, store_prices,
 )
 from ..game.cards import STOCK_WILDS, WILD, Color, number_card
 from ..game.engine import HandState
@@ -575,6 +576,131 @@ class TestStore(unittest.TestCase):
         self.assertTrue(fresh.load_payload(s.to_payload()))
         self.assertEqual(fresh.bought_slots, {1, 5})
         self.assertEqual(fresh.points_left, s.points_left)
+
+    # -- the one-use cards -------------------------------------------------
+
+    def buying(self, buff_points=4, slots=6):
+        """A store with spare points and a hand open to buy a card into."""
+        s = self.store(slots=slots, points=store_points(slots, buff_points))
+        s.items[PHASE_UNLOCK.format(1)] = 1
+        s.start_hand(1)
+        return s
+
+    def test_a_one_use_card_lands_in_your_hand(self) -> None:
+        s = self.buying()
+        held = len(s.hand.hand)
+        card = s.buy_buff(BUFF_WILD)
+        self.assertTrue(card.is_wild)
+        self.assertEqual(len(s.hand.hand), held + 1)
+        self.assertIn(card, s.hand.hand)
+        self.assertEqual(s.hand.bought_cards, 1)
+
+    def test_it_costs_no_draw(self) -> None:
+        """It is not a draw. Spending the budget on it would make the card a
+        worse deal than the draw it replaced, on the hand that could least
+        afford it."""
+        s = self.buying()
+        before = s.hand.draws_used
+        s.buy_buff(BUFF_SKIP)
+        self.assertEqual(s.hand.draws_used, before)
+        self.assertFalse(s.hand.drew_this_turn)
+
+    def test_it_is_rebuyable(self) -> None:
+        """Every point the ladder does not need, not just the buff budget. The
+        slack is spendable too, and deliberately: it existed so the last slot
+        was not hostage to where the final point landed, and the reservation
+        now does that job outright, so holding it back on top would only make
+        it a point nobody could ever use."""
+        s = self.buying(buff_points=4)
+        spare = s.buff_points_left
+        self.assertEqual(spare, store_points(6, 4) - sum(store_prices(6)))
+        times = 0
+        while s.can_buy_buff(BUFF_SKIP) is None:
+            s.buy_buff(BUFF_SKIP)
+            times += 1
+        self.assertEqual(times, spare)
+        self.assertEqual(s.buff_points_left, 0)
+
+    def test_buying_a_card_can_never_strand_a_slot(self) -> None:
+        """The property the reservation exists for, and the only thing about
+        this feature that could break a seed rather than a round.
+
+        Archipelago's logic reasons about points *received*; it cannot model
+        one being spent. A player who spent the store's own money on cards
+        would leave locations the seed was generated as reachable with no way
+        left to reach them. So: every point count a default store can hold,
+        spent down to the last card the store will sell, and then all 720
+        orders the six slots can be bought in.
+        """
+        from itertools import permutations
+
+        total = store_points(6, DEFAULT_BUFF_POINTS)
+        for held in range(total + 1):
+            spent = self.store(points=held)
+            spent.items[PHASE_UNLOCK.format(1)] = 1
+            spent.start_hand(1)
+            while spent.can_buy_buff(BUFF_SKIP) is None:
+                spent.buy_buff(BUFF_SKIP)
+            bought = dict(spent.buffs_bought)
+            for order in permutations(range(1, 7)):
+                s = self.store(points=held)
+                s.buffs_bought = dict(bought)
+                for slot in order:
+                    refusal = s.can_buy(slot)
+                    if refusal is None:
+                        s.buy_slot(slot)
+                    else:
+                        # Not affordable is the failure. Gated is fine: that is
+                        # the seed's own logic, and it is on points received,
+                        # which spending does not touch.
+                        self.assertNotIn(
+                            "unspent", refusal,
+                            f"{held} points, spent on {bought}, "
+                            f"order {order}: {refusal}",
+                        )
+
+    def test_every_order_still_works_after_buying_cards(self) -> None:
+        """The dearest-first order is the one that strands the cheap slots, so
+        it is the one worth spending against."""
+        s = self.buying(buff_points=4)
+        while s.can_buy_buff(BUFF_WILD) is None:
+            s.buy_buff(BUFF_WILD)
+        for slot in (6, 5, 4, 3, 2, 1):
+            self.assertIsNone(s.can_buy(slot), f"slot {slot}: {s.can_buy(slot)}")
+            s.buy_slot(slot)
+        self.assertEqual(len(s.bought_slots), 6)
+
+    def test_the_refusal_says_where_the_points_went(self) -> None:
+        # Exactly what the six slots cost, and no more.
+        s = self.store(slots=6, points=sum(store_prices(6)))
+        s.items[PHASE_UNLOCK.format(1)] = 1
+        s.start_hand(1)
+        refusal = s.can_buy_buff(BUFF_WILD)
+        self.assertIsNotNone(refusal)
+        self.assertIn("held for", refusal)
+
+    def test_a_card_needs_a_hand_to_land_in(self) -> None:
+        s = self.store(slots=6, points=store_points(6, 4))
+        self.assertIn("start a round first", s.can_buy_buff(BUFF_WILD))
+
+    def test_cards_bought_survive_a_reconnect(self) -> None:
+        """Or a reload would hand the points back, and the cards would be free
+        to anybody willing to restart the client."""
+        s = self.buying(buff_points=4)
+        s.buy_buff(BUFF_WILD)
+        fresh = session(store_slots=6)
+        fresh.set_items([AP_POINT] * store_points(6, 4))
+        self.assertTrue(fresh.load_payload(s.to_payload()))
+        self.assertEqual(fresh.buffs_bought, {BUFF_WILD: 1})
+        self.assertEqual(fresh.points_left, s.points_left)
+
+    def test_a_save_from_before_the_cards_existed_still_loads(self) -> None:
+        s = self.store(points=4)
+        payload = s.to_payload()
+        del payload["buffs_bought"]
+        fresh = session(store_slots=6)
+        self.assertTrue(fresh.load_payload(payload))
+        self.assertEqual(fresh.buffs_bought, {})
 
     def test_a_save_without_purchases_still_loads(self) -> None:
         s = self.store(points=4)

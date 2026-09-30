@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AP_10</title>
-<link rel="stylesheet" href="style.css?v=b0dd71f1">
+<link rel="stylesheet" href="style.css?v=2af7fd90">
 </head>
 <body>
 <header>
@@ -174,9 +174,16 @@
     </div>
 
     <div id="store-wrap" hidden>
-      <h2>Store <small>buy a check with AP Points</small></h2>
+      <h2>Store <small>buy a check, or a card, with AP Points</small></h2>
       <div id="store-summary"></div>
       <div id="store"></div>
+      <!-- The rebuyable half. Kept under its own line because it is a
+           different kind of thing from a slot: a slot is bought once and is
+           then a check, these are bought as often as the points allow. -->
+      <div id="store-buffs-wrap" hidden>
+        <div id="store-buffs-note"></div>
+        <div id="store-buffs"></div>
+      </div>
     </div>
 
   </section>
@@ -203,6 +210,6 @@
   </div>
 </div>
 
-<script type="module" src="src/ui.js?v=b0dd71f1"></script>
+<script type="module" src="src/ui.js?v=2af7fd90"></script>
 </body>
 </html>

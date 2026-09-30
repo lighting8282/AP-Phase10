@@ -9,14 +9,14 @@
 // before the restore lands would overwrite a real one with that empty rebuild.
 // Nothing is saved until restoreState is "done".
 
-import { Client } from "../node_modules/archipelago.js/dist/index.js?v=b0dd71f1";
+import { Client } from "../node_modules/archipelago.js/dist/index.js?v=2af7fd90";
 
 import { GAME_NAME, MULLIGAN, PHASE_COUNT, WILD_CARD, phaseUnlock }
-  from "./data.js?v=b0dd71f1";
-import { STOCK_SKIPS } from "./cards.js?v=b0dd71f1";
-import { Phase10Game, roundToString } from "./game.js?v=b0dd71f1";
-import { Phase10Session } from "./session.js?v=b0dd71f1";
-import { describeMeldCards } from "./phases.js?v=b0dd71f1";
+  from "./data.js?v=2af7fd90";
+import { STOCK_SKIPS } from "./cards.js?v=2af7fd90";
+import { Phase10Game, roundToString } from "./game.js?v=2af7fd90";
+import { Phase10Session } from "./session.js?v=2af7fd90";
+import { describeMeldCards } from "./phases.js?v=2af7fd90";
 
 /**
  * The deck a free-play run is dealt, with no Archipelago to hand items out.
@@ -364,6 +364,18 @@ export class Phase10Client {
     await this.save();
     this.onUpdate();
     return id;
+  }
+
+  /**
+   * Buy a one-use card. Nothing is checked -- this is not a location, it is a
+   * card -- but it is saved, because a purchase that a reload undid would be
+   * a purchase nobody ever had to pay for.
+   */
+  async buyBuff(buff) {
+    const card = this.session.buyBuff(buff);
+    await this.save();
+    this.onUpdate();
+    return card;
   }
 
   /** Finish a hand: report its checks, save, and trip the goal if it is met. */

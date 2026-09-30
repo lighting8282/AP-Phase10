@@ -42,7 +42,9 @@ class Phase10World(World):
 
         base = PHASE_COUNT * int(self.options.checks_per_phase) + len(HANDS_WON_MILESTONES)
         floor = PHASE_COUNT + MIN_WILD_CARDS + MIN_EXTRA_DRAWS
-        slots, points = items.plan_store(base, int(self.options.store_slots), floor)
+        slots, points = items.plan_store(
+            base, int(self.options.store_slots), floor,
+            int(self.options.store_buff_points))
         self.options.store_slots.value = slots
         self.store_points = points
 

@@ -11,18 +11,18 @@
 //     takes the hand off the game.
 
 import {
-  BASE_HAND_SIZE, EXTRA_DRAW, HANDS_WON_MILESTONES, HAND_SIZE_UPGRADE, LEAN_DEAL,
+  BASE_HAND_SIZE, BUFF_PRICES, BUFF_WILD, EXTRA_DRAW, HANDS_WON_MILESTONES, HAND_SIZE_UPGRADE, LEAN_DEAL,
   AP_POINT, LOCATION_NAME_TO_ID, MAX_SKIPS, MAX_STORE_SLOTS, MULLIGAN,
   PHASE_COUNT, PHASE_LOCK,
   SCORE_REDUCTION,
   SCORE_REDUCTION_VALUE, SKIP_CARD, TIERS, WILD_CARD,
   WILD_THEFT, milestoneLocationName, phaseLocationName, phaseUnlock,
-  storeGate, storeLocationName, storePrices,
-} from "./data.js?v=b0dd71f1";
-import { STOCK_WILDS } from "./cards.js?v=b0dd71f1";
-import { HAND_STATE, Table, gameConfig } from "./engine.js?v=b0dd71f1";
-import { MID, NAMES as OPPONENT_NAMES, buildOpponents } from "./opponents.js?v=b0dd71f1";
-import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js?v=b0dd71f1";
+  buffPrice, storeGate, storeLocationName, storePrices,
+} from "./data.js?v=2af7fd90";
+import { SKIP, STOCK_WILDS, WILD } from "./cards.js?v=2af7fd90";
+import { HAND_STATE, Table, gameConfig } from "./engine.js?v=2af7fd90";
+import { MID, NAMES as OPPONENT_NAMES, buildOpponents } from "./opponents.js?v=2af7fd90";
+import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js?v=2af7fd90";
 
 export const LEAN_DEAL_PENALTY = 2;
 
@@ -58,6 +58,9 @@ export class Phase10Session {
     //: Which store slots have been bought, so what has been spent is derived
     //: rather than stored twice and left to disagree with itself.
     this.boughtSlots = new Set();
+    //: How many of each one-use card have been bought, so what has been spent
+    //: on them is derived rather than stored twice and left to disagree.
+    this.buffsBought = new Map();
     this._opponentPhases = [];
     this._opponentScores = [];
     //: The table the current hand is being played at, opponents included.
@@ -198,7 +201,43 @@ export class Phase10Session {
     for (const slot of this.boughtSlots) {
       if (slot >= 1 && slot <= this.storeSlots) spent += prices[slot - 1];
     }
+    return spent + this.buffPointsSpent;
+  }
+
+  get buffPointsSpent() {
+    let spent = 0;
+    for (const [name, count] of this.buffsBought) spent += buffPrice(name) * count;
     return spent;
+  }
+
+  /**
+   * What the slots you have not bought still cost.
+   *
+   * The one thing spending must never do is strand a location the seed was
+   * generated as reachable. Archipelago's logic cannot model a currency being
+   * spent -- it reasons about points *received* -- so the client is where that
+   * has to hold, and it holds by keeping the slots' own prices out of what a
+   * buff is allowed to touch.
+   */
+  get pointsReserved() {
+    let owed = 0;
+    for (let slot = 1; slot <= this.storeSlots; slot += 1) {
+      if (!this.boughtSlots.has(slot)) owed += this.storePrice(slot);
+    }
+    return owed;
+  }
+
+  get slotsLeft() {
+    let left = 0;
+    for (let slot = 1; slot <= this.storeSlots; slot += 1) {
+      if (!this.boughtSlots.has(slot)) left += 1;
+    }
+    return left;
+  }
+
+  /** Points you may spend on a card rather than a check. */
+  get buffPointsLeft() {
+    return Math.max(0, this.pointsLeft - this.pointsReserved);
   }
 
   get pointsLeft() {
@@ -242,6 +281,46 @@ export class Phase10Session {
     const id = LOCATION_NAME_TO_ID[storeLocationName(slot)];
     this.checkedLocations.add(id);
     return id;
+  }
+
+  // -- one-use cards ---------------------------------------------------------
+  // The other half of the store: a card, once, now. Bought any number of times
+  // while the points last, and gone the moment it is played or discarded. They
+  // are here for the run where you are three rounds into phase 17 and the deck
+  // will not give you a fourth nine.
+
+  /** Returns null if the buff is buyable right now, else why not. */
+  canBuyBuff(buff) {
+    if (!(buff in BUFF_PRICES)) return `The store does not sell ${buff}.`;
+    if (!this.storeSlots) return "This seed has no store.";
+    const hand = this.hand;
+    if (!hand || hand.state !== HAND_STATE.IN_PROGRESS) {
+      return "A one-use card is bought into a hand; start a round first.";
+    }
+    if (hand.digPending || hand.denyPending) {
+      return "Finish the move you are in first.";
+    }
+    const price = buffPrice(buff);
+    if (this.buffPointsLeft < price) {
+      const reserved = this.pointsReserved;
+      if (reserved && this.pointsLeft >= price) {
+        // Spelled out rather than refused flatly: the points are there, they
+        // are just the ones the remaining checks are owed.
+        return `${buff} costs ${price}; ${this.pointsLeft} unspent, but `
+          + `${reserved} of those are held for the ${this.slotsLeft} slot(s) `
+          + "you have not bought.";
+      }
+      return `${buff} costs ${price}; you have ${this.buffPointsLeft} to spend.`;
+    }
+    return null;
+  }
+
+  /** Buy a one-use card. It lands in your hand, and it is yours to lose. */
+  buyBuff(buff) {
+    const refusal = this.canBuyBuff(buff);
+    if (refusal) throw new Error(refusal);
+    this.buffsBought.set(buff, (this.buffsBought.get(buff) ?? 0) + 1);
+    return this.hand.takeBoughtCard(buff === BUFF_WILD ? WILD : SKIP);
   }
 
   // -- mulligans -----------------------------------------------------------
@@ -502,6 +581,9 @@ export class Phase10Session {
       opponent_phases: [...this._opponentPhases],
       opponent_scores: [...this._opponentScores],
       bought_slots: [...this.boughtSlots].sort((a, b) => a - b),
+      // Saved, or a reload would hand the points back and the one-use cards
+      // would be free to anybody willing to refresh the page.
+      buffs_bought: Object.fromEntries(this.buffsBought),
       locked_phase: this.lockedPhase,
     };
   }
@@ -551,6 +633,17 @@ export class Phase10Session {
     if (Array.isArray(bought)
         && bought.every((v) => Number.isInteger(v) && v >= 1 && v <= MAX_STORE_SLOTS)) {
       this.boughtSlots = new Set(bought);
+    }
+
+    // Same, one version later. A name the store does not sell is dropped
+    // rather than trusted: this arrives over the network like the rest.
+    const buffs = payload.buffs_bought;
+    if (buffs && typeof buffs === "object" && !Array.isArray(buffs)) {
+      for (const [name, count] of Object.entries(buffs)) {
+        if (name in BUFF_PRICES && Number.isInteger(count) && count >= 0) {
+          this.buffsBought.set(name, count);
+        }
+      }
     }
 
     const locked = payload.locked_phase;

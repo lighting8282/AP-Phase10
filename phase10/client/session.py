@@ -15,6 +15,8 @@ from typing import Any
 from ..data import (
     AP_POINT,
     BASE_HAND_SIZE,
+    BUFF_PRICES,
+    BUFF_WILD,
     EXTRA_DRAW,
     HAND_SIZE_UPGRADE,
     HANDS_WON_MILESTONES,
@@ -32,13 +34,14 @@ from ..data import (
     TIERS,
     WILD_CARD,
     WILD_THEFT,
+    buff_price,
     milestone_location_name,
     phase_location_name,
     store_gate,
     store_location_name,
     store_prices,
 )
-from ..game.cards import STOCK_WILDS
+from ..game.cards import SKIP, STOCK_WILDS, WILD, Card
 from ..game.engine import GameConfig, HandState, PhaseHand, Table
 from ..game.opponents import MID, build_opponents
 from ..game.game import SAVE_VERSION, Phase10Game, RoundResult
@@ -83,6 +86,9 @@ class Phase10Session:
     #: Which store slots have been bought, so what has been spent is derived
     #: rather than stored twice and left to disagree with itself.
     bought_slots: set[int] = field(default_factory=set)
+    #: How many of each one-use card have been bought, so what has been spent
+    #: on them is derived rather than stored twice and left to disagree.
+    buffs_bought: dict[str, int] = field(default_factory=dict)
     _opponent_phases: list[int] = field(default_factory=list)
     _opponent_scores: list[int] = field(default_factory=list)
     checked_locations: set[int] = field(default_factory=set)
@@ -308,9 +314,34 @@ class Phase10Session:
 
     @property
     def points_spent(self) -> int:
-        return sum(store_prices(self.store_slots)[slot - 1]
-                   for slot in self.bought_slots
-                   if 1 <= slot <= self.store_slots)
+        bought = sum(store_prices(self.store_slots)[slot - 1]
+                     for slot in self.bought_slots
+                     if 1 <= slot <= self.store_slots)
+        return bought + self.buff_points_spent
+
+    @property
+    def buff_points_spent(self) -> int:
+        return sum(buff_price(name) * count
+                   for name, count in self.buffs_bought.items())
+
+    @property
+    def points_reserved(self) -> int:
+        """What the slots you have not bought still cost.
+
+        The one thing spending must never do is strand a location the seed was
+        generated as reachable. Archipelago's logic cannot model a currency
+        being spent -- it reasons about points *received* -- so the client is
+        where that has to hold, and it holds by keeping the slots' own prices
+        out of what a buff is allowed to touch.
+        """
+        return sum(self.store_price(slot)
+                   for slot in range(1, self.store_slots + 1)
+                   if slot not in self.bought_slots)
+
+    @property
+    def buff_points_left(self) -> int:
+        """Points you may spend on a card rather than a check."""
+        return max(0, self.points_left - self.points_reserved)
 
     @property
     def points_left(self) -> int:
@@ -349,6 +380,48 @@ class Phase10Session:
             raise RuntimeError(refusal)
         self.bought_slots.add(slot)
         return LOCATION_NAME_TO_ID[store_location_name(slot)]
+
+    # -- one-use cards -----------------------------------------------------
+    # The other half of the store: a card, once, now. Bought any number of
+    # times while the points last, and gone the moment it is played or
+    # discarded. They are here for the run where you are three rounds into
+    # phase 17 and the deck will not give you a fourth nine.
+
+    def can_buy_buff(self, buff: str) -> str | None:
+        """Returns None if the buff is buyable right now, else why not."""
+        if buff not in BUFF_PRICES:
+            return f"The store does not sell {buff!r}."
+        if not self.store_slots:
+            return "This seed has no store."
+        hand = self.hand
+        if hand is None or hand.state is not HandState.IN_PROGRESS:
+            return "A one-use card is bought into a hand; start a round first."
+        if hand.dig_pending or hand.deny_pending:
+            return "Finish the move you are in first."
+        price = buff_price(buff)
+        if self.buff_points_left < price:
+            reserved = self.points_reserved
+            if reserved and self.points_left >= price:
+                # Spelled out rather than refused flatly: the points are there,
+                # they are just the ones the remaining checks are owed.
+                return (f"{buff} costs {price}; {self.points_left} unspent, "
+                        f"but {reserved} of those are held for the "
+                        f"{self.slots_left} slot(s) you have not bought.")
+            return f"{buff} costs {price}; you have {self.buff_points_left} to spend."
+        return None
+
+    @property
+    def slots_left(self) -> int:
+        return sum(1 for slot in range(1, self.store_slots + 1)
+                   if slot not in self.bought_slots)
+
+    def buy_buff(self, buff: str) -> Card:
+        """Buy a one-use card. It lands in your hand, and it is yours to lose."""
+        refusal = self.can_buy_buff(buff)
+        if refusal:
+            raise RuntimeError(refusal)
+        self.buffs_bought[buff] = self.buffs_bought.get(buff, 0) + 1
+        return self.hand.take_bought_card(WILD if buff == BUFF_WILD else SKIP)
 
     # -- mulligans ---------------------------------------------------------
     @property
@@ -490,6 +563,9 @@ class Phase10Session:
             "opponent_phases": list(self._opponent_phases),
             "opponent_scores": list(self._opponent_scores),
             "bought_slots": sorted(self.bought_slots),
+            # Saved, or a reconnect would hand the points back and the one-use
+            # cards would be free to anybody willing to restart the client.
+            "buffs_bought": dict(self.buffs_bought),
             "locked_phase": self.locked_phase,
         }
 
@@ -539,6 +615,15 @@ class Phase10Session:
             isinstance(v, int) and 1 <= v <= MAX_STORE_SLOTS for v in bought
         ):
             self.bought_slots = set(bought)
+
+        # Same, one version later. A name the store does not sell is dropped
+        # rather than trusted: this arrives over the network like the rest.
+        buffs = payload.get("buffs_bought")
+        if isinstance(buffs, dict):
+            self.buffs_bought = {
+                name: count for name, count in buffs.items()
+                if name in BUFF_PRICES and isinstance(count, int) and count >= 0
+            }
 
         locked = payload.get("locked_phase")
         self.locked_phase = (

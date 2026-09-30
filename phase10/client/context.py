@@ -22,7 +22,10 @@ from CommonClient import (
 )
 from NetUtils import ClientStatus
 
-from ..data import GAME_NAME, PHASE_COUNT, store_gate
+from ..data import (
+    BUFF_SKIP, BUFF_WILD, BUFFS, GAME_NAME, PHASE_COUNT, buff_price,
+    store_gate,
+)
 from ..game.autoplay import play_out
 from ..game.engine import HandState
 from ..game.phases import PHASES, describe_meld, phase_description
@@ -302,15 +305,45 @@ class Phase10CommandProcessor(ClientCommandProcessor):
                 why = f"  ({refusal})" if refusal else ""
             self.output(f"  {mark}  Slot {slot}: {price} point(s)"
                         f"  opens at {store_gate(slot)}{why}")
+        # The rebuyable half, reported with what is actually spendable rather
+        # than with what is unspent: the slots you have not bought are owed
+        # their prices, because the seed's logic reasons about points received
+        # and cannot model a currency being spent.
+        budget = s.buff_points_left
+        reserved = s.points_reserved
+        held = (f"  ({reserved} held for the {s.slots_left} slot(s) left)"
+                if reserved else "")
+        self.output(f"One-use cards: {budget} point(s) to spend{held}")
+        for buff in BUFFS:
+            refusal = s.can_buy_buff(buff)
+            mark = "  --" if refusal else " buy"
+            bought = s.buffs_bought.get(buff, 0)
+            so_far = f"  bought x{bought}" if bought else ""
+            why = f"  ({refusal})" if refusal else ""
+            self.output(f"  {mark}  {buff}: {buff_price(buff)} point(s)"
+                        f"{so_far}{why}")
 
     def _cmd_buy(self, slot: str) -> None:
-        """Buy a store slot with AP Points. Usage: /buy <slot>"""
+        """Buy a store slot, or a one-use card. Usage: /buy <slot|wild|skip>"""
+        session = self.ctx.session
+        # A word rather than a number is a card. Matched on the short name so
+        # the command stays typeable mid-turn, which is when it is wanted.
+        wanted = {"wild": BUFF_WILD, "skip": BUFF_SKIP}.get(slot.strip().lower())
+        if wanted is not None:
+            try:
+                card = session.buy_buff(wanted)
+            except RuntimeError as err:
+                self.output(str(err))
+                return
+            self.ctx.save_pending = True
+            self.output(f"Bought a {wanted}. {card} is in your hand; "
+                        f"{session.buff_points_left} point(s) left for cards.")
+            return
         try:
             number = int(slot)
         except ValueError:
-            self.output("Usage: /buy <slot>")
+            self.output("Usage: /buy <slot>, /buy wild or /buy skip")
             return
-        session = self.ctx.session
         try:
             location = session.buy_slot(number)
         except RuntimeError as err:

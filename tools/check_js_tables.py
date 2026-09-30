@@ -38,6 +38,8 @@ def load_python_tables() -> dict:
         "maxSkips": module.MAX_SKIPS,
         "traps": list(module.TRAPS),
         "fillers": list(module.FILLERS),
+        "buffs": list(module.BUFFS),
+        "buffPrices": dict(module.BUFF_PRICES),
     }
 
 
@@ -54,6 +56,8 @@ def load_js_tables() -> dict:
         maxSkips: d.MAX_SKIPS,
         traps: d.TRAPS,
         fillers: d.FILLERS,
+        buffs: d.BUFFS,
+        buffPrices: d.BUFF_PRICES,
       }));
     });
     """
