@@ -939,6 +939,15 @@ alone on the next — worse than the row it replaced.
 All of it sits inside the existing `max-width: 768px`/`pointer: coarse` block,
 so the desktop page is untouched, and the Kivy client reads no CSS at all.
 
+**Your own hand went 58px to 48px** for the same reason and with the same
+floor. What matters there is not the card but how many fit a row: at 58px it
+was five across, so ten cards cost *three* rows on a 360 or 390px phone and two
+on a 412px one. At 48px it is six across on anything from 360 up — two rows
+everywhere, which is 125px off the common phones and 30px off the widest. Not
+smaller than that: these are the cards you tap rather than the ones you read
+across the table, 48px still clears the 44px floor, and a mis-tap here
+discards.
+
 **The stylesheet is stamped too**, and was not. Half the layout lives in
 `style.css`, Pages serves it with the same ten-minute cache as everything else,
 and a CSS-only deploy left the old rules in place with nothing in the markup to
