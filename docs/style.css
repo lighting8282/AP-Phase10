@@ -141,6 +141,22 @@ header.slim #free-play-offer { display: none; }
    the question is asked, rather than in a log column on the other side of the
    page. The ring outlives the turn: it clears when the table next moves, so
    there is as long as you like to read it. */
+/* And the card stays marked for the rest of the round, quietly. The flash
+   below answers "what just changed"; this answers "whose card is that", which
+   is the question you have two turns later when you are working out who is
+   close to going out.
+
+   Inside the card rather than around it: at `outline-offset: -1px` the border
+   costs no layout and cannot reach the card beside it, so a group of nine can
+   have three marked cards in it without the marks running together. The card
+   art is a flat colour at the edges, so two pixels of it is a price worth
+   paying for a border that is unambiguous at 20px. */
+.meld img.played {
+  outline: 2px solid var(--hit, var(--cleared));
+  outline-offset: -1px;
+  border-radius: 3px;
+}
+
 /* Offset by a pixel so the panel shows through between card and ring. The
    seat colours and the card colours are both green/red/yellow, so a ring drawn
    flush against the card it marks can land green-on-green and disappear --

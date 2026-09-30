@@ -888,6 +888,28 @@ against the card, a green ring on a green card disappears, exactly on the card
 it exists to point at. And the count is written out beside the group name,
 because four similar rings is a lot to ask of colour alone.
 
+**The mark outlives the flash.** Those two are answering different questions and
+were doing only the first. The ring says *what just changed*, and it has to
+clear or everything is ringed by the end of a round. Whose card a card is does
+not change, and it is the thing you want two turns later: a run of nine with
+two of your cards and one of Ada's in it is a different thing from a run of
+nine Cy built alone, and counting back through the log is not reading the
+table. So a card played onto a group that was already down keeps a border in
+the player's colour for the rest of the round, under the flash while the flash
+lasts.
+
+`playedBy` is a second map beside `justHit`, written at the same two points and
+cleared when a round starts rather than when the table moves. It lives in the
+UI rather than the engine because it can: `toPayload` keeps finished rounds and
+nothing else, so a hand in progress is never restored and a round always begins
+with the table empty. Nothing to mirror into Python, and no `SAVE_VERSION` bump.
+
+The border is drawn *inside* the card, at `outline-offset: -1px`. Outside it
+would cost no layout either but would reach the card beside it -- groups pack
+at a 2px gap -- so a group with three marked cards in it would read as one
+smear. Two pixels of card art is a cheap price for a border that is still
+unambiguous at the 20px a seat's cards are drawn at on a phone.
+
 **The turn moved into `Table.playSeat`, and that is the part worth remembering.**
 It is the body of the old `endOfTurn` loop, so a seat played one at a time is
 played exactly as it was played all at once -- including consuming a Skip, which
