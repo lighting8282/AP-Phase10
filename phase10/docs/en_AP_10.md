@@ -67,7 +67,17 @@ bought rather than played for. Each slot has a price, and a slot opens once you
 have received enough points to have afforded every cheaper slot, so you can buy
 them in whatever order you like. `store_slots` sets how many there are, or 0
 for none. In a very small seed the store trims itself to what the item pool can
-carry.
+carry. Connected, each slot says what it is holding, so you are choosing
+between items rather than between prices.
+
+The store also sells a card rather than a check: a **One-Use Wild** for two
+points or a **One-Use Skip** for one, as often as you can afford them. The card
+goes straight into your hand, costs you no draw, and is gone the moment you
+play or discard it -- one more card to shed, and one more to be caught holding.
+Buying them can never cost you a check: the store holds back what your unbought
+slots still cost and only lets you spend what is left over.
+`store_buff_points` sets how much spending money the seed carries beyond the
+slots, or 0 for none.
 
 Locations: each of the twenty phases is worth up to four checks -- clearing it,
 clearing it inside half your draw budget, clearing it without a wild, and
