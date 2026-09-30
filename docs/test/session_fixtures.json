@@ -1292,7 +1292,7 @@
      ],
      "handsWon": 10,
      "lockedPhase": null,
-     "goalMet": true
+     "goalMet": false
     },
     {
      "phase": 11,
@@ -1395,7 +1395,7 @@
      ],
      "handsWon": 20,
      "lockedPhase": null,
-     "goalMet": false
+     "goalMet": true
     }
    ]
   },

@@ -14,10 +14,10 @@ from ..game.engine import HandState
 from ..game.game import SAVE_VERSION
 
 
-def session() -> Phase10Session:
-    return Phase10Session.from_slot_data(
-        {"goal": 0, "starting_draws": 6, "checks_per_phase": 4}, random.Random(3)
-    )
+def session(**slot) -> Phase10Session:
+    base = {"goal": 0, "starting_draws": 6, "checks_per_phase": 4}
+    base.update(slot)
+    return Phase10Session.from_slot_data(base, random.Random(3))
 
 
 def play(s: Phase10Session, phase: int, state: HandState) -> None:
@@ -46,12 +46,15 @@ class TestRoundTrip(unittest.TestCase):
         self.assertEqual(after.game.round_number, 4)
 
     def test_goal_progress_survives(self) -> None:
-        before = session()
+        # Ten phases, said rather than assumed: the default goal is every one
+        # of the twenty, and this test is about the payload rather than about
+        # how long a seed is.
+        before = session(phases_to_win=10)
         for phase in range(1, 11):
             play(before, phase, HandState.PHASE_LAID)
         self.assertTrue(before.goal_met)
 
-        after = session()
+        after = session(phases_to_win=10)
         self.assertFalse(after.goal_met)
         self.assertTrue(after.load_payload(before.to_payload()))
         self.assertTrue(after.goal_met)

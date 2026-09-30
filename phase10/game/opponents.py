@@ -316,13 +316,20 @@ class Opponent:
         return f"<Opponent {self.name} p{self.phase} {state} hand={len(self.hand)}>"
 
 
+#: Who sits at the table, in order. At module level rather than inside
+#: `build_opponents` because the clients name a seat when no table is dealt --
+#: reporting who won a finished run, for one -- and the JS port has exported
+#: it that way all along. Buried here, `Phase10Session.seat_name` referred to
+#: a name that did not exist and raised NameError the moment a seat won.
+NAMES = ["Ada", "Bo", "Cy", "Del", "Eve", "Fen"]
+
+
 def build_opponents(count: int, phases: list[int] | None, config: GameConfig,
                     rng: random.Random, skill: OpponentSkill = MID) -> list[Opponent]:
     """Seat `count` opponents, each on its own phase."""
-    names = ["Ada", "Bo", "Cy", "Del", "Eve", "Fen"]
     if phases is None:
         phases = [1] * count
     return [
-        Opponent(names[i % len(names)], phases[i], config, rng, skill)
+        Opponent(NAMES[i % len(NAMES)], phases[i], config, rng, skill)
         for i in range(count)
     ]

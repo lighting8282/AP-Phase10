@@ -14,6 +14,7 @@ from ..data import (
 )
 from ..game.cards import STOCK_WILDS, WILD, Color, number_card
 from ..game.engine import HandState
+from ..game.game import RoundResult
 
 
 def session(**slot) -> Phase10Session:
@@ -713,6 +714,59 @@ class TestStore(unittest.TestCase):
         self.assertEqual(fresh.bought_slots, set())
 
 
+class TestGoal(unittest.TestCase):
+    """Mirrors the block of the same name in docs/test/session_test.mjs.
+
+    The client and the world have to agree about what finishes a slot. A
+    client that declares victory on a different count than the seed was
+    generated for sends the goal early, and the server believes it.
+    """
+
+    def goal(self, **slot) -> Phase10Session:
+        return session(**slot)
+
+    def clear_up_to(self, s: Phase10Session, upto: int) -> Phase10Session:
+        for phase in range(1, upto + 1):
+            s.game.rounds.append(RoundResult(
+                number=phase, phase=phase, state=HandState.WENT_OUT,
+                score=0, draws_used=1, wilds_used=0, skips_played=0,
+            ))
+        return s
+
+    def test_ten_of_twenty_is_not_the_default_goal(self) -> None:
+        """The bug this class exists for. Ten was hardcoded when there were ten
+        phases and never moved when the other ten arrived, so a default seed --
+        whose own rule is HasAll(Phase 1..20 Clear) -- was won at half."""
+        self.assertFalse(self.clear_up_to(self.goal(), 10).goal_met)
+
+    def test_twenty_of_twenty_is(self) -> None:
+        self.assertTrue(self.clear_up_to(self.goal(), PHASE_COUNT).goal_met)
+
+    def test_phases_to_win_sets_the_length(self) -> None:
+        self.assertTrue(self.clear_up_to(self.goal(phases_to_win=10), 10).goal_met)
+        self.assertFalse(self.clear_up_to(self.goal(phases_to_win=14), 10).goal_met)
+        self.assertTrue(self.clear_up_to(self.goal(phases_to_win=14), 14).goal_met)
+
+    def test_it_is_the_named_phases_not_a_count(self) -> None:
+        """Any three standing in for the first three is not what
+        HasAll(Phase 1..N Clear) says, and the seed is generated on that."""
+        s = self.goal(phases_to_win=3)
+        for phase in (1, 2, 7):
+            s.game.rounds.append(RoundResult(
+                number=phase, phase=phase, state=HandState.WENT_OUT,
+                score=0, draws_used=1, wilds_used=0, skips_played=0,
+            ))
+        self.assertEqual(len(s.cleared_phases), 3)
+        self.assertFalse(s.goal_met)
+
+    def test_a_seed_without_the_key_wants_every_phase(self) -> None:
+        self.assertEqual(self.goal().phases_to_win, PHASE_COUNT)
+
+    def test_phase_ten_is_untouched(self) -> None:
+        s = self.clear_up_to(self.goal(goal=1, phases_to_win=PHASE_COUNT), 10)
+        self.assertTrue(s.goal_met)
+
+
 class TestRunEnds(unittest.TestCase):
     """Mirrors the block of the same name in docs/test/client_test.mjs.
 
@@ -735,6 +789,9 @@ class TestRunEnds(unittest.TestCase):
         self.assertEqual(s.phase_cap, PHASE_COUNT)
         s.opponent_phases[0] = 99
         self.assertFalse(s.run_over)
+        # Unlocked first: a seed gates on items, so "still playable" has to be
+        # asked of a phase the slot actually holds.
+        s.items[PHASE_UNLOCK.format(1)] = 1
         self.assertIsNone(s.can_play(1))
 
     def test_a_seat_past_the_cap_has_finished_and_ends_the_run(self) -> None:

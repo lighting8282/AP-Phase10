@@ -2,14 +2,15 @@ from dataclasses import dataclass
 
 from Options import Choice, DeathLink, OptionGroup, PerGameCommonOptions, Range, Toggle
 
-from .data import DEFAULT_BUFF_POINTS, MAX_STORE_SLOTS
+from .data import DEFAULT_BUFF_POINTS, MAX_STORE_SLOTS, PHASE_COUNT
 
 
 class Goal(Choice):
     """
     What finishes the multiworld.
 
-    all_phases: clear every one of the ten phases.
+    all_phases: clear phases 1 up to `phases_to_win`. At the default of 20
+                that is every phase; at 10 it is the ten the box ships with.
     phase_ten:  clear Phase 10 only. Much shorter, and since the phases are
                 unlocked out of order this is not necessarily the last one you
                 will be able to attempt.
@@ -18,6 +19,27 @@ class Goal(Choice):
     option_all_phases = 0
     option_phase_ten = 1
     default = option_all_phases
+
+
+class PhasesToWin(Range):
+    """
+    How many phases `all_phases` actually asks for: clear 1 up to this one.
+
+    20 is every phase this world has. 10 is the game as the box ships it --
+    the extra ten were measured to fill a gap those leave, so stopping at ten
+    is a whole game rather than half of one.
+
+    Being a range, the YAML's own syntax covers a random goal length:
+    `random-range-10-20` picks one per seed and `random` picks from the whole
+    range. The seed's logic is built on whatever it picks, so every phase up to
+    it is required and reachable.
+
+    Ignored when the goal is `phase_ten`.
+    """
+    display_name = "Phases To Win"
+    range_start = 1
+    range_end = PHASE_COUNT
+    default = PHASE_COUNT
 
 
 class StartingDraws(Range):
@@ -247,6 +269,7 @@ class StoreBuffPoints(Range):
 @dataclass
 class Phase10Options(PerGameCommonOptions):
     goal: Goal
+    phases_to_win: PhasesToWin
     starting_phases: StartingPhases
     opponents: Opponents
     starting_draws: StartingDraws
@@ -262,8 +285,8 @@ class Phase10Options(PerGameCommonOptions):
 
 
 option_groups = [
-    OptionGroup("Goal", [Goal, ChecksPerPhase, StoreSlots, StoreBuffPoints,
-                         StartingPhases]),
+    OptionGroup("Goal", [Goal, PhasesToWin, ChecksPerPhase, StoreSlots,
+                         StoreBuffPoints, StartingPhases]),
     OptionGroup("Difficulty", [Opponents, StartingDraws, ExtraDrawItems,
                                WildCardItems, HandSizeUpgrades, SkipCardItems]),
     OptionGroup("Deck", [TrapChance, Phase10DeathLink]),

@@ -27,7 +27,14 @@ class TestIdTables(unittest.TestCase):
         self.assertGreater(min(milestone_ids), max(phase_ids))
 
     def test_world_tables_match_the_shared_ones(self) -> None:
-        from ..world import Phase10World
+        # The only test in this module that needs the World class, and so the
+        # only one that needs Archipelago on the path. Skipped rather than
+        # errored without it, so `tools/run_world_tests.py` reports what it
+        # actually checked instead of one red line it can never turn green.
+        try:
+            from ..world import Phase10World
+        except ModuleNotFoundError as err:  # pragma: no cover - env dependent
+            raise unittest.SkipTest(f"needs an Archipelago checkout: {err}")
 
         self.assertEqual(Phase10World.location_name_to_id, LOCATION_NAME_TO_ID)
         self.assertEqual(Phase10World.item_name_to_id, ITEM_NAME_TO_ID)
