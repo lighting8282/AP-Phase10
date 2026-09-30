@@ -248,7 +248,7 @@ explanation; these are the ones that change the shape of a run most.
 | `goal` | all phases | Clear every phase, or just Phase 10 |
 | `checks_per_phase` | 2 | 1–4 checks per phase: cleared, under par, no wilds, went out |
 | `store_slots` | 6 | Checks you can buy outright with AP Points; 0 for none |
-| `store_buff_points` | 4 | Spending money for the store's one-use cards; 0 for none |
+| `store_buff_points` | 8 | Spending money for the store's one-use cards; 0 for none |
 | `starting_phases` | 2 | How many phases you open with |
 | `opponents` | 3 | Computer players at the table; 0 for the pure solo game |
 | `starting_draws` | 4 | Draws per hand before Extra Draw items |

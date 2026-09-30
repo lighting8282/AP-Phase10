@@ -135,7 +135,13 @@ BUFFS = [BUFF_WILD, BUFF_SKIP]
 #: them. Trimmed before the slack and before any slot when the pool is tight,
 #: so a seed that could only just fit its store still gets the store it got
 #: before these existed.
-DEFAULT_BUFF_POINTS = 4
+#:
+#: Eight rather than four because four was a run's worth of three Wilds, which
+#: is not relief -- it is a thing to hoard and agonise over, which is the
+#: opposite of the point. Eight buys ten cards at the default store and costs
+#: one Skip Card item and three filler; see DEVELOPMENT.md for where the curve
+#: turns and why it does not go higher by default.
+DEFAULT_BUFF_POINTS = 8
 
 
 def buff_price(buff: str) -> int:
