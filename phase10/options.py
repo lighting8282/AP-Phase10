@@ -222,6 +222,15 @@ class StoreBuffPoints(Range):
     slot you have not bought yet, which is the only way spending could strand
     a location the seed was generated as reachable.
 
+    Points are items, so they come out of the same location budget as
+    everything else. At the default two checks a phase there are 56 locations
+    and logic already claims 29, so the curve turns: 8 costs a Skip Card item
+    and some filler, 12 costs the Hand Size Upgrades and the rest of the Skip
+    Cards, and past 12 it starts eating the Wild Card items themselves --
+    trading wilds that are in the deck every round for wilds you get once,
+    which is a bad trade in both directions. At three or four checks a phase
+    there is room to spare and 20 costs nothing but filler.
+
     Trimmed first when the pool is tight -- before the store's slack and
     before any slot -- so a seed that could only just fit its store still gets
     the store it would have got without these.
@@ -231,7 +240,7 @@ class StoreBuffPoints(Range):
 
     display_name = "Store Buff Points"
     range_start = 0
-    range_end = 12
+    range_end = 20
     default = DEFAULT_BUFF_POINTS
 
 

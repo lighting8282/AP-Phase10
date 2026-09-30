@@ -746,6 +746,35 @@ nobody could ever use. And the refusal **says where the points went** rather
 than reporting a flat no, because "8 unspent, but 8 of those are held for the 6
 slots you have not bought" is the difference between a rule and a bug.
 
+**How much spending money, measured.** Four was a run's worth of three Wilds,
+which is not relief — it is a thing to hoard and agonise over, which is the
+opposite of what it is for. Points are items, though, so they come out of the
+same location budget as everything else, and at the default two checks a phase
+that budget is genuinely tight: 56 locations, 29 of them already claimed by
+logic. Modelled through `plan_store` and `build_power_item_counts` at default
+options:
+
+| buff points | total points | spare for cards | wilds in deck | skip items | filler |
+|---|---|---|---|---|---|
+| 0 | 10 | 2 | 8 | 4 | 9 |
+| **8** | **18** | **10** | **8** | **3** | **2** |
+| 12 | 22 | 14 | 8 | 0 | 2 |
+| 16 | 26 | 18 | 5 | 0 | 2 |
+| 20 | 27 | 19 | 4 | 0 | 2 |
+
+The curve turns twice. Up to 8 it costs one Skip Card item and some filler. By
+12 the Hand Size Upgrades and the rest of the Skip Cards are gone. **Past 12 it
+starts eating the Wild Card items themselves** — trading a wild that is in the
+deck every round for a wild you get once, which is a bad trade whichever way
+you read it. So the default is 8 and the ceiling is 20 for the seeds that can
+afford it: at three or four checks a phase there are 76 and 96 locations, and
+20 costs nothing but filler.
+
+The prices stay 2 and 1. Making them equal would be the obvious way to buy more
+cards for the same points, and it would quietly delete the Skip: a One-Use Wild
+fits any phase and is the best card in the deck, so at the same price nobody
+would ever buy the other one. Volume is the lever, not price.
+
 `store_buff_points` is how much spending money the seed carries beyond the
 ladder. It is trimmed **first** when the pool is tight — before the slack and
 before any slot — so a seed that could only just fit its store still gets the

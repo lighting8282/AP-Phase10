@@ -392,7 +392,7 @@ fixtures.sequences.forEach((script, index) => {
   // on cards would leave locations the seed was generated as reachable with no
   // way left to reach them. The store reserves what the unbought slots cost;
   // everything here is that reservation.
-  const BUDGET = 4;
+  const BUDGET = 8;              // DEFAULT_BUFF_POINTS in data.py
   const WITH_BUFFS = POINTS + BUDGET;
   const buying = (points = WITH_BUFFS, slots = 6) => {
     const s = store(slots, points);

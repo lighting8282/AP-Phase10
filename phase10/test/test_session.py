@@ -579,7 +579,7 @@ class TestStore(unittest.TestCase):
 
     # -- the one-use cards -------------------------------------------------
 
-    def buying(self, buff_points=4, slots=6):
+    def buying(self, buff_points=DEFAULT_BUFF_POINTS, slots=6):
         """A store with spare points and a hand open to buy a card into."""
         s = self.store(slots=slots, points=store_points(slots, buff_points))
         s.items[PHASE_UNLOCK.format(1)] = 1
@@ -611,9 +611,11 @@ class TestStore(unittest.TestCase):
         was not hostage to where the final point landed, and the reservation
         now does that job outright, so holding it back on top would only make
         it a point nobody could ever use."""
-        s = self.buying(buff_points=4)
+        s = self.buying()
         spare = s.buff_points_left
-        self.assertEqual(spare, store_points(6, 4) - sum(store_prices(6)))
+        self.assertEqual(
+            spare,
+            store_points(6, DEFAULT_BUFF_POINTS) - sum(store_prices(6)))
         times = 0
         while s.can_buy_buff(BUFF_SKIP) is None:
             s.buy_buff(BUFF_SKIP)
@@ -662,7 +664,7 @@ class TestStore(unittest.TestCase):
     def test_every_order_still_works_after_buying_cards(self) -> None:
         """The dearest-first order is the one that strands the cheap slots, so
         it is the one worth spending against."""
-        s = self.buying(buff_points=4)
+        s = self.buying()
         while s.can_buy_buff(BUFF_WILD) is None:
             s.buy_buff(BUFF_WILD)
         for slot in (6, 5, 4, 3, 2, 1):
@@ -680,16 +682,16 @@ class TestStore(unittest.TestCase):
         self.assertIn("held for", refusal)
 
     def test_a_card_needs_a_hand_to_land_in(self) -> None:
-        s = self.store(slots=6, points=store_points(6, 4))
+        s = self.store(slots=6, points=store_points(6, DEFAULT_BUFF_POINTS))
         self.assertIn("start a round first", s.can_buy_buff(BUFF_WILD))
 
     def test_cards_bought_survive_a_reconnect(self) -> None:
         """Or a reload would hand the points back, and the cards would be free
         to anybody willing to restart the client."""
-        s = self.buying(buff_points=4)
+        s = self.buying()
         s.buy_buff(BUFF_WILD)
         fresh = session(store_slots=6)
-        fresh.set_items([AP_POINT] * store_points(6, 4))
+        fresh.set_items([AP_POINT] * store_points(6, DEFAULT_BUFF_POINTS))
         self.assertTrue(fresh.load_payload(s.to_payload()))
         self.assertEqual(fresh.buffs_bought, {BUFF_WILD: 1})
         self.assertEqual(fresh.points_left, s.points_left)
