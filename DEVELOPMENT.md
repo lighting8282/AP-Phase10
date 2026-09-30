@@ -42,6 +42,7 @@ while to find and would be easy to reintroduce.
 - [The store](#the-store)
   - [The gate is not the price](#the-gate-is-not-the-price)
   - [Sizing it, measured](#sizing-it-measured)
+  - [The slots say what they hold](#the-slots-say-what-they-hold)
   - [The rebuyable half](#the-rebuyable-half)
   - [It runs alongside the phases](#it-runs-alongside-the-phases)
 - [Game and scoring](#game-and-scoring)
@@ -694,6 +695,24 @@ The trap found while prototyping: the points have to be reserved *before* the
 power items are sized. Otherwise the store's own new locations are swallowed by
 power items that were previously being trimmed away, and the points have
 nowhere to go — the store silently pays for Wild Cards.
+
+### The slots say what they hold
+
+A shop that will not say what is on the shelf is a shop you cannot shop in.
+The decision the store offers is *which slot to spend a point on*, and that
+decision is the item behind the slot; without it the six differ only by price.
+So on connect both clients scout the store's locations and put the item's name
+on the slot, with the receiver's name when it is somebody else's and a mark
+when it is progression.
+
+`create_as_hint` is **0**. That is a scout, not a hint: no hint points are
+spent, nothing is broadcast, and no other player learns anything. It tells this
+client what it is being asked to buy and nothing more.
+
+Failing is quiet. A slot whose contents are unknown shows its price and buys
+exactly as it did before, which is also what every offline and free-play seed
+sees, so the store has to read an empty stock as "not asked yet" rather than as
+"nothing there".
 
 ### The rebuyable half
 

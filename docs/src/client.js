@@ -9,14 +9,17 @@
 // before the restore lands would overwrite a real one with that empty rebuild.
 // Nothing is saved until restoreState is "done".
 
-import { Client } from "../node_modules/archipelago.js/dist/index.js?v=2af7fd90";
+import { Client } from "../node_modules/archipelago.js/dist/index.js?v=7d88f0bc";
 
-import { GAME_NAME, MULLIGAN, PHASE_COUNT, WILD_CARD, phaseUnlock }
-  from "./data.js?v=2af7fd90";
-import { STOCK_SKIPS } from "./cards.js?v=2af7fd90";
-import { Phase10Game, roundToString } from "./game.js?v=2af7fd90";
-import { Phase10Session } from "./session.js?v=2af7fd90";
-import { describeMeldCards } from "./phases.js?v=2af7fd90";
+import {
+  GAME_NAME, LOCATION_NAME_TO_ID, MULLIGAN, PHASE_COUNT, WILD_CARD, phaseUnlock,
+  storeLocationName,
+}
+  from "./data.js?v=7d88f0bc";
+import { STOCK_SKIPS } from "./cards.js?v=7d88f0bc";
+import { Phase10Game, roundToString } from "./game.js?v=7d88f0bc";
+import { Phase10Session } from "./session.js?v=7d88f0bc";
+import { describeMeldCards } from "./phases.js?v=7d88f0bc";
 
 /**
  * The deck a free-play run is dealt, with no Archipelago to hand items out.
@@ -94,6 +97,10 @@ export class Phase10Client {
     //: Playing with no server at all. Not the same as disconnected: a
     //: free-play run has its own items, its own saves, and no checks.
     this.offline = false;
+    //: What each store slot is holding, by location id, once the room has been
+    //: asked. Empty offline and empty until the scout lands, and the store
+    //: reads it as "not known yet" rather than as "nothing there".
+    this.storeStock = new Map();
     //: How far a run climbs. Only free play moves it; a seed is always the
     //: full set, because its locations exist for every phase.
     this.phaseCap = PHASE_COUNT;
@@ -285,9 +292,53 @@ export class Phase10Client {
 
     this.syncItems();
     await this.restore();
+    await this.scoutStore();
     this.onLog(`Connected as ${slotName}.`);
     this.onUpdate();
     return slotData;
+  }
+
+  /**
+   * Ask the room what each store slot is holding.
+   *
+   * A shop that will not say what is on the shelf is a shop you cannot shop
+   * in: the whole decision -- which slot to spend points on -- is the item
+   * behind it, and without this the slots differ only by price. This is the
+   * ordinary Archipelago shop pattern.
+   *
+   * `createHint` is 0, so nothing is hinted: no hint points are spent, nothing
+   * is broadcast to the room, and no other player learns anything. It only
+   * tells this client what it is being asked to buy.
+   *
+   * Failing is fine and stays quiet in the store itself. A slot whose contents
+   * are unknown still shows its price and still buys, which is exactly the
+   * behaviour every seed had before this existed.
+   */
+  async scoutStore() {
+    this.storeStock = new Map();
+    if (!this.connected || !this.session.storeSlots) return;
+    const ids = [];
+    for (let slot = 1; slot <= this.session.storeSlots; slot += 1) {
+      const id = LOCATION_NAME_TO_ID[storeLocationName(slot)];
+      if (id !== undefined) ids.push(id);
+    }
+    if (!ids.length) return;
+    try {
+      const found = await this.client.scout(ids, 0);
+      found.forEach((item, index) => {
+        this.storeStock.set(ids[index], {
+          name: item.name,
+          receiver: item.receiver?.name ?? "",
+          mine: item.receiver?.slot === this.client.players.self?.slot,
+          progression: Boolean(item.progression),
+        });
+      });
+    } catch (err) {
+      // Not worth a line in the log on its own -- the store still works, and a
+      // room that refuses to scout is not a room that refuses to play.
+      this.onLog(`Could not read the store's stock: ${err.message}`);
+    }
+    this.onUpdate();
   }
 
   /**

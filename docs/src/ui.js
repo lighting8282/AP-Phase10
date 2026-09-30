@@ -4,18 +4,18 @@
 // client, and holds no game state of its own. Anything it needed to remember
 // would be a second copy of something the session already owns.
 
-import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=2af7fd90";
+import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=7d88f0bc";
 
 //: Faces used purely as icons in the stat panel.
 const SKIP_FACE = SKIP;
 const WILD_FACE = WILD;
-import { HAND_STATE } from "./engine.js?v=2af7fd90";
+import { HAND_STATE } from "./engine.js?v=7d88f0bc";
 import {
   BUFFS, HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, buffPrice,
   milestoneLocationName, phaseLocationName, storeGate, storeLocationName,
-} from "./data.js?v=2af7fd90";
-import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=2af7fd90";
-import { Phase10Client } from "./client.js?v=2af7fd90";
+} from "./data.js?v=7d88f0bc";
+import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=7d88f0bc";
+import { Phase10Client } from "./client.js?v=7d88f0bc";
 
 const el = (id) => document.getElementById(id);
 
@@ -1033,8 +1033,21 @@ function renderStore(session) {
     const refusal = session.canBuy(slot);
     const button = document.createElement("button");
     button.className = `chk buy ${refusal ? "locked" : "open"}`;
-    button.textContent = `Slot ${slot} - ${price}`;
-    button.title = refusal ?? `Buy Store Slot ${slot} for ${price} point(s)`;
+    // What is on the shelf, when the room has said. Without it the slots
+    // differ only by price, and which slot to spend on *is* the item behind
+    // it -- which is the whole decision the store exists to offer.
+    const stock = app.storeStock?.get(LOCATION_NAME_TO_ID[storeLocationName(slot)]);
+    const shelf = stock
+      ? `${stock.name}${stock.mine ? "" : ` -> ${stock.receiver}`}`
+      : null;
+    button.textContent = shelf
+      ? `Slot ${slot} - ${price} - ${shelf}`
+      : `Slot ${slot} - ${price}`;
+    if (stock?.progression) button.classList.add("progression");
+    button.title = refusal
+      ?? (shelf
+        ? `Buy ${shelf} for ${price} point(s)`
+        : `Buy Store Slot ${slot} for ${price} point(s)`);
     button.disabled = Boolean(refusal);
     button.addEventListener("click", () => buy(slot));
     box.append(button);
