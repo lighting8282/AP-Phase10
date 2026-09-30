@@ -190,8 +190,16 @@ they are not Python; a real generation run is what catches those drifting.
 point generation at that. Never sweep the whole `Players/` folder — it picks up
 whatever else is sitting there and the seed is not the one you meant to make.
 
-**Cutting a release:** delete all older releases and tags. Only the current one
-should exist.
+**Cutting a release:** `python tools/cut_release.py`, which reads the version
+from `phase10/archipelago.json`, runs the battery, builds and verifies the
+apworld, tags, publishes, and *then* deletes every older release and tag —
+only the current one should exist. `--dry-run` says what it would do.
+
+It cannot run from a cloud session. That GitHub access is brokered by a proxy
+which permits commits, branches and pull requests but not tags or releases, so
+the tag push and every `gh release` call come back 403. Tried, and confirmed by
+the error rather than assumed. Bump the version, land it, and run the script on
+a machine you are signed in on.
 
 **Version floor and `websockets`:** AP pins `websockets==13.1` and uses APIs
 removed in 14. Any machine doing AP networking needs the venv with that pin, or
