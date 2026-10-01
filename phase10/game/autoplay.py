@@ -66,9 +66,13 @@ def play_out(h: PhaseHand) -> PhaseHand:
             h.mark_failed("stock_empty")
             break
 
-        # A Skip in hand is strictly better spent than held: it buys a choice
-        # of three for no draw at all, and sheds itself as the discard.
-        if h.skips_in_hand:
+        # A Skip in hand is better spent than held either way -- it is fifteen
+        # points to be caught with and never part of a phase -- but the two
+        # modes spend it differently, and the autoplayer has to know which it
+        # is in or it plays a move the engine refuses.
+        if h.skips_in_hand and cfg.skip_mode == "dig":
+            # The dig buys a choice of three for no draw at all, and the Skip
+            # sheds itself as the discard.
             options = h.play_skip()
             h.take_dug(choose_dig(options, h.hand, spec, cfg))
             continue
@@ -84,9 +88,33 @@ def play_out(h: PhaseHand) -> PhaseHand:
         if h.state is not HandState.IN_PROGRESS:
             break
         if h.hand:
-            h.discard_card(choose_discard(h.hand, spec, cfg))
+            # In deny mode the Skip *is* the discard: throwing it is how it is
+            # played, so it goes the moment there is nothing better to throw,
+            # and it is aimed at whoever is closest to going out.
+            held_skip = next((c for c in h.hand if c.is_skip), None) \
+                if cfg.skip_mode == "deny" else None
+            h.discard_card(held_skip or choose_discard(h.hand, spec, cfg))
+            if h.deny_pending:
+                h.deny_seat(_best_deny(h))
 
     return h
+
+
+def _best_deny(h: PhaseHand) -> int:
+    """Which seat a thrown Skip should cost a turn, as an index into the
+    targets the engine offers.
+
+    The same reading the seats use on each other: down first, then whoever is
+    holding least. Everything here is face up, so this is not the autoplayer
+    seeing hands it should not.
+    """
+    targets = h.deny_targets()
+    best, choice = None, 0
+    for index, seat in enumerate(targets):
+        rank = (0 if getattr(seat, "laid_down", False) else 1, len(seat.hand))
+        if best is None or rank < best:
+            best, choice = rank, index
+    return choice
 
 
 def hit_everything(h: PhaseHand) -> int:

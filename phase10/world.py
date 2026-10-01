@@ -67,7 +67,13 @@ class Phase10World(World):
     def fill_slot_data(self) -> Mapping[str, Any]:
         # The client builds its GameConfig from these; the engine's knobs map
         # one-to-one onto the option names.
-        return self.options.as_dict(
+        data = self.options.as_dict(
             "goal", "phases_to_win", "starting_draws", "checks_per_phase",
             "death_link", "opponents", "store_slots",
         )
+        # Spelled out rather than sent as the Choice's integer: the engine's
+        # knob is the word, both clients read the word, and a number here
+        # would make the two agree only by coincidence.
+        data["skip_mode"] = ("deny" if int(self.options.skip_mode)
+                             == phase10_options.SkipMode.option_deny else "dig")
+        return data

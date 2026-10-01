@@ -767,6 +767,39 @@ class TestGoal(unittest.TestCase):
         self.assertTrue(s.goal_met)
 
 
+class TestSkipMode(unittest.TestCase):
+    """Mirrors the block of the same name in docs/test/session_test.mjs.
+
+    The mode is a word, and it has to survive slot data intact: a seed
+    generated for the dig whose client plays the deny is a seed whose measured
+    clear rates describe a different game.
+    """
+
+    def test_a_seed_digs_unless_it_says_otherwise(self) -> None:
+        s = session()
+        self.assertEqual(s.skip_mode, "dig")
+        self.assertEqual(s.config.skip_mode, "dig")
+
+    def test_a_seed_can_ask_for_the_printed_rule(self) -> None:
+        s = session(skip_mode="deny")
+        self.assertEqual(s.skip_mode, "deny")
+        self.assertEqual(s.config.skip_mode, "deny")
+
+    def test_anything_else_digs(self) -> None:
+        """Slot data arrives over the network. A word nobody recognises must
+        land on the measured mode rather than on the other one."""
+        for odd in ("DENY", "", "dug", None, 1):
+            self.assertEqual(session(skip_mode=odd).skip_mode, "dig", odd)
+
+    def test_the_skip_is_still_dealt_into_your_hand(self) -> None:
+        """How a Skip is obtained did not change with what it does."""
+        s = session(skip_mode="deny")
+        s.items[SKIP_CARD] = 2
+        s.items[PHASE_UNLOCK.format(1)] = 1
+        hand = s.start_hand(1)
+        self.assertEqual(hand.skips_in_hand, 2)
+
+
 class TestRunEnds(unittest.TestCase):
     """Mirrors the block of the same name in docs/test/client_test.mjs.
 

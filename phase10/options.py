@@ -42,6 +42,42 @@ class PhasesToWin(Range):
     default = PHASE_COUNT
 
 
+class SkipMode(Choice):
+    """
+    What playing a Skip does.
+
+    dig:  reveal the top three of the stock and keep one, free, spending no
+          draw. Not the printed rule, and deliberate: it is what every
+          measured clear rate the access rules are built on was measured with.
+    deny: the printed rule. Discard the Skip and choose who sits out a turn.
+
+    **`deny` is a real difficulty increase here, and it was measured.** A
+    denied turn is worth almost nothing in a seed, because a seed is a race
+    against your draw budget rather than against the table -- at four draws
+    the opponents end a round about once in three hundred. Meanwhile the Skip
+    is a card you cannot use, taking up a hand slot and costing fifteen if you
+    are caught with it. 400 autoplayed rounds per cell, default options:
+
+        phase  skips   dig %   deny %   delta
+            1      1    87.2     79.2    -8.0
+            5      3    82.5     56.5   -26.0
+           10      3    64.5     22.5   -42.0
+           20      3    82.2     41.8   -40.5
+
+    Note which way the Skip count runs: more Skips makes `deny` *worse*, so
+    `Skip Card` items become something to dread. Pair it with
+    `skip_card_items: 0` unless that is the joke you are after, and expect the
+    tier gating to be generous, since it was priced for the dig.
+
+    Free play is always `deny` -- it is the printed game, and nothing there is
+    gated on a measured number.
+    """
+    display_name = "Skip Mode"
+    option_dig = 0
+    option_deny = 1
+    default = option_dig
+
+
 class StartingDraws(Range):
     """
     How many draws you get per hand before Extra Draw items are counted.
@@ -270,6 +306,7 @@ class StoreBuffPoints(Range):
 class Phase10Options(PerGameCommonOptions):
     goal: Goal
     phases_to_win: PhasesToWin
+    skip_mode: SkipMode
     starting_phases: StartingPhases
     opponents: Opponents
     starting_draws: StartingDraws
@@ -288,7 +325,8 @@ option_groups = [
     OptionGroup("Goal", [Goal, PhasesToWin, ChecksPerPhase, StoreSlots,
                          StoreBuffPoints, StartingPhases]),
     OptionGroup("Difficulty", [Opponents, StartingDraws, ExtraDrawItems,
-                               WildCardItems, HandSizeUpgrades, SkipCardItems]),
+                               WildCardItems, HandSizeUpgrades, SkipCardItems,
+                               SkipMode]),
     OptionGroup("Deck", [TrapChance, Phase10DeathLink]),
 ]
 

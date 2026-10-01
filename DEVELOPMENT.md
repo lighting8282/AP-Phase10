@@ -45,6 +45,7 @@ while to find and would be easy to reintroduce.
   - [The slots say what they hold](#the-slots-say-what-they-hold)
   - [The rebuyable half](#the-rebuyable-half)
   - [It runs alongside the phases](#it-runs-alongside-the-phases)
+- [The Skip, in a seed](#the-skip-in-a-seed)
 - [The goal, and two ways it was wrong](#the-goal-and-two-ways-it-was-wrong)
 - [Game and scoring](#game-and-scoring)
 - [UI](#ui)
@@ -794,6 +795,55 @@ Measured over fifteen seeds at the default, six slots and ten points:
 
 So it opens early and finishes before the endgame, rather than being six checks
 that all come due at once.
+
+## The Skip, in a seed
+
+`skip_mode` is a YAML option now, and it defaults to `dig` for the same reason
+it always did: every measured clear rate the access rules stand on was
+measured with the dig. `deny` is the printed rule, available to anyone who
+wants it, and the seed records which it used so a client never guesses.
+
+**The deny was measured before it was offered, and it is a large difficulty
+increase.** 400 autoplayed rounds per cell through the same policy every other
+number here came from, at default options:
+
+| phase | skips | dig % | deny, dealt to hand | deny, shuffled into deck |
+|---|---|---|---|---|
+| 1 | 1 | 87.2 | 79.2 | 71.2 |
+| 1 | 3 | 96.0 | 81.8 | 68.5 |
+| 5 | 3 | 82.5 | 56.5 | 47.2 |
+| 10 | 3 | 64.5 | **22.5** | **12.5** |
+| 20 | 3 | 82.2 | 41.8 | 28.5 |
+
+Two things in that table are worth more than the headline.
+
+**More Skips makes `deny` worse.** At phase 10 one Skip costs 14 points of
+clear rate and three cost 42. So in deny mode a `Skip Card` item is a
+*drawback*, and a pool full of them is a punishment — which is not a thing an
+Archipelago item should quietly be. `skip_card_items: 0` is the sane
+companion setting, and the option's help says so.
+
+**Putting them in the deck instead is worse again**, which was the opposite of
+the guess. A Skip shuffled in is a card you might spend one of four draws
+pulling, and then still have to shed.
+
+The cause is structural rather than a tuning accident. A seed is a race
+against the draw budget, not against the table — at four draws the opponents
+end a round about once in three hundred — so a denied turn buys you nothing,
+while the Skip itself occupies a hand slot and costs fifteen if you are caught
+with it. The dig, by contrast, is three cards looked at for no draw, which is
+worth a great deal when you only get four. **Deny is the free-play mechanic,
+and free play is where it earns its keep**, because there the race is real and
+there is no budget.
+
+So: offered, measured, documented, and not the default. Turning it on is a
+legitimate way to make a seed harder; it is not a way to make Skips feel like
+Skips without paying for it. Were the default ever to move, every tier
+percentage in this document would need re-measuring first, because they price
+a game in which the Skip helps.
+
+`autoplay.play_out` knows both modes. It had only ever known the dig, and
+would have called `play_skip` into an engine that refuses it.
 
 ## The goal, and two ways it was wrong
 
