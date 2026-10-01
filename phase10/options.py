@@ -25,14 +25,10 @@ class PhasesToWin(Range):
     """
     How many phases `all_phases` actually asks for: clear 1 up to this one.
 
-    20 is every phase this world has. 10 is the game as the box ships it --
-    the extra ten were measured to fill a gap those leave, so stopping at ten
-    is a whole game rather than half of one.
+    20 is every phase. 10 is the game the box ships, and a complete one.
 
-    Being a range, the YAML's own syntax covers a random goal length:
-    `random-range-10-20` picks one per seed and `random` picks from the whole
-    range. The seed's logic is built on whatever it picks, so every phase up to
-    it is required and reachable.
+    `random-range-10-20` picks a length per seed; `random` picks from the whole
+    range. Whatever it picks, every phase up to it is required and reachable.
 
     Ignored when the goal is `phase_ten`.
     """
@@ -46,42 +42,18 @@ class SkipMode(Choice):
     """
     What playing a Skip does.
 
-    dig:  reveal the top three of the stock and keep one, free, spending no
-          draw. Not the printed rule, and deliberate: it is what every
-          measured clear rate the access rules are built on was measured with.
+    dig:  look at the top three of the draw pile and keep one, free. Not the
+          printed rule, and the one the phase difficulty is balanced around.
     deny: the printed rule. Discard the Skip and choose who sits out a turn.
 
-    **`deny` is a real difficulty increase here, and it was measured.** A
-    denied turn is worth almost nothing in a seed, because a seed is a race
-    against your draw budget rather than against the table -- at four draws
-    the opponents end a round about once in three hundred. The dig, meanwhile,
-    is three cards looked at for no draw, which is worth a great deal when you
-    only get four.
+    **`deny` makes a seed harder.** A denied turn is worth little when the
+    round is a race against your draw budget rather than against the table,
+    so the Skip goes from the strongest item in the pool to nearly nothing --
+    worth about a twentieth of what the dig is worth. Pick it if you want the
+    printed rule and a tougher seed, not if you want Skips to feel useful.
 
-    So the difference is not that the Skip hurts under `deny`. It is that it
-    stops doing much of anything. Clear rate by how many Skips you hold, 600
-    autoplayed rounds per cell at default options, phase 10:
-
-        skips held     dig %   deny %
-                 0      18.5     18.5
-                 1      32.7     19.2
-                 2      51.2     21.2
-                 3      61.0     22.2
-                 4      74.3     22.2
-
-    Zero to four Skips is worth **+55.8 percentage points of clear rate**
-    under `dig` and **+3.7** under `deny`. (Percentage points, not score: the
-    15 a Skip costs you if you are caught holding it is a different number
-    entirely.) More Skips still helps under `deny`, slightly, and
-    never hurts -- so leave `skip_card_items` alone; setting it to 0 only
-    makes a deny seed harder still. What changes is that the strongest item in
-    the pool becomes one of the weakest.
-
-    Expect the tier gating to be generous either way, since it was priced for
-    the dig.
-
-    Free play is always `deny` -- it is the printed game, and nothing there is
-    gated on a measured number.
+    `skip_card_items` still wants leaving alone either way: more Skips helps a
+    little under `deny` and never hurts.
     """
     display_name = "Skip Mode"
     option_dig = 0
@@ -93,10 +65,9 @@ class StartingDraws(Range):
     """
     How many draws you get per hand before Extra Draw items are counted.
 
-    The draw budget replaces the multiplayer race to go out, and it is by far
-    the strongest difficulty knob. At 8 total draws the ten phases spread from
-    roughly 66% down to 1% success. Low values here make Extra Draw items the
-    spine of the run.
+    This is the strongest difficulty setting in the file by a distance, and
+    lower is much harder. It also decides how much Extra Draw items matter:
+    start low and they become the spine of the run.
     """
     display_name = "Starting Draws"
     range_start = 2
@@ -109,12 +80,9 @@ class Opponents(Range):
     How many computer players share the table with you.
 
     They draw from the same deck, build toward their own phases, and when one
-    of them goes out your round ends wherever it stands. Set to 0 for the solo
-    game, where only your draw budget can end a round.
-
-    Three opponents end a round around turn five. That is a minimum-of-N
-    effect -- one seat alone takes about eight turns -- so more opponents make
-    rounds shorter, not just busier.
+    of them goes out your round ends wherever it stands. More opponents means
+    shorter rounds, not merely busier ones. Set to 0 for the solo game, where
+    only your draw budget can end a round.
     """
     display_name = "Opponents"
     range_start = 0
@@ -126,19 +94,12 @@ class ExtraDrawItems(Range):
     """
     How many Extra Draw items go in the pool. Each adds one draw per hand.
 
-    The floor of 5 is the most logic can demand: the No Wilds check on every
-    phase asks for Extra Draw x5, so a smaller pool leaves those checks
-    unreachable and the seed will not generate.
+    The floor of 5 is what logic requires -- the No Wilds check asks for five
+    of them -- so a smaller pool would leave those checks unreachable.
 
-    The ceiling is low on purpose. With opponents at the table the round ends
-    when somebody goes out, and past roughly eight *total* draws the budget
-    stops buying anything. Measured across the ten phases, going from 4 draws
-    to 8 is worth real clear rate; from 8 to 14 is worth nothing at all.
-    Anything past that range is a dead item in the pool.
-
-    At the default starting_draws of 4 the floor of 5 already puts you at 9
-    total, so the fifth copy is carrying a logic requirement rather than any
-    real difficulty. Lower starting_draws if you want every copy to bite.
+    The ceiling is low because draws stop buying anything past about eight in
+    total. At the default `starting_draws` of 4 you are already there, so
+    lower that if you want every copy to matter.
     """
     display_name = "Extra Draw Items"
     range_start = 5
@@ -172,8 +133,7 @@ class StartingPhases(Range):
     """
     How many phases you begin with already unlocked.
 
-    At least one is needed or a seed opens with nothing you can play. Easy
-    phases are handed out first, so the opening phases are actually clearable
+    Easy phases are handed out first, so your opening phases are clearable
     before any Wild Card or Extra Draw has arrived.
     """
     display_name = "Starting Phases"
@@ -186,23 +146,21 @@ class ChecksPerPhase(Range):
     """
     How many checks each phase is worth.
 
-    Twenty phases at four checks each is ninety locations, and the item pool
-    cannot fill that with anything meaningful: wilds are capped by the deck's
-    eight, extra draws by the point past which they buy nothing, and skips and
-    hand size by their own limits. The remainder is filler, and at four checks
-    it measured 59% of the pool -- thirty-five Mulligans, which is an infinite
-    supply. Two checks a phase keeps the world at fifty locations, the size the
-    item pool was actually built for. Raise it if you would rather have more
-    checks than more meaningful items.
-
     1: clear the phase.
     2: also clear it inside half your draw budget.
     3: also clear it without using a single wild.
     4: also shed your whole hand and go out.
 
-    In that order because it is a prefix, so a lower number drops the hardest
-    tiers rather than the easiest. Going out is last because solo it is
-    unreachable on eight of the twenty phases.
+    It is a prefix, so a lower number drops the hardest tiers rather than the
+    easiest.
+
+    More checks means more filler in the pool, not more meaningful items --
+    there are only so many wilds and draws worth having, and the rest is
+    Mulligans. Two is the size the item pool was built for. Raise it if you
+    would rather have more checks than better ones.
+
+    Going out is the last tier because playing solo it is unreachable on eight
+    of the twenty phases.
     """
     display_name = "Checks Per Phase"
     range_start = 1
@@ -215,12 +173,11 @@ class SkipCardItems(Range):
     How many Skip Card items go in the pool.
 
     Each one puts a Skip in your hand at the start of every hand, dealt on top
-    of your hand size so it costs no room. Play it to look at the top three of
-    the draw pile and keep one, free -- the Skip becomes that turn's discard.
+    of your hand size so it costs no room. They are granted rather than
+    shuffled into the deck, so you always get them.
 
-    Skips are granted, never shuffled into the deck. Measured in the deck they
-    turn up about a third of a hand and are a straight loss; held, the first one
-    is worth roughly twelve points of success rate on the hardest phases.
+    What a Skip does is set by `skip_mode`, and that decides how much these are
+    worth: a lot under `dig`, very little under `deny`.
     """
     display_name = "Skip Card Items"
     range_start = 0
@@ -253,19 +210,14 @@ class StoreSlots(Range):
     """
     How many checks the store sells for AP Points.
 
-    The store is a second track beside the phases: points arrive as items, and
-    a slot can be bought once you hold enough of them. Prices ascend (1, 1, 1,
-    1, 2, 2, 3, 3) and a slot's gate is the sum of the cheapest prices up to
-    it, so buying in any order is legal.
+    The store is a second track beside the phases: AP Points arrive as items,
+    and a slot can be bought once you hold enough of them. Prices ascend
+    (1, 1, 1, 1, 2, 2, 3, 3), and a slot opens once you could have afforded
+    every cheaper one -- so you can buy them in any order. Connected, each slot
+    says what it is holding.
 
-    Measured at the default of two checks a phase, six slots with ten points:
-    the first slot opens around sphere 2 of an 11-sphere seed and the last
-    around sphere 8, so it runs alongside the phases rather than piling up at
-    the end. It costs two filler items -- the store brings its own locations,
-    so points only displace filler once there are more points than slots.
-
-    At `checks_per_phase: 1` there is almost no room: thirty locations carry
-    two filler items, and the store is trimmed to whatever still fits.
+    The store brings its own locations, so it is close to free. At
+    `checks_per_phase: 1` there is little room and it trims itself to fit.
 
     0 turns the store off.
     """
@@ -281,28 +233,16 @@ class StoreBuffPoints(Range):
     Extra AP Points the seed carries for the store's one-use cards.
 
     The store also sells a card rather than a check: a One-Use Wild for two
-    points or a One-Use Skip for one, any number of times, gone the moment it
-    is played. They exist for the run where you are three rounds into phase 17
-    and the deck will not give you a fourth nine.
+    points or a One-Use Skip for one, as often as you can afford them, gone
+    the moment you play them. They are there for the run where you are three
+    rounds into phase 17 and the deck will not give you a fourth nine.
 
-    This is how many points are added *beyond* what the slots need, so the
-    buffs are not paid for out of the checks. Buying one can never cost you a
-    slot: the store refuses a buff that would leave you unable to afford every
-    slot you have not bought yet, which is the only way spending could strand
-    a location the seed was generated as reachable.
+    This is the spending money for them, on top of what the slots cost, so
+    buying cards can never cost you a check.
 
-    Points are items, so they come out of the same location budget as
-    everything else. At the default two checks a phase there are 56 locations
-    and logic already claims 29, so the curve turns: 8 costs a Skip Card item
-    and some filler, 12 costs the Hand Size Upgrades and the rest of the Skip
-    Cards, and past 12 it starts eating the Wild Card items themselves --
-    trading wilds that are in the deck every round for wilds you get once,
-    which is a bad trade in both directions. At three or four checks a phase
-    there is room to spare and 20 costs nothing but filler.
-
-    Trimmed first when the pool is tight -- before the store's slack and
-    before any slot -- so a seed that could only just fit its store still gets
-    the store it would have got without these.
+    **Past 12 this starts costing you Wild Card items** at the default two
+    checks a phase -- trading wilds that are in the deck every round for wilds
+    you get once. At three or four checks a phase there is room for the lot.
 
     0 turns the one-use cards off and leaves the store selling checks alone.
     """
