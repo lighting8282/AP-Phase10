@@ -54,20 +54,31 @@ class SkipMode(Choice):
     **`deny` is a real difficulty increase here, and it was measured.** A
     denied turn is worth almost nothing in a seed, because a seed is a race
     against your draw budget rather than against the table -- at four draws
-    the opponents end a round about once in three hundred. Meanwhile the Skip
-    is a card you cannot use, taking up a hand slot and costing fifteen if you
-    are caught with it. 400 autoplayed rounds per cell, default options:
+    the opponents end a round about once in three hundred. The dig, meanwhile,
+    is three cards looked at for no draw, which is worth a great deal when you
+    only get four.
 
-        phase  skips   dig %   deny %   delta
-            1      1    87.2     79.2    -8.0
-            5      3    82.5     56.5   -26.0
-           10      3    64.5     22.5   -42.0
-           20      3    82.2     41.8   -40.5
+    So the difference is not that the Skip hurts under `deny`. It is that it
+    stops doing much of anything. Clear rate by how many Skips you hold, 600
+    autoplayed rounds per cell at default options, phase 10:
 
-    Note which way the Skip count runs: more Skips makes `deny` *worse*, so
-    `Skip Card` items become something to dread. Pair it with
-    `skip_card_items: 0` unless that is the joke you are after, and expect the
-    tier gating to be generous, since it was priced for the dig.
+        skips held     dig %   deny %
+                 0      18.5     18.5
+                 1      32.7     19.2
+                 2      51.2     21.2
+                 3      61.0     22.2
+                 4      74.3     22.2
+
+    Zero to four Skips is worth **+55.8 percentage points of clear rate**
+    under `dig` and **+3.7** under `deny`. (Percentage points, not score: the
+    15 a Skip costs you if you are caught holding it is a different number
+    entirely.) More Skips still helps under `deny`, slightly, and
+    never hurts -- so leave `skip_card_items` alone; setting it to 0 only
+    makes a deny seed harder still. What changes is that the strongest item in
+    the pool becomes one of the weakest.
+
+    Expect the tier gating to be generous either way, since it was priced for
+    the dig.
 
     Free play is always `deny` -- it is the printed game, and nothing there is
     gated on a measured number.

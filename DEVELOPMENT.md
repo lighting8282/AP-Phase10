@@ -804,28 +804,35 @@ measured with the dig. `deny` is the printed rule, available to anyone who
 wants it, and the seed records which it used so a client never guesses.
 
 **The deny was measured before it was offered, and it is a large difficulty
-increase.** 400 autoplayed rounds per cell through the same policy every other
-number here came from, at default options:
+increase.** 600 autoplayed rounds per cell through the same policy every other
+number here came from, at default options — clear rate against how many Skips
+you hold:
 
-| phase | skips | dig % | deny, dealt to hand | deny, shuffled into deck |
-|---|---|---|---|---|
-| 1 | 1 | 87.2 | 79.2 | 71.2 |
-| 1 | 3 | 96.0 | 81.8 | 68.5 |
-| 5 | 3 | 82.5 | 56.5 | 47.2 |
-| 10 | 3 | 64.5 | **22.5** | **12.5** |
-| 20 | 3 | 82.2 | 41.8 | 28.5 |
+| skips held | dig % | deny, dealt to hand | deny, shuffled into deck |
+|---|---|---|---|
+| 0 | 18.5 | 18.5 | 18.5 |
+| 1 | 32.7 | 19.2 | 20.2 |
+| 2 | 51.2 | 21.2 | 16.2 |
+| 3 | 61.0 | 22.2 | 12.8 |
+| 4 | 74.3 | 22.2 | 15.2 |
 
-Two things in that table are worth more than the headline.
+(Phase 10. Percentage points throughout — not score, which is the other thing
+this game calls points.)
 
-**More Skips makes `deny` worse.** At phase 10 one Skip costs 14 points of
-clear rate and three cost 42. So in deny mode a `Skip Card` item is a
-*drawback*, and a pool full of them is a punishment — which is not a thing an
-Archipelago item should quietly be. `skip_card_items: 0` is the sane
-companion setting, and the option's help says so.
+**The Skip does not become harmful under the deny. It stops doing much of
+anything.** Zero to four Skips is worth +55.8 percentage points of clear rate
+under the dig and +3.7 under the deny, where it also plateaus after two. More
+Skips still helps, slightly, and never hurts, so `skip_card_items` wants
+leaving alone — turning it down only makes a deny seed harder. What changes is
+that the strongest item in the pool becomes one of the weakest.
 
-**Putting them in the deck instead is worse again**, which was the opposite of
-the guess. A Skip shuffled in is a card you might spend one of four draws
-pulling, and then still have to shed.
+This was stated backwards first, and the correction is worth keeping: the
+claim that a `Skip Card` becomes a *drawback* is true only of the **deck**
+column, which is not what the option does. Shuffling Skips in rather than
+dealing them is genuinely self-defeating — a Skip in the deck is a card you
+might spend one of four draws pulling, and then still have to shed — but that
+variant was measured and not shipped, and its conclusion got carried across to
+the one that was.
 
 The cause is structural rather than a tuning accident. A seed is a race
 against the draw budget, not against the table — at four draws the opponents
