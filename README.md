@@ -248,6 +248,7 @@ explanation; these are the ones that change the shape of a run most.
 | `goal` | all phases | Clear every phase, or just Phase 10 |
 | `checks_per_phase` | 2 | 1–4 checks per phase: cleared, under par, no wilds, went out |
 | `phases_to_win` | 20 | How many phases `all_phases` asks for; `random-range-10-20` for a random length |
+| `skip_mode` | `dig` | What a Skip does: `dig` looks at three cards, `deny` costs somebody a turn |
 | `store_slots` | 6 | Checks you can buy outright with AP Points; 0 for none |
 | `store_buff_points` | 8 | Spending money for the store's one-use cards; 0 for none |
 | `starting_phases` | 2 | How many phases you open with |

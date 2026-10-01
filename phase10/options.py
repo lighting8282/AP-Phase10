@@ -42,6 +42,53 @@ class PhasesToWin(Range):
     default = PHASE_COUNT
 
 
+class SkipMode(Choice):
+    """
+    What playing a Skip does.
+
+    dig:  reveal the top three of the stock and keep one, free, spending no
+          draw. Not the printed rule, and deliberate: it is what every
+          measured clear rate the access rules are built on was measured with.
+    deny: the printed rule. Discard the Skip and choose who sits out a turn.
+
+    **`deny` is a real difficulty increase here, and it was measured.** A
+    denied turn is worth almost nothing in a seed, because a seed is a race
+    against your draw budget rather than against the table -- at four draws
+    the opponents end a round about once in three hundred. The dig, meanwhile,
+    is three cards looked at for no draw, which is worth a great deal when you
+    only get four.
+
+    So the difference is not that the Skip hurts under `deny`. It is that it
+    stops doing much of anything. Clear rate by how many Skips you hold, 600
+    autoplayed rounds per cell at default options, phase 10:
+
+        skips held     dig %   deny %
+                 0      18.5     18.5
+                 1      32.7     19.2
+                 2      51.2     21.2
+                 3      61.0     22.2
+                 4      74.3     22.2
+
+    Zero to four Skips is worth **+55.8 percentage points of clear rate**
+    under `dig` and **+3.7** under `deny`. (Percentage points, not score: the
+    15 a Skip costs you if you are caught holding it is a different number
+    entirely.) More Skips still helps under `deny`, slightly, and
+    never hurts -- so leave `skip_card_items` alone; setting it to 0 only
+    makes a deny seed harder still. What changes is that the strongest item in
+    the pool becomes one of the weakest.
+
+    Expect the tier gating to be generous either way, since it was priced for
+    the dig.
+
+    Free play is always `deny` -- it is the printed game, and nothing there is
+    gated on a measured number.
+    """
+    display_name = "Skip Mode"
+    option_dig = 0
+    option_deny = 1
+    default = option_dig
+
+
 class StartingDraws(Range):
     """
     How many draws you get per hand before Extra Draw items are counted.
@@ -270,6 +317,7 @@ class StoreBuffPoints(Range):
 class Phase10Options(PerGameCommonOptions):
     goal: Goal
     phases_to_win: PhasesToWin
+    skip_mode: SkipMode
     starting_phases: StartingPhases
     opponents: Opponents
     starting_draws: StartingDraws
@@ -288,7 +336,8 @@ option_groups = [
     OptionGroup("Goal", [Goal, PhasesToWin, ChecksPerPhase, StoreSlots,
                          StoreBuffPoints, StartingPhases]),
     OptionGroup("Difficulty", [Opponents, StartingDraws, ExtraDrawItems,
-                               WildCardItems, HandSizeUpgrades, SkipCardItems]),
+                               WildCardItems, HandSizeUpgrades, SkipCardItems,
+                               SkipMode]),
     OptionGroup("Deck", [TrapChance, Phase10DeathLink]),
 ]
 

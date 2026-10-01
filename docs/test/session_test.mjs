@@ -15,6 +15,7 @@ import { Phase10Session } from "../src/session.js";
 import { Phase10Game } from "../src/game.js";
 import {
   AP_POINT, BUFF_SKIP, BUFF_WILD, LOCATION_NAME_TO_ID, MULLIGAN, PHASE_COUNT,
+  SKIP_CARD,
   SCORE_REDUCTION, SCORE_REDUCTION_VALUE, phaseUnlock, storeGate,
   storeLocationName,
 } from "../src/data.js";
@@ -529,6 +530,38 @@ fixtures.sequences.forEach((script, index) => {
 
   check("phase_ten is untouched by any of it",
     clearUpTo(goal({ goal: 1, phases_to_win: 20 }), 10).goalMet, true);
+}
+
+// -- the skip mode -----------------------------------------------------------
+// The mirror of TestSkipMode in phase10/test/test_session.py. The mode is a
+// word, and it has to survive slot data intact: a seed generated for the dig
+// whose client plays the deny is a seed whose measured clear rates describe a
+// different game.
+{
+  const seed = (slot) => Phase10Session.fromSlotData(
+    { goal: 0, starting_draws: 4, checks_per_phase: 4, ...slot },
+    new Phase10Game({ seed: 2 }),
+  );
+
+  check("a seed digs unless it says otherwise", seed({}).skipMode, "dig");
+  check("and its engine agrees", seed({}).config.skipMode, "dig");
+  check("a seed can ask for the printed rule",
+    seed({ skip_mode: "deny" }).skipMode, "deny");
+  check("and its engine agrees too",
+    seed({ skip_mode: "deny" }).config.skipMode, "deny");
+
+  // Slot data arrives over the network. A word nobody recognises must land on
+  // the measured mode rather than on the other one.
+  for (const odd of ["DENY", "", "dug", null, 1]) {
+    check(`${JSON.stringify(odd)} digs`, seed({ skip_mode: odd }).skipMode, "dig");
+  }
+
+  // How a Skip is obtained did not change with what it does.
+  const dealt = seed({ skip_mode: "deny" });
+  dealt.items.set(SKIP_CARD, 2);
+  dealt.items.set(phaseUnlock(1), 1);
+  check("the Skip is still dealt into your hand",
+    dealt.startHand(1).skipsInHand, 2);
 }
 
 for (const line of failures) console.log(`  FAIL ${line}`);
