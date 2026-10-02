@@ -398,6 +398,13 @@ class PhaseHand:
         if from_discard:
             if not self.config.allow_discard_draw or not self.discard:
                 raise RuntimeError("cannot draw from discard")
+            # The printed rule, and the one this engine was missing: a Skip on
+            # the pile is spent. Taking it back up makes one card deny a turn
+            # every time round the table, and in a seed -- where a dig costs no
+            # draw -- an endless free choice of three. Both clients let the
+            # player do exactly that until this line existed.
+            if self.discard[-1].is_skip:
+                raise RuntimeError("a played Skip cannot be taken from the discard")
             card = self.discard.pop()
         else:
             if not self.stock:

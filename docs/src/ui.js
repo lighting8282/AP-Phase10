@@ -4,18 +4,18 @@
 // client, and holds no game state of its own. Anything it needed to remember
 // would be a second copy of something the session already owns.
 
-import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=35be1704";
+import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=67cbef8b";
 
 //: Faces used purely as icons in the stat panel.
 const SKIP_FACE = SKIP;
 const WILD_FACE = WILD;
-import { HAND_STATE } from "./engine.js?v=35be1704";
+import { HAND_STATE } from "./engine.js?v=67cbef8b";
 import {
   BUFFS, HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, buffPrice,
   milestoneLocationName, phaseLocationName, storeGate, storeLocationName,
-} from "./data.js?v=35be1704";
-import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=35be1704";
-import { Phase10Client } from "./client.js?v=35be1704";
+} from "./data.js?v=67cbef8b";
+import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=67cbef8b";
+import { Phase10Client } from "./client.js?v=67cbef8b";
 
 const el = (id) => document.getElementById(id);
 
@@ -838,16 +838,22 @@ function renderMiddle(hand) {
   stock.disabled = !live || drawn || hand.digPending;
 
   const top = hand ? hand.discardTop : null;
+  // A played Skip stays on the pile where everyone can see it was spent, but
+  // it cannot be taken back up. The tile says so rather than refusing a click
+  // silently, which is how this was reported: the card looked available.
+  const spentSkip = Boolean(top) && isSkip(top);
   discard.classList.toggle("empty", !top);
+  discard.classList.toggle("spent", spentSkip);
   face.src = top ? `assets/cards/${cardFilename(top)}` : "assets/cards/back.png";
   face.alt = top ? describe(top) : "";
-  discard.title = top ? describe(top) : "the discard pile is empty";
-  discard.disabled = !live || drawn || !top || hand.digPending;
+  discard.title = spentSkip ? "a played Skip -- it cannot be picked up"
+    : top ? describe(top) : "the discard pile is empty";
+  discard.disabled = !live || drawn || !top || spentSkip || hand.digPending;
 
-  el("prompt").textContent = promptFor(hand, live, drawn);
+  el("prompt").textContent = promptFor(hand, live, drawn, Boolean(top) && !spentSkip);
 }
 
-function promptFor(hand, live, drawn) {
+function promptFor(hand, live, drawn, canTake) {
   // Said first: while the table is moving, nothing else on this line is true.
   if (pacing) {
     const who = activeSeat ? `${activeSeat.name} is playing` : "the table is playing";
@@ -860,7 +866,9 @@ function promptFor(hand, live, drawn) {
   if (!live) return "* The round is over *";
   if (hand.digPending) return "* Keep one of the dug cards *";
   if (hand.denyPending) return "* Say who misses their turn *";
-  if (!drawn) return "* Draw or pick up a card *";
+  // Only offer the pile when there is something on it to take. A spent Skip
+  // leaves a card sitting face up that the line would otherwise invite.
+  if (!drawn) return canTake ? "* Draw or pick up a card *" : "* Draw a card *";
   return "* Play what you can, then discard a card *";
 }
 

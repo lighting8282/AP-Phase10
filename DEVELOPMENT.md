@@ -48,6 +48,7 @@ while to find and would be easy to reintroduce.
 - [The build was not reproducible across platforms](#the-build-was-not-reproducible-across-platforms)
 - [The option help is for choosing, not for showing work](#the-option-help-is-for-choosing-not-for-showing-work)
 - [The Skip, in a seed](#the-skip-in-a-seed)
+  - [A played Skip could be picked up again](#a-played-skip-could-be-picked-up-again)
 - [The goal, and two ways it was wrong](#the-goal-and-two-ways-it-was-wrong)
 - [Game and scoring](#game-and-scoring)
 - [UI](#ui)
@@ -901,6 +902,39 @@ a game in which the Skip helps.
 
 `autoplay.play_out` knows both modes. It had only ever known the dig, and
 would have called `play_skip` into an engine that refuses it.
+
+### A played Skip could be picked up again
+
+Reported from a real game: a Skip thrown onto the discard could be taken
+straight back off it and played a second time. The box has a rule for this and
+the engine did not — `draw(from_discard=True)` took whatever was on top.
+
+It is worse than a missing rule in each mode for a different reason. Denying,
+one card can cost a turn every time round the table, for as long as players keep
+handing it back and forth. Digging, where a dig costs *no draw*, picking the
+Skip back up is an unbounded free choice of three: take it, dig, it lands back
+on the pile, and the next player does the same.
+
+Both ports now refuse it, the seats' own policy refuses it before `draw` is
+reached, and `check_rules_doc.py` pins the claim in both modes.
+
+**No measured number moves.** The worry was that the clear rates were measured
+with the recycling available, since `autoplay` is what measured them. It was
+not: across a sweep where a spent Skip sat on the pile at 9,996 draw decisions,
+the autoplayer took it **zero** times — adding a Skip can never reduce
+`cards_short`, and the policy only takes the top when it strictly does. So the
+tier percentages above stand as measured.
+
+What *did* record the bug was `engine_traces.json`. The trace exporter is a
+fuzzer: it offered every legal-looking action, including this one, so the
+fixtures contained draws the fixed JS port correctly refuses. The fixture was
+the wrong side, not the engine. Re-exported, 480 traces, 16,325 actions.
+
+That re-export needed an Archipelago checkout it should never have needed —
+the traces are pure engine. `export_engine_traces.py` now falls back to the
+`worlds.phase10` mount that `run_world_tests.py` uses, which was verified by
+re-exporting the *unchanged* exporter through it and getting the committed
+fixture back byte for byte before any rule change was made.
 
 ## The goal, and two ways it was wrong
 

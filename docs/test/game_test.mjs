@@ -309,6 +309,33 @@ check(many.scorecard(10)[0].includes("4 earlier round(s)"), "scorecard elides ol
   try { denyTable().hand.playSkip(); } catch (err) { refused = err.message; }
   check(/discard the Skip/.test(refused), "and there is no pre-draw Skip to play");
 
+  // The printed rule, and one both ports shipped without: a Skip on the pile
+  // is spent, and picking it back up let one card deny a turn every time round
+  // the table. Mirrors test_a_played_skip_cannot_be_taken_back_up.
+  for (const skipMode of ["deny", "dig"]) {
+    const h = new PhaseHand(1, gameConfig({ maxDraws: 20, skipMode }),
+      mulberry32(7));
+    h.discard.push(SKIP);
+    let taken = "";
+    try { h.draw(true); } catch (err) { taken = err.message; }
+    check(/Skip/.test(taken), `a played Skip cannot be taken back up (${skipMode})`);
+    eq(h.skipsInHand, 0, `and does not reach the hand (${skipMode})`);
+    check(!h.drewThisTurn, `and the turn is left intact (${skipMode})`);
+  }
+
+  // The refusal is about the card, not about the pile.
+  const ordinary = new PhaseHand(1, gameConfig({ maxDraws: 20 }), mulberry32(7));
+  ordinary.discard.push(numberCard(7, "red"));
+  eq(ordinary.draw(true).rank, 7, "an ordinary discard top is still takeable");
+
+  // Stated in the seat's own policy too, since it reads its shortfall rather
+  // than calling draw.
+  const watching = denyTable();
+  watching.table.seats[0].skill = { name: "certain", discardAwareness: 1,
+    discardError: 0 };
+  check(!watching.table.seats[0]._wantsDiscardTop(SKIP),
+    "and a seat never takes a spent Skip either");
+
   // Going out on a Skip denies nobody -- there is no next turn left to miss.
   const last = denyTable();
   last.hand.hand = [SKIP];

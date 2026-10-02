@@ -13,9 +13,9 @@
 // near turn five. So the race resolves before a large budget can matter -- see
 // the Python module for the numbers and what was done about them.
 
-import { cardToString, handScore, isSkip, points } from "./cards.js?v=35be1704";
-import { cardsShort, removeCard } from "./engine.js?v=35be1704";
-import { PHASES, describeMeldCards, solveMelds } from "./phases.js?v=35be1704";
+import { cardToString, handScore, isSkip, points } from "./cards.js?v=67cbef8b";
+import { cardsShort, removeCard } from "./engine.js?v=67cbef8b";
+import { PHASES, describeMeldCards, solveMelds } from "./phases.js?v=67cbef8b";
 
 /**
  * How well a seat plays. 1.0 / 0.0 is the greedy autoplayer exactly.
@@ -91,6 +91,9 @@ export class Opponent {
   // -- policy ---------------------------------------------------------------
   _wantsDiscardTop(top) {
     if (top === null || top === undefined || !this.config.allowDiscardDraw) return false;
+    // A spent Skip cannot be taken back up -- stated here as well as in `draw`,
+    // for the reason opponents.py gives.
+    if (isSkip(top)) return false;
     if (this.random() > this.skill.discardAwareness) return false; // not looking
     return this._short([...this.hand, top]) < this._short(this.hand);
   }

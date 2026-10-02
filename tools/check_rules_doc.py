@@ -125,6 +125,19 @@ try:
 except RuntimeError as err:
     claim("hitting needs your phase down", "lay your own phase down" in str(err))
 
+# -- a spent Skip stays spent -------------------------------------------------
+# Both modes, because both put the Skip on the pile and the README says the rule
+# holds either way.
+for mode in ("deny", "dig"):
+    h5 = PhaseHand(1, GameConfig(max_draws=20, skip_mode=mode),
+                   random.Random(4), table=Table())
+    h5.discard.append(SKIP)
+    try:
+        h5.draw(from_discard=True)
+        claim(f"a played Skip cannot be picked up ({mode})", False)
+    except RuntimeError as err:
+        claim(f"a played Skip cannot be picked up ({mode})", "Skip" in str(err))
+
 # -- going out ---------------------------------------------------------------
 claim("laying your last card goes out", h2.state is not HandState.WENT_OUT)
 

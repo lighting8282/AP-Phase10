@@ -112,6 +112,12 @@ class Opponent:
     def _wants_discard_top(self, top: Card | None) -> bool:
         if top is None or not self.config.allow_discard_draw:
             return False
+        # A spent Skip cannot be taken back up. Stated here as well as in
+        # `draw`, because a seat reads its own shortfall rather than calling
+        # that: today a Skip never shortens a hand so this changes no decision,
+        # but a seat that learned to value Skips would start throwing.
+        if top.is_skip:
+            return False
         if self.rng.random() > self.skill.discard_awareness:
             return False  # not paying attention this turn
         return self._short(self.hand + [top]) < self._short(self.hand)

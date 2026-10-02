@@ -80,7 +80,10 @@ def play_out(h: PhaseHand) -> PhaseHand:
         base = _short(h.hand, spec, cfg)
         top = h.discard_top
         take_discard = False
-        if top is not None and cfg.allow_discard_draw:
+        if top is not None and cfg.allow_discard_draw and not top.is_skip:
+            # A spent Skip is not available: the engine refuses it, and this
+            # is a sweep of thousands of hands, so a refusal here is a crashed
+            # measurement rather than a wasted turn.
             take_discard = _short(h.hand + [top], spec, cfg) < base
 
         h.draw(from_discard=take_discard)
