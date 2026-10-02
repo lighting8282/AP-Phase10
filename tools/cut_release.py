@@ -43,6 +43,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 MANIFEST = ROOT / "phase10" / "archipelago.json"
 ARTIFACT = ROOT / "dist" / "phase10.apworld"
 TEMPLATE = ROOT / "dist" / "AP_10.yaml"
+README = ROOT / "README.md"
 #: export_template.py's "no Archipelago here" code, as opposed to a real
 #: failure. A release without the template is still a release.
 NO_ARCHIPELAGO = 2
@@ -114,6 +115,24 @@ def version() -> str:
     return declared
 
 
+def readme_says(declared: str) -> None:
+    """The README's sample YAML pins a world version. Keep it honest.
+
+    It is a line a player copies, and nothing else checks it, so it sat nine
+    releases out of date (`AP_10: 0.9.0` against a shipped 1.4.1) until someone
+    read the file against the code. A release is exactly when it goes stale, so
+    a release is where it is caught.
+    """
+    found = re.search(r"^\s*AP_10:\s*(\d+\.\d+\.\d+)\s*$",
+                      README.read_text(encoding="utf-8"), re.M)
+    if found is None:
+        raise SystemExit("! no `AP_10: x.y.z` sample found in README.md. If the "
+                         "sample moved, update this check with it.")
+    if found.group(1) != declared:
+        raise SystemExit(f"! README.md's sample YAML says AP_10: {found.group(1)}, "
+                         f"but this release is {declared}. Fix the README.")
+
+
 def refuse_unless_ready(tag: str) -> None:
     """Every reason not to cut, checked before anything is published."""
     # Checked here as well as at first use: it is the one whose absence should
@@ -170,7 +189,9 @@ def main() -> int:
     print(f"cutting {tag}")
 
     refuse_unless_ready(tag)
-    print("  ready: clean tree, on the default branch, level with origin")
+    readme_says(version())
+    print("  ready: clean tree, on the default branch, level with origin, "
+          "README in step")
 
     for what, command in CHECKS:
         run(command)
