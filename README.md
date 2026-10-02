@@ -93,8 +93,9 @@ plays through commands in the client console:
 1. Download `phase10.apworld` from
    [the latest release](https://github.com/lighting8282/AP-Phase10/releases/latest).
 2. Drop it into your Archipelago `custom_worlds/` folder.
-3. Generate a YAML template from the launcher, or copy one from a previous
-   seed and check the version line.
+3. Take `AP_10.yaml` from the same release for a template with every option in
+   it, or generate one from the launcher. Copying a YAML from a previous seed
+   works too — check the version line.
 
 Requires **Archipelago 0.6.7 or newer**.
 
@@ -105,11 +106,12 @@ game: AP_10
 requires:
   version: 0.6.7
   game:
-    AP_10: 0.9.0
+    AP_10: 1.4.1
 ```
 
-Releases that change the items or locations need a new seed; each release says
-so at the top of its notes.
+A seed is generated against one version of the world. After updating, generate
+a new one rather than rejoining an old room with the new apworld installed:
+a release that moves the items or locations moves what those names mean.
 
 ## The rules
 
@@ -317,7 +319,7 @@ won" milestones, and one location per store slot. **56 at default options.**
         game.py                  many hands, one scorecard
         autoplay.py              greedy autoplayer (difficulty measurement)
         play_in_console.py       headless runner and difficulty sweeps
-      test/                      world and session tests, run in an AP checkout
+      test/                      world and session tests (tools/run_world_tests.py)
       docs/                      the setup and game-info pages AP ships
 
     docs/                        the browser client, served by GitHub Pages
@@ -353,8 +355,14 @@ once:
     python tools/stamp_build.py            # after changing anything in docs/src
     python tools/stamp_build.py --check    # fails if a stamp is stale
 
-The world's own tests need an Archipelago **source** checkout with this package
-linked into `worlds/`, and run from its root:
+Most of the world's own tests — the session, the store, the data tables, the
+save payload — run with nothing installed:
+
+    python tools/run_world_tests.py
+
+The handful that build a multiworld need an Archipelago **source** checkout with
+this package linked into `worlds/`, and that run, from the AP root, is the
+authority:
 
     SKIP_REQUIREMENTS_UPDATE=1 python -m unittest discover -s worlds/phase10/test -t .
 
@@ -363,6 +371,7 @@ Packaging:
     python tools/build_apworld.py                          # dist/phase10.apworld
     python tools/build_apworld.py --verify dist/phase10.apworld
 
+    python tools/export_template.py                        # dist/AP_10.yaml
     python tools/cut_release.py --dry-run                  # what a release would do
     python tools/cut_release.py                            # and do it
 
@@ -371,6 +380,10 @@ whole battery, builds and verifies the apworld, tags, publishes, and then
 retires every older release and tag -- only the current one should exist. It
 needs the `gh` CLI and refuses on a dirty tree, the wrong branch, a branch that
 is not level with origin, a failing check, or a tag that already exists.
+
+It attaches two files: the apworld, and the YAML options template when
+Archipelago can be reached through `AP_ROOT`. Without a checkout it says so and
+cuts the release without the template.
 
 Every number and every "always" or "never" in the rules section above is
 asserted against the engine, because prose is where a rule drifts from the code

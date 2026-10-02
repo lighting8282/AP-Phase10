@@ -89,7 +89,7 @@ def build(target: pathlib.Path) -> pathlib.Path:
         for path in files:
             rel = path.relative_to(PACKAGE)
             name = f"{MODULE}/{rel.as_posix()}"
-            payload = path.read_bytes()
+            payload = normalise(path.read_bytes(), rel.suffix)
             if rel.as_posix() == "archipelago.json":
                 payload = container_manifest(payload)
             info = zipfile.ZipInfo(name, date_time=FIXED_TIME)
@@ -98,6 +98,30 @@ def build(target: pathlib.Path) -> pathlib.Path:
             z.writestr(info, payload)
 
     return target
+
+
+#: Suffixes whose newlines are normalised on the way into the zip. Binary
+#: formats are left exactly as they are -- a card face does not have lines.
+TEXT_SUFFIXES = frozenset({".py", ".json", ".md", ".txt", ".cfg", ".toml", ".yaml"})
+
+
+def normalise(payload: bytes, suffix: str) -> bytes:
+    """Line endings as LF, whatever the checkout decided they were.
+
+    The fixed timestamps above exist so two builds of the same source are
+    byte-identical. On Windows that was not true: git with `core.autocrlf`
+    hands the working tree CRLF, the builder zips the working tree, and the
+    result differs from a Linux build of the same commit in 24 of 77 files --
+    identical once newlines are normalised, and not otherwise. Found by
+    downloading a published release and failing to reproduce it.
+
+    It never broke anything: Python reads either. What it broke is the only
+    use the guarantee has, which is being able to rebuild a shipped artifact
+    and see that it matches.
+    """
+    if suffix.lower() not in TEXT_SUFFIXES:
+        return payload
+    return payload.replace(b"\r\n", b"\n")
 
 
 def container_manifest(source: bytes) -> bytes:
@@ -131,6 +155,15 @@ def verify(target: pathlib.Path) -> list[str]:
                 problems.append(f"bytecode leaked in: {name}")
             if f"{MODULE}/test/" in name:
                 problems.append(f"dev test tree leaked in: {name}")
+
+        # A CRLF in here means the build is not reproducible: the same commit
+        # built on Windows and on Linux would differ in every text file, and
+        # rebuilding a shipped artifact to check it matches stops working.
+        for name in sorted(names):
+            if pathlib.PurePosixPath(name).suffix.lower() not in TEXT_SUFFIXES:
+                continue
+            if b"\r\n" in z.read(name):
+                problems.append(f"CRLF line endings in: {name}")
 
         # The Kivy client loads these at runtime; a world without them imports
         # fine and then shows blank cards.

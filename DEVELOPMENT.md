@@ -45,6 +45,7 @@ while to find and would be easy to reintroduce.
   - [The slots say what they hold](#the-slots-say-what-they-hold)
   - [The rebuyable half](#the-rebuyable-half)
   - [It runs alongside the phases](#it-runs-alongside-the-phases)
+- [The build was not reproducible across platforms](#the-build-was-not-reproducible-across-platforms)
 - [The option help is for choosing, not for showing work](#the-option-help-is-for-choosing-not-for-showing-work)
 - [The Skip, in a seed](#the-skip-in-a-seed)
 - [The goal, and two ways it was wrong](#the-goal-and-two-ways-it-was-wrong)
@@ -796,6 +797,33 @@ Measured over fifteen seeds at the default, six slots and ten points:
 
 So it opens early and finishes before the endgame, rather than being six checks
 that all come due at once.
+
+## The build was not reproducible across platforms
+
+`build_apworld.py` fixes every timestamp in the zip so two builds of the same
+source are byte-identical, and says why: *otherwise every build looks like a
+change and you cannot tell whether a shipped file differs from the one you
+have.* That guarantee held on one machine and quietly failed across two.
+
+Found by verifying a release rather than by reading. The published v1.4.1 was
+downloaded and compared against a build of the same commit here: same 77 files,
+nothing added or missing, and **24 of them different** — all of them text, all
+of them identical once newlines were normalised. Git on Windows with
+`core.autocrlf` hands the working tree CRLF, the builder zips the working tree,
+and the artifact carries them.
+
+Nothing was ever broken by it. Python reads either ending, and the world runs.
+What broke is the only use the guarantee has: rebuilding a shipped artifact and
+seeing that it matches.
+
+So the builder normalises newlines to LF on the way in for text suffixes, and
+leaves everything else — a card face has no lines — exactly as it is. `--verify`
+now refuses an apworld with a CRLF in any text file, which was checked by
+building one deliberately and watching it fail.
+
+The alternative, a `.gitattributes` with `eol=lf`, would fix the checkout
+rather than the builder. That is worth having too, but it only helps people who
+re-clone, and the builder is the thing that must not care.
 
 ## The option help is for choosing, not for showing work
 
