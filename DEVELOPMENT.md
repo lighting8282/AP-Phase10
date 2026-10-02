@@ -45,6 +45,7 @@ while to find and would be easy to reintroduce.
   - [The slots say what they hold](#the-slots-say-what-they-hold)
   - [The rebuyable half](#the-rebuyable-half)
   - [It runs alongside the phases](#it-runs-alongside-the-phases)
+- [The option help is for choosing, not for showing work](#the-option-help-is-for-choosing-not-for-showing-work)
 - [The Skip, in a seed](#the-skip-in-a-seed)
 - [The goal, and two ways it was wrong](#the-goal-and-two-ways-it-was-wrong)
 - [Game and scoring](#game-and-scoring)
@@ -795,6 +796,27 @@ Measured over fifteen seeds at the default, six slots and ten points:
 
 So it opens early and finishes before the endgame, rather than being six checks
 that all come due at once.
+
+## The option help is for choosing, not for showing work
+
+The YAML template is generated from the option docstrings, so every word in
+them lands in front of a player deciding what to roll. They were carrying the
+*reasoning* as well as the choice — sphere counts, sample sizes, percentages
+off the autoplayer, the history of why a ceiling is where it is — and that is
+this document's job rather than theirs. Reported plainly: nobody picking
+settings wants the working.
+
+So the docstrings say what the option does, what the values mean, which
+direction is harder, and any interaction that would surprise someone. The
+measurements stay here, which is where anyone who wants to check them is
+already looking. Two that lived only in the option text, kept so they are not
+lost with it:
+
+  * **Three opponents end a round around turn five**, and one seat alone takes
+    about eight. That is a minimum-of-N effect, so more opponents make rounds
+    shorter rather than merely busier.
+  * **Skips shuffled into the deck turn up about 0.34 times a hand**, which is
+    why Archipelago grants them instead and leaves `skips_in_deck` at zero.
 
 ## The Skip, in a seed
 
