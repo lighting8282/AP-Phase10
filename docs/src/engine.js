@@ -21,10 +21,10 @@ import {
   isWild,
   numberCard,
   COLORS,
-} from "./cards.js?v=35be1704";
+} from "./cards.js?v=67cbef8b";
 import {
   GROUP, PHASES, phaseCardCount, solveLayOptions, solveMelds, solvePhase,
-} from "./phases.js?v=35be1704";
+} from "./phases.js?v=67cbef8b";
 
 /** How deep into the stock a played Skip lets you look. */
 export const SKIP_DIG_DEPTH = 3;
@@ -452,6 +452,13 @@ export class PhaseHand {
     if (fromDiscard) {
       if (!this.config.allowDiscardDraw || !this.discard.length) {
         throw new Error("cannot draw from discard");
+      }
+      // The printed rule, and the one this engine was missing: a Skip on the
+      // pile is spent. Taking it back up makes one card deny a turn every time
+      // round the table, and in a seed -- where a dig costs no draw -- an
+      // endless free choice of three.
+      if (isSkip(this.discard[this.discard.length - 1])) {
+        throw new Error("a played Skip cannot be taken from the discard");
       }
       card = this.discard.pop();
     } else {

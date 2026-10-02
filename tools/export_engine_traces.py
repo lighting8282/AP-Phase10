@@ -26,12 +26,28 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 OUT = PROJECT_ROOT / "docs" / "test" / "engine_traces.json"
 
 AP = os.environ.get("AP_ROOT", "C:/Users/turtl/Archipelago")
-sys.path.insert(0, AP)
-os.chdir(AP)
 
-import ModuleUpdate  # noqa: E402
-
-ModuleUpdate.update_ran = True
+# The traces are pure engine, and the engine has no Archipelago dependency --
+# the import path was the only thing AP was ever needed for. So fall back to
+# mounting `worlds.phase10` at the real directory, the same trick
+# tools/run_world_tests.py uses, which makes the fixtures regenerable in a
+# session with no checkout. Verified by re-exporting through it and getting the
+# committed file back byte for byte.
+if Path(AP).is_dir():
+    sys.path.insert(0, AP)
+    os.chdir(AP)
+    import ModuleUpdate  # noqa: E402
+    ModuleUpdate.update_ran = True
+else:
+    import types
+    worlds = types.ModuleType("worlds")
+    worlds.__path__ = []
+    package = types.ModuleType("worlds.phase10")
+    package.__path__ = [str(PROJECT_ROOT / "phase10")]
+    package.__package__ = "worlds.phase10"
+    worlds.phase10 = package
+    sys.modules["worlds"] = worlds
+    sys.modules["worlds.phase10"] = package
 
 from worlds.phase10.game.engine import GameConfig, HandState, PhaseHand  # noqa: E402
 from worlds.phase10.game.phases import PHASE_COUNT  # noqa: E402
@@ -90,7 +106,12 @@ def play(hand: PhaseHand, rng: random.Random) -> list[dict]:
             continue
 
         choices = ["draw"]
-        if hand.discard_top is not None and hand.config.allow_discard_draw:
+        # Not a spent Skip: the engine refuses that one, and this chooser offers
+        # only legal moves -- an illegal one would record a step the JS port is
+        # right to reject, which is how the recycling bug sat in the fixtures.
+        top = hand.discard_top
+        if (top is not None and not top.is_skip
+                and hand.config.allow_discard_draw):
             choices.append("draw_discard")
         if hand.skips_in_hand and hand.stock:
             choices += ["skip", "skip"]        # weight digs so they get exercised

@@ -366,6 +366,41 @@ def test_the_skip_is_spent_onto_the_discard():
     assert any(card.is_skip for card in hand.discard)
 
 
+def test_a_played_skip_cannot_be_taken_back_up():
+    """The printed rule, and one this engine shipped without: a Skip on the
+    pile is spent. Picking it up again let one card deny a turn every time
+    round the table."""
+    for mode in ("deny", "dig"):
+        hand = PhaseHand(1, GameConfig(max_draws=20, skip_mode=mode),
+                         random.Random(7))
+        hand.discard.append(SKIP)
+        try:
+            hand.draw(from_discard=True)
+        except RuntimeError as err:
+            assert "Skip" in str(err), str(err)
+        else:
+            raise AssertionError(f"{mode}: the spent Skip was taken back up")
+        assert hand.skips_in_hand == 0
+        assert not hand.drew_this_turn  # the turn is intact; draw from stock
+
+
+def test_an_ordinary_discard_top_is_still_there_for_the_taking():
+    """The refusal is about the card, not about the pile."""
+    hand = PhaseHand(1, GameConfig(max_draws=20), random.Random(7))
+    hand.discard.append(number_card(7, R))
+    assert hand.draw(from_discard=True).rank == 7
+
+
+def test_a_seat_never_takes_a_spent_skip():
+    """Stated in the seat's own policy as well as in `draw`, since the seat
+    reads its shortfall rather than calling it."""
+    _, table = deny_table()
+    seat = table.seats[0]
+    seat.skill = OpponentSkill("certain", discard_awareness=1.0,
+                               discard_error=0.0)
+    assert not seat._wants_discard_top(SKIP)
+
+
 def test_two_skips_deny_two_different_seats():
     """The flag is consumed when that seat's turn comes round, so a second
     Skip played later in the round finds the first seat available again --

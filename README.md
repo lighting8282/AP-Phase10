@@ -219,6 +219,11 @@ measured clear rates, and every one of those was measured with the dig.
 Either way the Skip itself becomes that turn's discard, so playing one sheds
 the 15 points it would have cost you to be caught holding it.
 
+**A played Skip cannot be picked up.** It stays face up on the pile, where you
+can see it was spent, but it is out of play — nobody takes it back to deny
+another turn with the same card. It can come round again only the way every
+other card does: when an exhausted stock is reshuffled from the pile.
+
 ### How this version differs from the box
 
 - **Twenty phases**, not ten. The extra ten were measured to fill a gap the

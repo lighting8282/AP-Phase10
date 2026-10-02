@@ -677,6 +677,11 @@ pre {
 /* An empty discard is a slot, not a card. */
 .pile.empty img { visibility: hidden; }
 .pile.empty { border-style: dashed; }
+/* A played Skip is still face up -- seeing one was spent is the point -- but it
+   is not yours to take, so it reads as out of play rather than as a card that
+   ignores clicks. */
+.pile.spent img { opacity: 0.45; filter: grayscale(0.7); }
+.pile.spent { border-style: dashed; }
 
 /* --- your own side ----------------------------------------------------- */
 /* In a column the seat's flex basis would become a height; it is a block
