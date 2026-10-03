@@ -52,6 +52,7 @@ while to find and would be easy to reintroduce.
 - [The goal, and two ways it was wrong](#the-goal-and-two-ways-it-was-wrong)
 - [Game and scoring](#game-and-scoring)
 - [UI](#ui)
+  - [Sorting the hand](#sorting-the-hand)
   - [Checking it](#checking-it)
 - [Persistence](#persistence)
 - [Browser version](#browser-version)
@@ -1008,7 +1009,7 @@ usual Archipelago log and hints tabs.
 - the hand as colour-coded cards — click one to discard it
 - round, running score, wins, phases cleared
 - the current phase and its objective, draws left, stock, discard top, skips held
-- Draw / Take discard / Lay down / Dig / Auto / Score
+- Draw / Take discard / Lay down / Dig / Hit / Sort / Auto / Score
 - a phase row: blue is unlocked, green is cleared, grey is locked out
 - when a Skip reveals the top of the pile, the three cards appear as buttons
 
@@ -1024,6 +1025,37 @@ redraw an unchanged hand is waste.
 
 Kivy is imported lazily inside `make_gui`, so it stays off the import path for
 the headless tests and for anyone running without a display.
+
+### Sorting the hand
+
+Two orders, not one, and the split is not aesthetic: seventeen of the twenty
+phases are sets and runs, which are read by rank, and three — 8, 11 and 14 —
+are colour groups, where a rank sort scatters the one thing being counted.
+Wilds and Skips go last in both, as a block: they belong to no run and no set,
+so leaving them in rank position breaks up the sequence the sort exists to make
+readable.
+
+Both orders are **total** — ties in the leading key fall through to the other
+attribute — so sorting an already-sorted hand cannot rearrange equal cards. A
+partial order would have made the hand appear to shuffle itself on a re-sort,
+and the browser re-sorts on every render.
+
+It re-sorts on every render on purpose: the order has to stick as cards arrive,
+or a drawn card lands on the end and the player presses the button again. That
+is safe only because sorting is **not a move** — no draw, no turn ended, legal
+at any point, including mid-dig and while the table is playing. Everything the
+engine does takes a card rather than an index, so nothing cares where in the
+list a card sits. The browser's `Off` is the resting state and stops re-sorting
+rather than undoing: the dealt order is not kept, so putting it "back" would be
+a shuffle rather than a restore.
+
+**It is proved by the trace fuzzer rather than by a fixture of its own.**
+`export_engine_traces.py` offers `sort` alongside every other action, so sorts
+land mid-turn, between a draw and a discard, mid-dig and after laying down —
+4,841 of them across the 480 traces, split evenly between the two orders. The
+trace snapshot records the hand *in order*, so `crosscheck_engine.mjs` compares
+the two ports' sorts card for card rather than merely confirming both are
+sorted.
 
 ### Checking it
 

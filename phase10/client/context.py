@@ -28,7 +28,7 @@ from ..data import (
     buff_price, store_gate, store_location_name,
 )
 from ..game.autoplay import play_out
-from ..game.engine import HandState
+from ..game.engine import SORT_BY_COLOR, SORT_BY_RANK, HandState
 from ..game.phases import PHASES, describe_meld, phase_description
 from .session import Phase10Session
 
@@ -114,6 +114,19 @@ class Phase10CommandProcessor(ClientCommandProcessor):
             self.output(str(e))
             return
         self.output(f"Phase {number}: {phase_description(number)}")
+        self._cmd_hand()
+
+    def _cmd_sort(self, order: str = "") -> None:
+        """Sort your hand. `/sort` by number, `/sort c` by colour.
+
+        Not a move: it costs no draw and does not end your turn.
+        """
+        hand = self._require_hand()
+        if hand is None:
+            return
+        chosen = SORT_BY_COLOR if order.lower().startswith("c") else SORT_BY_RANK
+        hand.sort_hand(chosen)
+        self.output(f"sorted by {'colour' if chosen == SORT_BY_COLOR else 'number'}")
         self._cmd_hand()
 
     def _cmd_hand(self) -> None:

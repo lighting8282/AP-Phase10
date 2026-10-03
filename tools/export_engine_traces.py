@@ -49,7 +49,9 @@ else:
     sys.modules["worlds"] = worlds
     sys.modules["worlds.phase10"] = package
 
-from worlds.phase10.game.engine import GameConfig, HandState, PhaseHand  # noqa: E402
+from worlds.phase10.game.engine import (  # noqa: E402
+    SORT_ORDERS, GameConfig, HandState, PhaseHand,
+)
 from worlds.phase10.game.phases import PHASE_COUNT  # noqa: E402
 
 MAX_ACTIONS = 120
@@ -119,9 +121,19 @@ def play(hand: PhaseHand, rng: random.Random) -> list[dict]:
             # Only once: laying down is no longer terminal, so the loop
             # would otherwise keep offering an action that now raises.
             choices += ["lay", "lay", "lay"]
+        # Sorting is free and legal at any point, which is exactly what makes it
+        # worth fuzzing here: it lands in the middle of turns, between a draw
+        # and a discard, mid-dig, after laying down. The snapshot records the
+        # hand in order, so every one of these compares the two ports' sorts
+        # card for card.
+        choices.append("sort")
 
         action = rng.choice(choices)
-        if action == "lay":
+        if action == "sort":
+            order = rng.choice(SORT_ORDERS)
+            hand.sort_hand(order)
+            steps.append({"action": "sort", "order": order, "after": snapshot(hand)})
+        elif action == "lay":
             hand.lay_down()
             steps.append({"action": "lay_down", "after": snapshot(hand)})
         elif action == "skip":

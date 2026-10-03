@@ -9,17 +9,17 @@
 // before the restore lands would overwrite a real one with that empty rebuild.
 // Nothing is saved until restoreState is "done".
 
-import { Client } from "../node_modules/archipelago.js/dist/index.js?v=67cbef8b";
+import { Client } from "../node_modules/archipelago.js/dist/index.js?v=13b79947";
 
 import {
   GAME_NAME, LOCATION_NAME_TO_ID, MULLIGAN, PHASE_COUNT, WILD_CARD, phaseUnlock,
   storeLocationName,
 }
-  from "./data.js?v=67cbef8b";
-import { STOCK_SKIPS } from "./cards.js?v=67cbef8b";
-import { Phase10Game, roundToString } from "./game.js?v=67cbef8b";
-import { Phase10Session } from "./session.js?v=67cbef8b";
-import { describeMeldCards } from "./phases.js?v=67cbef8b";
+  from "./data.js?v=13b79947";
+import { STOCK_SKIPS } from "./cards.js?v=13b79947";
+import { Phase10Game, roundToString } from "./game.js?v=13b79947";
+import { Phase10Session } from "./session.js?v=13b79947";
+import { describeMeldCards } from "./phases.js?v=13b79947";
 
 /**
  * The deck a free-play run is dealt, with no Archipelago to hand items out.

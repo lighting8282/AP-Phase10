@@ -185,6 +185,8 @@ class Phase10View(BoxLayout):
             ("Dig (Skip)", "/skip"),
             ("Mulligan", "/mulligan"),
             ("Hit", "/hit"),
+            ("Sort", "/sort"),
+            ("Sort by colour", "/sort c"),
             ("Auto", "/auto"),
             ("Score", "/score"),
         ):

@@ -309,6 +309,60 @@ check(many.scorecard(10)[0].includes("4 earlier round(s)"), "scorecard elides ol
   try { denyTable().hand.playSkip(); } catch (err) { refused = err.message; }
   check(/discard the Skip/.test(refused), "and there is no pre-draw Skip to play");
 
+  // -- sorting the hand, mirroring the sort tests in tests/test_game.py ------
+  const sorting = (cards) => {
+    const h = new PhaseHand(1, gameConfig({ maxDraws: 20 }), mulberry32(3));
+    h.hand = [...cards];
+    return h;
+  };
+  const shown = (h) => h.hand.map(cardToString);
+
+  {
+    const byRank = sorting([numberCard(9, "blue"), numberCard(2, "red"),
+      numberCard(5, "green")]);
+    byRank.sortHand("rank");
+    eq(byRank.hand.map((c) => c.rank), [2, 5, 9], "sorting by rank runs low to high");
+
+    const byColour = sorting([numberCard(9, "blue"), numberCard(2, "red"),
+      numberCard(5, "blue"), numberCard(7, "red")]);
+    byColour.sortHand("color");
+    eq(byColour.hand.map((c) => `${c.rank}${c.color[0]}`),
+      ["2r", "7r", "5b", "9b"], "sorting by colour groups the colours, low to high inside");
+
+    // The specials belong to no run and no set, so they go last as a block.
+    for (const order of ["rank", "color"]) {
+      const mixed = sorting([SKIP, numberCard(12, "yellow"), WILD, numberCard(1, "red")]);
+      mixed.sortHand(order);
+      eq(shown(mixed).slice(-2), ["W", "S"], `the specials go last (${order})`);
+    }
+
+    // Both orders are total, so a re-sort cannot shuffle equal cards about.
+    for (const order of ["rank", "color"]) {
+      const same = sorting([numberCard(5, "red"), numberCard(5, "yellow"),
+        numberCard(5, "blue"), WILD, numberCard(5, "green"), SKIP]);
+      const once = shown(same.sortHand(order) && same);
+      same.sortHand(order);
+      eq(shown(same), once, `sorting twice changes nothing (${order})`);
+    }
+
+    // Not a move: no draw spent, turn not ended, legal before drawing.
+    const free = sorting([numberCard(4, "red"), numberCard(2, "blue")]);
+    free.drawsUsed = 3;
+    free.sortHand();
+    eq(free.drawsUsed, 3, "sorting spends no draw");
+    check(!free.drewThisTurn, "and does not count as this turn's draw");
+    eq(free.state, HAND_STATE.IN_PROGRESS, "and does not end the hand");
+
+    let refusedSort = "";
+    try { free.sortHand("by vibes"); } catch (err) { refusedSort = err.message; }
+    check(/by vibes/.test(refusedSort), "an unknown sort order is refused");
+
+    const kept = sorting([SKIP, numberCard(5, "red"), numberCard(5, "red"), WILD, WILD]);
+    const before = shown(kept).slice().sort();
+    kept.sortHand("color");
+    eq(shown(kept).slice().sort(), before, "sorting keeps every card");
+  }
+
   // The printed rule, and one both ports shipped without: a Skip on the pile
   // is spent, and picking it back up let one card deny a turn every time round
   // the table. Mirrors test_a_played_skip_cannot_be_taken_back_up.
