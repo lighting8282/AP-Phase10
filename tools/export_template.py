@@ -19,7 +19,10 @@ from __future__ import annotations
 
 import argparse
 import ast
+import contextlib
+import io
 import json
+import logging
 import os
 import re
 import shutil
@@ -45,12 +48,21 @@ def main() -> int:
 
     sys.path.insert(0, root)
     os.chdir(root)
+    # Loading Archipelago loads every game it has, and each one missing an
+    # extra of its own logs a full traceback on the way past -- dozens on a
+    # real install. None of it is about AP_10, and printed it buried this
+    # script's own five-line answer at the bottom of a wall of errors, which is
+    # exactly how it was first seen. So it is held, and only shown if
+    # Archipelago itself fails to load.
+    noise = io.StringIO()
     try:
-        import ModuleUpdate
-        ModuleUpdate.update_ran = True
-        import Options
+        with quiet(noise):
+            import ModuleUpdate
+            ModuleUpdate.update_ran = True
+            import Options
     except Exception as err:  # pragma: no cover - environment dependent
         print(f"! could not load Archipelago from {root}: {err}", file=sys.stderr)
+        print(tail(noise), file=sys.stderr)
         return NO_ARCHIPELAGO
 
     write = getattr(Options, "generate_yaml_templates", None)
@@ -63,7 +75,8 @@ def main() -> int:
     # Templates are written for every installed world, so take ours out of a
     # scratch folder rather than pointing the generator at dist/.
     with tempfile.TemporaryDirectory() as tmp:
-        write(tmp, False)
+        with quiet(noise):
+            write(tmp, False)
         made = Path(tmp) / f"{GAME}.yaml"
         if not made.is_file():
             found = sorted(p.name for p in Path(tmp).glob("*.yaml"))
@@ -86,6 +99,24 @@ def main() -> int:
         return 1
     print(f"{out}  {len(text.splitlines())} lines, AP_10 {built_version()}")
     return 0
+
+
+@contextlib.contextmanager
+def quiet(sink: io.StringIO):
+    """Send Archipelago's output and logging somewhere other than the screen."""
+    root = logging.getLogger()
+    held = root.handlers[:]
+    root.handlers = [logging.StreamHandler(sink)]
+    try:
+        with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
+            yield
+    finally:
+        root.handlers = held
+
+
+def tail(noise: io.StringIO, lines: int = 15) -> str:
+    kept = noise.getvalue().strip().splitlines()[-lines:]
+    return "  last of what Archipelago said:\n    " + "\n    ".join(kept) if kept else ""
 
 
 # -- is it ours? ----------------------------------------------------------------
