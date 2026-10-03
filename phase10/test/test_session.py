@@ -10,6 +10,7 @@ from ..data import (
     MAX_SKIPS, MULLIGAN, PHASE_COUNT, PHASE_LOCK, PHASE_UNLOCK, SCORE_REDUCTION,
     SCORE_REDUCTION_VALUE, SKIP_CARD, WILD_CARD, WILD_THEFT,
     BUFF_SKIP, BUFF_WILD, DEFAULT_BUFF_POINTS,
+    STORE_ALL_AT_ONCE, STORE_GATINGS, STORE_LADDER,
     store_gate, store_location_name, store_points, store_prices,
 )
 from ..game.cards import STOCK_WILDS, WILD, Color, number_card
@@ -538,18 +539,22 @@ class TestStore(unittest.TestCase):
         """
         from itertools import permutations
 
-        for points in range(store_points(6) + 1):
-            for order in permutations(range(1, 7)):
-                s = self.store(points=points)
-                for slot in order:
-                    refusal = s.can_buy(slot)
-                    if refusal is None:
-                        s.buy_slot(slot)
-                    else:
-                        self.assertNotIn(
-                            "costs", refusal,
-                            f"{points} points, order {order}: {refusal}",
-                        )
+        # Both shapes. All at once has one gate for every slot, so it has to
+        # cover the whole store, and this is what proves that it does.
+        for gating in STORE_GATINGS:
+            for points in range(store_points(6, gating=gating) + 1):
+                for order in permutations(range(1, 7)):
+                    s = self.store(points=points)
+                    s.store_gating = gating
+                    for slot in order:
+                        refusal = s.can_buy(slot)
+                        if refusal is None:
+                            s.buy_slot(slot)
+                        else:
+                            self.assertNotIn(
+                                "costs", refusal,
+                                f"{gating}, {points} points, order {order}: {refusal}",
+                            )
 
     def test_every_order_is_affordable_with_a_full_purse(self) -> None:
         """The property the ladder exists for. Buying the dearest slots first
@@ -559,6 +564,66 @@ class TestStore(unittest.TestCase):
             self.assertIsNone(s.can_buy(slot), slot)
             s.buy_slot(slot)
         self.assertEqual(len(s.bought_slots), 6)
+
+    def test_all_at_once_opens_every_slot_together(self) -> None:
+        """Nothing until the whole store is affordable, then everything."""
+        for points, expected in ((0, []), (5, []), (6, [1, 2, 3, 4, 5, 6])):
+            s = session(store_slots=6, store_gating=STORE_ALL_AT_ONCE)
+            s.set_items([AP_POINT] * points)
+            self.assertEqual([slot for slot in range(1, 7) if s.can_buy(slot) is None],
+                             expected, f"{points} points")
+
+    def test_all_at_once_lets_you_choose_the_first_slot(self) -> None:
+        """The point of the shape: the last slot is as available as the first."""
+        s = session(store_slots=6, store_gating=STORE_ALL_AT_ONCE)
+        s.set_items([AP_POINT] * 6)
+        s.buy_slot(6)
+        self.assertEqual(s.points_left, 5)
+        self.assertIsNone(s.can_buy(1))
+
+    def test_all_at_once_prices_every_slot_at_one(self) -> None:
+        s = session(store_slots=8, store_gating=STORE_ALL_AT_ONCE)
+        self.assertEqual([s.store_price(slot) for slot in range(1, 9)], [1] * 8)
+        self.assertEqual({s.store_gate(slot) for slot in range(1, 9)}, {8})
+
+    def test_all_at_once_says_how_far_off_the_store_is(self) -> None:
+        s = session(store_slots=6, store_gating=STORE_ALL_AT_ONCE)
+        s.set_items([AP_POINT] * 4)
+        self.assertIn("opens at 6", s.can_buy(3))
+
+    def test_the_slot_data_word_is_read(self) -> None:
+        self.assertEqual(session(store_slots=6, store_gating="all_at_once").store_gating,
+                         STORE_ALL_AT_ONCE)
+
+    def test_a_seed_from_before_the_option_is_a_ladder(self) -> None:
+        """No word means the shape the seed was generated as. Anything else would
+        gate slots differently from the server, and that is the failure the gate
+        exists to prevent."""
+        self.assertEqual(session(store_slots=6).store_gating, STORE_LADDER)
+        self.assertEqual(session(store_slots=6, store_gating="nonsense").store_gating,
+                         STORE_LADDER)
+
+    def test_all_at_once_reserves_what_the_slots_cost(self) -> None:
+        """The card budget is what the slots do not need, in this shape too.
+        At the same points held, ones reserve less than the ladder does."""
+        ladder = session(store_slots=6)
+        flat = session(store_slots=6, store_gating=STORE_ALL_AT_ONCE)
+        for s in (ladder, flat):
+            s.set_items([AP_POINT] * 10)
+        self.assertEqual(ladder.points_reserved, 8)
+        self.assertEqual(flat.points_reserved, 6)
+        self.assertEqual(flat.buff_points_left - ladder.buff_points_left, 2)
+
+    def test_the_shape_does_not_change_the_spending_money(self) -> None:
+        """The pool is sized to what the store costs, so a cheaper store means
+        fewer points in the pool, not more to spend. What is left once every
+        slot is bought is `store_buff_points` plus the slack, in both shapes --
+        an earlier claim that all-at-once freed two points was wrong."""
+        for slots in range(1, 9):
+            left = {g: store_points(slots, DEFAULT_BUFF_POINTS, g)
+                       - sum(store_prices(slots, g))
+                    for g in STORE_GATINGS}
+            self.assertEqual(left[STORE_LADDER], left[STORE_ALL_AT_ONCE], slots)
 
     def test_a_seed_without_a_store_refuses(self) -> None:
         s = self.store(slots=0, points=10)

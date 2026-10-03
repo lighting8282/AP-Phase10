@@ -40,6 +40,21 @@ def load_python_tables() -> dict:
         "fillers": list(module.FILLERS),
         "buffs": list(module.BUFFS),
         "buffPrices": dict(module.BUFF_PRICES),
+        # Not a table but a function of one, and the thing that decides which
+        # store slots a client offers: computed out for every store size in
+        # both shapes, so a gate that drifted would make the browser offer a
+        # check the server thinks is unreachable. These were never compared
+        # until store_gating gave the gate a second shape.
+        "storeGatings": list(module.STORE_GATINGS),
+        "storeShapes": {
+            f"{gating}/{slots}": {
+                "prices": module.store_prices(slots, gating),
+                "gates": [module.store_gate(slot, slots, gating)
+                          for slot in range(1, slots + 1)],
+            }
+            for gating in module.STORE_GATINGS
+            for slots in range(module.MAX_STORE_SLOTS + 1)
+        },
     }
 
 
@@ -58,6 +73,16 @@ def load_js_tables() -> dict:
         fillers: d.FILLERS,
         buffs: d.BUFFS,
         buffPrices: d.BUFF_PRICES,
+        storeGatings: d.STORE_GATINGS,
+        storeShapes: Object.fromEntries(d.STORE_GATINGS.flatMap((gating) =>
+          Array.from({ length: d.MAX_STORE_SLOTS + 1 }, (_, slots) => [
+            `${gating}/${slots}`,
+            {
+              prices: d.storePrices(slots, gating),
+              gates: Array.from({ length: slots },
+                (_, i) => d.storeGate(i + 1, slots, gating)),
+            },
+          ]))),
       }));
     });
     """

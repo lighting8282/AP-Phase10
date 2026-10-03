@@ -265,6 +265,7 @@ explanation; these are the ones that change the shape of a run most.
 | `phases_to_win` | 20 | How many phases `all_phases` asks for; `random-range-10-20` for a random length |
 | `skip_mode` | `dig` | What a Skip does: `dig` looks at three cards, `deny` costs somebody a turn |
 | `store_slots` | 6 | Checks you can buy outright with AP Points; 0 for none |
+| `store_gating` | `ladder` | `ladder` opens slots one at a time; `all_at_once` opens every slot together and lets you pick the order |
 | `store_buff_points` | 8 | Spending money for the store's one-use cards; 0 for none |
 | `starting_phases` | 2 | How many phases you open with |
 | `opponents` | 3 | Computer players at the table; 0 for the pure solo game |
@@ -282,9 +283,19 @@ explanation; these are the ones that change the shape of a run most.
 Skip Card. The deck starts with no wilds at all and a small draw budget; items
 build both back up.
 
-**AP Point** buys a check outright in the store. Each slot has a price, and a
-slot opens once you hold enough points to have afforded every cheaper one — so
-you can buy them in any order.
+**AP Point** buys a check outright in the store, in one of two shapes set by
+`store_gating`:
+
+- **`ladder`** (the default) — prices climb 1, 1, 1, 1, 2, 2, 3, 3 and the
+  slots open one at a time: your first point opens slot 1, your second slot 2,
+  and so on. A store check from your very first point, but the order is set.
+- **`all_at_once`** — every slot costs 1, and they all open together once you
+  hold enough to buy the lot: 6 points at 6 slots. Nothing until then, but
+  then you choose the order. It also fits a full store into tight seeds that
+  the ladder has to trim.
+
+Either way, spending can't strand you: once a slot is open you can always
+afford it, whatever you bought before.
 
 Connected to a room, each slot **says what it is holding** — the item's own
 name, and whose it is when it is not yours. That is a scout, not a hint: it

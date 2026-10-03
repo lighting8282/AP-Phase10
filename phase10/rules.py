@@ -85,10 +85,11 @@ def set_store_rules(world: Phase10World) -> None:
     slots instead, so every purchase order is covered by the same rule and the
     client never has to check a location the seed thinks is unreachable.
     """
-    for slot in range(1, int(world.options.store_slots) + 1):
+    slots = int(world.options.store_slots)
+    for slot in range(1, slots + 1):
         world.set_rule(
             world.get_location(store_location_name(slot)),
-            Has(AP_POINT, count=store_gate(slot)),
+            Has(AP_POINT, count=store_gate(slot, slots, world.store_gating)),
         )
 
 

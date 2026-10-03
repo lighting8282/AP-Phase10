@@ -12,7 +12,8 @@ from collections import Counter
 from BaseClasses import ItemClassification
 
 from ..data import (
-    AP_POINT, MAX_STORE_SLOTS, STORE_PRICES, STORE_SLACK, store_gate,
+    AP_POINT, DEFAULT_BUFF_POINTS, MAX_STORE_SLOTS, STORE_ALL_AT_ONCE,
+    STORE_LADDER, STORE_PRICES, STORE_SLACK, store_gate,
     store_location_name, store_points, store_prices,
 )
 from ..items import plan_store
@@ -82,8 +83,12 @@ class TestStoreWorld(Phase10TestBase):
             )
 
     def test_the_pool_carries_the_points(self) -> None:
+        # With the card budget. This compared against store_points(6) alone
+        # from the day the budget was added until it was next read -- 10
+        # expected, 18 in the pool -- because this file needs an Archipelago
+        # checkout and nothing that could run it did.
         pool = Counter(item.name for item in self.multiworld.itempool)
-        self.assertEqual(pool[AP_POINT], store_points(6))
+        self.assertEqual(pool[AP_POINT], store_points(6, DEFAULT_BUFF_POINTS))
 
     def test_points_are_progression(self) -> None:
         """Filler would let fill drop them anywhere, including behind the very
@@ -147,3 +152,60 @@ class TestStoreInATightSeed(Phase10TestBase):
             len(self.multiworld.get_unfilled_locations(self.player)),
             len(self.multiworld.itempool),
         )
+
+
+class TestStoreAllAtOnce(Phase10TestBase):
+    """`store_gating: all_at_once` in a real world: every slot one point, and
+    one gate for all of them at the store's total."""
+
+    options = {"checks_per_phase": 2, "store_slots": 6, "store_gating": "all_at_once"}
+
+    def test_nothing_opens_one_point_short(self) -> None:
+        points = self.get_items_by_name(AP_POINT)
+        self.collect(points[:5])
+        for slot in range(1, 7):
+            self.assertFalse(self.can_reach_location(store_location_name(slot)), slot)
+
+    def test_everything_opens_together(self) -> None:
+        points = self.get_items_by_name(AP_POINT)
+        self.collect(points[:6])
+        for slot in range(1, 7):
+            self.assertTrue(self.can_reach_location(store_location_name(slot)), slot)
+
+    def test_the_pool_carries_the_flat_store(self) -> None:
+        pool = Counter(item.name for item in self.multiworld.itempool)
+        self.assertEqual(pool[AP_POINT],
+                         store_points(6, DEFAULT_BUFF_POINTS, STORE_ALL_AT_ONCE))
+
+    def test_the_clients_are_told_the_shape(self) -> None:
+        self.assertEqual(self.world.fill_slot_data()["store_gating"], STORE_ALL_AT_ONCE)
+
+    def test_the_pool_still_fits(self) -> None:
+        self.assertEqual(
+            len(self.multiworld.get_unfilled_locations(self.player)),
+            len(self.multiworld.itempool),
+        )
+
+
+class TestStoreAllAtOnceInATightSeed(Phase10TestBase):
+    """Where the ladder trims to five slots, a store of ones pays for itself
+    exactly -- one point, one location -- so the whole store fits."""
+
+    options = {"checks_per_phase": 1, "store_slots": MAX_STORE_SLOTS,
+               "store_gating": "all_at_once"}
+
+    def test_the_whole_store_fits(self) -> None:
+        self.assertEqual(int(self.world.options.store_slots), MAX_STORE_SLOTS)
+
+    def test_the_pool_still_fits(self) -> None:
+        self.assertEqual(
+            len(self.multiworld.get_unfilled_locations(self.player)),
+            len(self.multiworld.itempool),
+        )
+
+
+class TestStoreLadderIsTheDefault(Phase10TestBase):
+    options = {"checks_per_phase": 2, "store_slots": 6}
+
+    def test_slot_data_says_ladder(self) -> None:
+        self.assertEqual(self.world.fill_slot_data()["store_gating"], STORE_LADDER)

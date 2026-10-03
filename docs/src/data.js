@@ -91,11 +91,29 @@ export const MAX_STORE_SLOTS = STORE_PRICES.length;
 /** Points beyond the ladder's total. See data.py for why it is two. */
 export const STORE_SLACK = 2;
 
-export const storePrices = (slots) => STORE_PRICES.slice(0, slots);
+/**
+ * How the store's slots open, from `store_gating`. Sent as the word, and a
+ * seed from before the option sends nothing and is a ladder -- which is what it
+ * was generated as. See data.py for the invariant both shapes keep.
+ */
+export const STORE_LADDER = "ladder";
+export const STORE_ALL_AT_ONCE = "all_at_once";
+export const STORE_GATINGS = Object.freeze([STORE_LADDER, STORE_ALL_AT_ONCE]);
 
-/** Points needed before slot `slot` (1-based) may be bought at all. */
-export const storeGate = (slot) =>
-  STORE_PRICES.slice(0, slot).reduce((total, price) => total + price, 0);
+const sum = (prices) => prices.reduce((total, price) => total + price, 0);
+
+export const storePrices = (slots, gating = STORE_LADDER) =>
+  gating === STORE_ALL_AT_ONCE ? Array(slots).fill(1) : STORE_PRICES.slice(0, slots);
+
+/**
+ * Points needed before slot `slot` (1-based) may be bought at all. On the
+ * ladder, the cheapest `slot` prices; all at once, the whole store, which is
+ * the only single gate every slot can share honestly.
+ */
+export const storeGate = (slot, slots = MAX_STORE_SLOTS, gating = STORE_LADDER) =>
+  gating === STORE_ALL_AT_ONCE
+    ? sum(storePrices(slots, gating))
+    : sum(STORE_PRICES.slice(0, slot));
 
 /**
  * What the store sells that is not a check: a card, once, now. See data.py for
