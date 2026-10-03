@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AP_10</title>
-<link rel="stylesheet" href="style.css?v=67cbef8b">
+<link rel="stylesheet" href="style.css?v=13b79947">
 </head>
 <body>
 <header>
@@ -112,6 +112,10 @@
       <button data-action="lay">Lay down</button>
       <button data-action="skip" id="skip-button">Dig (Skip)</button>
       <button data-action="mulligan" id="mulligan-button">Mulligan</button>
+      <!-- Not a move: it costs nothing and ends no turn. Here anyway, because
+           this is the row under the hand and that is where a player looks for
+           it. -->
+      <button data-action="sort" id="sort-button" class="tool"></button>
     </div>
 
     <h2>Phases</h2>
@@ -210,6 +214,6 @@
   </div>
 </div>
 
-<script type="module" src="src/ui.js?v=67cbef8b"></script>
+<script type="module" src="src/ui.js?v=13b79947"></script>
 </body>
 </html>

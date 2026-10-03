@@ -103,6 +103,11 @@ for (const [t, trace] of traces.entries()) {
         case "lay_down":
           hand.layDown();
           break;
+        case "sort":
+          // The snapshot records the hand in order, so this compares the two
+          // ports' sorts card for card rather than merely both being sorted.
+          hand.sortHand(step.order);
+          break;
         case "mark_failed":
           hand.markFailed(step.reason);
           break;

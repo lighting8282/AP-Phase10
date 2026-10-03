@@ -21,7 +21,9 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from enum import Enum
 
-from .cards import SKIP, WILD, Card, Color, hand_score, number_card, shuffled_deck
+from .cards import (
+    COLOR_ORDER, SKIP, WILD, Card, Color, hand_score, number_card, shuffled_deck,
+)
 from .phases import (
     PHASES, GroupKind, GroupSpec, Layout, Meld, PhaseSpec, phase_card_count,
     solve_lay_options, solve_melds, solve_phase,
@@ -30,6 +32,36 @@ from .phases import (
 
 #: How deep into the stock a played Skip lets you look.
 SKIP_DIG_DEPTH = 3
+
+#: The orders `PhaseHand.sort_hand` understands. Named rather than boolean
+#: because a third ("by what the phase wants") is an obvious thing to want
+#: later, and a flag would have to be unpicked to add it.
+SORT_BY_RANK = "rank"
+SORT_BY_COLOR = "color"
+SORT_ORDERS = (SORT_BY_RANK, SORT_BY_COLOR)
+
+#: Where the specials sit in a sorted hand. Last, as a block: a Wild or a Skip
+#: belongs to no run and no set, so leaving them in rank position breaks up the
+#: sequence the sort exists to make readable.
+_NUMBERS, _WILDS, _SKIPS = 0, 1, 2
+
+
+def sort_key(card: Card, order: str = SORT_BY_RANK):
+    """Where one card sits in a sorted hand.
+
+    Both orders are total: ties inside the leading key fall through to the
+    other attribute, so sorting the same hand twice gives the same arrangement
+    whichever order it was in before. Without that, a sort would shuffle equal
+    cards around and the hand would look like it had changed when it had not.
+    """
+    if card.is_skip:
+        return (_SKIPS, 0, 0)
+    if card.is_wild:
+        return (_WILDS, 0, 0)
+    colour = COLOR_ORDER[card.color]
+    if order == SORT_BY_COLOR:
+        return (_NUMBERS, colour, card.rank)
+    return (_NUMBERS, card.rank, colour)
 
 
 class HandState(Enum):
@@ -354,6 +386,24 @@ class PhaseHand:
     @property
     def skips_in_hand(self) -> int:
         return sum(1 for c in self.hand if c.is_skip)
+
+    def sort_hand(self, order: str = SORT_BY_RANK) -> list[Card]:
+        """Put the hand in reading order. Free, and not a move.
+
+        It costs no draw, does not end the turn and is legal at any point,
+        because it changes nothing a rule can see -- only the order the cards
+        sit in. Every move takes a card rather than an index, so nothing the
+        engine does cares where in the list a card was.
+
+        Two orders, because the phases come in two shapes. Seventeen of the
+        twenty are sets and runs, which are read by rank; three (8, 11 and 14)
+        are colour groups, and in those a rank sort scatters the one thing you
+        are counting.
+        """
+        if order not in SORT_ORDERS:
+            raise ValueError(f"sort order {order!r} is not one of {SORT_ORDERS}")
+        self.hand.sort(key=lambda card: sort_key(card, order))
+        return self.hand
 
     def solution(self) -> Layout | None:
         return solve_phase(self.hand, self.spec,

@@ -26,6 +26,12 @@ class Color(Enum):
     YELLOW = "yellow"
 
 
+#: Colour order for anything that has to show colours in a fixed sequence --
+#: the hand sort, today. Declaration order, pinned here so the JavaScript port
+#: has one thing to match rather than an enum's iteration order.
+COLOR_ORDER: dict[Color, int] = {c: i for i, c in enumerate(Color)}
+
+
 class Kind(Enum):
     NUMBER = "number"
     WILD = "wild"

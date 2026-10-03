@@ -21,13 +21,50 @@ import {
   isWild,
   numberCard,
   COLORS,
-} from "./cards.js?v=67cbef8b";
+} from "./cards.js?v=13b79947";
 import {
   GROUP, PHASES, phaseCardCount, solveLayOptions, solveMelds, solvePhase,
-} from "./phases.js?v=67cbef8b";
+} from "./phases.js?v=13b79947";
 
 /** How deep into the stock a played Skip lets you look. */
 export const SKIP_DIG_DEPTH = 3;
+
+// The orders sortHand understands. Named rather than boolean, matching
+// engine.py: a third ("by what the phase wants") is an obvious thing to want
+// later, and a flag would have to be unpicked to add it.
+export const SORT_BY_RANK = "rank";
+export const SORT_BY_COLOR = "color";
+export const SORT_ORDERS = [SORT_BY_RANK, SORT_BY_COLOR];
+
+// Where the specials sit in a sorted hand. Last, as a block: a Wild or a Skip
+// belongs to no run and no set, so leaving them in rank position breaks up the
+// sequence the sort exists to make readable.
+const NUMBERS = 0, WILDS = 1, SKIPS = 2;
+
+/**
+ * Where one card sits in a sorted hand. Port of engine.py's `sort_key`.
+ *
+ * Both orders are total: ties inside the leading key fall through to the other
+ * attribute, so sorting the same hand twice gives the same arrangement
+ * whichever order it was in before. Returned as an array and compared
+ * element by element, because JavaScript has no tuple ordering.
+ */
+export function sortKey(card, order = SORT_BY_RANK) {
+  if (isSkip(card)) return [SKIPS, 0, 0];
+  if (isWild(card)) return [WILDS, 0, 0];
+  const colour = COLORS.indexOf(card.color);
+  return order === SORT_BY_COLOR
+    ? [NUMBERS, colour, card.rank]
+    : [NUMBERS, card.rank, colour];
+}
+
+/** Compare two sort keys, left to right. */
+function compareKeys(a, b) {
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return a[i] - b[i];
+  }
+  return 0;
+}
 
 export const HAND_STATE = {
   IN_PROGRESS: "in_progress",
@@ -406,6 +443,26 @@ export class PhaseHand {
 
   get skipsInHand() {
     return this.hand.filter(isSkip).length;
+  }
+
+  /**
+   * Put the hand in reading order. Free, and not a move.
+   *
+   * It costs no draw, does not end the turn and is legal at any point, because
+   * it changes nothing a rule can see -- only the order the cards sit in.
+   * Every move takes a card rather than an index, so nothing the engine does
+   * cares where in the list a card was.
+   *
+   * Two orders, because the phases come in two shapes. Seventeen of the twenty
+   * are sets and runs, which are read by rank; three (8, 11 and 14) are colour
+   * groups, and in those a rank sort scatters the one thing you are counting.
+   */
+  sortHand(order = SORT_BY_RANK) {
+    if (!SORT_ORDERS.includes(order)) {
+      throw new Error(`sort order ${order} is not one of ${SORT_ORDERS}`);
+    }
+    this.hand.sort((a, b) => compareKeys(sortKey(a, order), sortKey(b, order)));
+    return this.hand;
   }
 
   solution() {

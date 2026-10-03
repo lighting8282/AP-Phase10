@@ -55,6 +55,13 @@ button on the table sets how long each of their turns stays on screen — `1x`,
 `2x`, `4x`, or `Off` for no pause at all. It works while they are playing, so
 you can hurry a turn along once it has started, and your choice is remembered.
 
+The **Sort** button orders your hand — `by number` for the sets and runs that
+make up seventeen of the twenty phases, `by colour` for the three that are
+colour groups, or `Off` to leave cards where they land. Wilds and Skips go to
+the end either way. Once it is on it stays on, so a card you draw arrives in
+its place rather than on the end, and the choice is remembered. Sorting is not
+a move: it costs no draw, ends no turn, and works while the table is playing.
+
 ### In a browser, connected to a room
 
 Same page. Put in the server address, your slot name and any password, and
@@ -72,6 +79,7 @@ plays through commands in the client console:
     /status     the deck and draw budget your items have built
     /play <n>   start a hand
     /hand       your cards, the discard top, draws left
+    /sort [c]   order your hand by number, or by colour with `c`
     /draw [d]   draw from the stock, or from the discard with `d`
     /discard <i>  discard by position
     /hit <n>    play a card onto a group already on the table

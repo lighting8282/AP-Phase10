@@ -167,3 +167,49 @@ class TestPlayCommands(unittest.TestCase):
         ctx, cp = make(phase=1)
         cp("/play 7")
         self.assertTrue(any("not unlocked" in line for line in cp.lines))
+
+
+class TestSortCommand(unittest.TestCase):
+    """`/sort` is the Kivy client's half of the browser's Sort button."""
+
+    def test_sort_orders_the_hand_by_number(self) -> None:
+        ctx, cp = make()
+        cp("/play 1")
+        ranks = [c.rank for c in ctx.session.hand.hand if c.is_number]
+        cp("/sort")
+        sorted_ranks = [c.rank for c in ctx.session.hand.hand if c.is_number]
+        self.assertEqual(sorted_ranks, sorted(ranks))
+        self.assertTrue(any("sorted by number" in line for line in cp.lines))
+
+    def test_sort_c_groups_the_colours(self) -> None:
+        ctx, cp = make()
+        cp("/play 1")
+        cp("/sort c")
+        colours = [c.color for c in ctx.session.hand.hand if c.is_number]
+        # Grouped means each colour forms one unbroken run, so the list of
+        # colours with repeats collapsed has no colour in it twice.
+        runs = [colour for i, colour in enumerate(colours)
+                if i == 0 or colours[i - 1] != colour]
+        self.assertEqual(len(runs), len(set(runs)), f"a colour was split up: {colours}")
+        self.assertTrue(any("sorted by colour" in line for line in cp.lines))
+
+    def test_the_specials_sort_to_the_end(self) -> None:
+        ctx, cp = make(skips=2)
+        cp("/play 1")
+        cp("/sort")
+        tail = ctx.session.hand.hand[-2:]
+        self.assertTrue(all(c.is_skip for c in tail), "the two Skips should be last")
+
+    def test_sorting_spends_no_draw_and_ends_no_turn(self) -> None:
+        ctx, cp = make()
+        cp("/play 1")
+        hand = ctx.session.hand
+        cp("/sort")
+        self.assertEqual(hand.draws_used, 0)
+        self.assertFalse(hand.drew_this_turn)
+        self.assertIs(hand.state, HandState.IN_PROGRESS)
+
+    def test_sorting_without_a_hand_says_so(self) -> None:
+        ctx, cp = make()
+        cp("/sort")
+        self.assertTrue(any("No hand" in line for line in cp.lines))

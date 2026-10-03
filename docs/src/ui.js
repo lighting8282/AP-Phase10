@@ -4,18 +4,18 @@
 // client, and holds no game state of its own. Anything it needed to remember
 // would be a second copy of something the session already owns.
 
-import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=67cbef8b";
+import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=13b79947";
 
 //: Faces used purely as icons in the stat panel.
 const SKIP_FACE = SKIP;
 const WILD_FACE = WILD;
-import { HAND_STATE } from "./engine.js?v=67cbef8b";
+import { HAND_STATE, SORT_BY_COLOR, SORT_BY_RANK } from "./engine.js?v=13b79947";
 import {
   BUFFS, HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, buffPrice,
   milestoneLocationName, phaseLocationName, storeGate, storeLocationName,
-} from "./data.js?v=67cbef8b";
-import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=67cbef8b";
-import { Phase10Client } from "./client.js?v=67cbef8b";
+} from "./data.js?v=13b79947";
+import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=13b79947";
+import { Phase10Client } from "./client.js?v=13b79947";
 
 const el = (id) => document.getElementById(id);
 
@@ -55,6 +55,32 @@ const SPEEDS = [
   { label: "Off", times: 0, says: "no pause at all" },
 ];
 const SPEED_KEY = "ap10_table_speed";
+
+/**
+ * How the hand sorts, and what the button says it will do.
+ *
+ * Two orders because the phases come in two shapes: seventeen of the twenty
+ * are sets and runs, read by rank, and three (8, 11 and 14) are colour groups,
+ * where a rank sort scatters the one thing you are counting.
+ *
+ * `Off` is first, and it is the resting state: cards stay where they land,
+ * which is how the hand has always behaved, so nobody's game rearranges itself
+ * until they ask. It stops re-sorting rather than undoing a sort -- the order
+ * a hand was dealt in is not kept, and putting it back would be a shuffle, not
+ * a restore.
+ *
+ * It is a cycle rather than a one-shot button so that the order sticks as
+ * cards arrive. A sort you have to press again after every draw is a sort you
+ * stop pressing.
+ */
+const SORTS = [
+  { label: "Off", order: null, says: "left where the cards land" },
+  { label: "by number", order: SORT_BY_RANK, says: "sorted by number" },
+  { label: "by colour", order: SORT_BY_COLOR, says: "sorted by colour" },
+];
+const SORT_KEY = "ap10_hand_sort";
+
+let sortIndex = 0;
 //: How long the pause is checked against while it runs, so a change made
 //: during one takes effect in it rather than in the next.
 const SPEED_TICK_MS = 100;
@@ -553,7 +579,43 @@ const ACTIONS = {
   lay: () => layDown(),
   skip: () => withHand((hand) => hand.playSkip()),
   mulligan: () => mulligan(),
+  sort: () => cycleSort(),
 };
+
+/**
+ * Put the hand in the chosen order, if one is chosen.
+ *
+ * Called on the way into every render rather than once when the button is
+ * pressed, so a card that arrives later lands in place instead of on the end.
+ * Safe to call as often as that: sorting is idempotent, costs no draw and ends
+ * no turn, so a render can do it without being a move.
+ */
+function applyHandSort(hand) {
+  const { order } = SORTS[sortIndex];
+  if (order && hand) hand.sortHand(order);
+}
+
+/** Step to the next order, remember it, and redraw the hand in it. */
+function cycleSort() {
+  sortIndex = (sortIndex + 1) % SORTS.length;
+  try {
+    // By name rather than by position, so adding an order later cannot
+    // silently turn somebody's saved choice into a different one.
+    localStorage.setItem(SORT_KEY, SORTS[sortIndex].label);
+  } catch {
+    /* a private window is not a reason to refuse to sort */
+  }
+  showSort();
+  render();
+}
+
+function showSort() {
+  const button = el("sort-button");
+  const { label, says } = SORTS[sortIndex];
+  button.textContent = `Sort: ${label}`;
+  button.setAttribute("aria-label", `Hand ${says}. Press to change.`);
+  button.title = "How your hand is ordered -- it costs nothing and is not a move";
+}
 
 // -- rendering ---------------------------------------------------------------
 function render() {
@@ -613,7 +675,10 @@ function render() {
   renderStore(s);
   renderChecks(s);
 
-  for (const button of document.querySelectorAll("#actions button")) {
+  // `.tool` is excluded: those are not moves. Sorting costs nothing and ends
+  // no turn, so there is no moment it should be shut -- including while the
+  // table is playing, which is exactly when somebody has time to tidy up.
+  for (const button of document.querySelectorAll("#actions button:not(.tool)")) {
     button.disabled = pacing || !hand || hand.state !== HAND_STATE.IN_PROGRESS;
   }
   // The button is the dig, and only a seed digs. Where a Skip denies a turn it
@@ -913,6 +978,7 @@ function renderHand(hand) {
   const box = el("hand");
   box.replaceChildren();
   if (!hand) return;
+  applyHandSort(hand);
   const denies = skipDenies();
   hand.hand.forEach((card, index) => {
     const button = cardButton(card, () => playFromHand(index));
@@ -1390,6 +1456,13 @@ el("edit-connection").addEventListener("click", () => setConnectionFormOpen(true
   } catch {
     /* a private window is not a reason to fail to draw the page */
   }
+  try {
+    const savedSort = SORTS.findIndex((s) => s.label === localStorage.getItem(SORT_KEY));
+    if (savedSort >= 0) sortIndex = savedSort;
+  } catch {
+    /* as above: a page that cannot read storage still draws */
+  }
+  showSort();
   button.addEventListener("click", () => {
     speedIndex = (speedIndex + 1) % SPEEDS.length;
     show();

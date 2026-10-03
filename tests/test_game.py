@@ -8,7 +8,9 @@ import random
 
 from game.cards import SKIP, WILD, hand_score, number_card
 from game.cards import Color
-from game.engine import GameConfig, HandState, PhaseHand, Table
+from game.engine import (
+    SORT_BY_COLOR, SORT_BY_RANK, GameConfig, HandState, PhaseHand, Table,
+)
 from game.opponents import MID, Opponent, OpponentSkill, build_opponents
 from game.game import Phase10Game, RoundResult
 
@@ -364,6 +366,81 @@ def test_the_skip_is_spent_onto_the_discard():
     hand.deny_seat(0)
     assert hand.skips_in_hand == before
     assert any(card.is_skip for card in hand.discard)
+
+
+def sorting_hand(cards):
+    """A hand holding exactly these cards, for sorting."""
+    h = PhaseHand(1, GameConfig(max_draws=20), random.Random(3))
+    h.hand = list(cards)
+    return h
+
+
+B, G, Y = Color.BLUE, Color.GREEN, Color.YELLOW
+
+
+def test_sorting_by_rank_runs_low_to_high():
+    h = sorting_hand([number_card(9, B), number_card(2, R), number_card(5, G)])
+    assert [c.rank for c in h.sort_hand(SORT_BY_RANK)] == [2, 5, 9]
+
+
+def test_sorting_by_colour_groups_the_colours():
+    h = sorting_hand([number_card(9, B), number_card(2, R), number_card(5, B),
+                      number_card(7, R)])
+    assert [(c.color, c.rank) for c in h.sort_hand(SORT_BY_COLOR)] == [
+        (R, 2), (R, 7), (B, 5), (B, 9)]
+
+
+def test_a_colour_sort_still_runs_low_to_high_inside_a_colour():
+    """Grouping without ordering would make the colour phases no easier to
+    read than the shuffle they started as."""
+    h = sorting_hand([number_card(11, G), number_card(3, G), number_card(7, G)])
+    assert [c.rank for c in h.sort_hand(SORT_BY_COLOR)] == [3, 7, 11]
+
+
+def test_the_specials_go_last_in_either_order():
+    """A Wild and a Skip belong to no run and no set, so leaving them in rank
+    position breaks up the sequence the sort exists to make readable."""
+    for order in (SORT_BY_RANK, SORT_BY_COLOR):
+        h = sorting_hand([SKIP, number_card(12, Y), WILD, number_card(1, R)])
+        assert [str(c) for c in h.sort_hand(order)][-2:] == ["W", "S"], order
+
+
+def test_sorting_twice_changes_nothing():
+    """Both orders are total, so equal cards cannot swap places on a re-sort --
+    a hand that looked settled would otherwise appear to change on its own."""
+    cards = [number_card(5, R), number_card(5, Y), number_card(5, B), WILD,
+             number_card(5, G), SKIP]
+    for order in (SORT_BY_RANK, SORT_BY_COLOR):
+        h = sorting_hand(cards)
+        once = [str(c) for c in h.sort_hand(order)]
+        assert [str(c) for c in h.sort_hand(order)] == once, order
+
+
+def test_sorting_is_not_a_move():
+    """It costs no draw, does not end the turn, and is legal before drawing --
+    if any of that changed, sorting would become a way to lose a hand."""
+    h = sorting_hand([number_card(4, R), number_card(2, B)])
+    h.draws_used = 3
+    h.sort_hand()
+    assert h.draws_used == 3
+    assert not h.drew_this_turn
+    assert h.state is HandState.IN_PROGRESS
+
+
+def test_an_unknown_sort_order_is_refused():
+    h = sorting_hand([number_card(4, R)])
+    try:
+        h.sort_hand("by vibes")
+    except ValueError as err:
+        assert "by vibes" in str(err)
+    else:
+        raise AssertionError("an unknown sort order should have been refused")
+
+
+def test_sorting_keeps_every_card():
+    h = sorting_hand([SKIP, number_card(5, R), number_card(5, R), WILD, WILD])
+    before = sorted(str(c) for c in h.hand)
+    assert sorted(str(c) for c in h.sort_hand(SORT_BY_COLOR)) == before
 
 
 def test_a_played_skip_cannot_be_taken_back_up():
