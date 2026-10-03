@@ -54,9 +54,21 @@ testing the previous build.
 
 ### What needs an Archipelago source checkout
 
-These need AP on the path, with this package linked into `worlds/`. They cannot
-run in a cloud session. Both honour `AP_ROOT`, which defaults to a path on the
-original author's machine, so set it:
+These need AP on the path, with this package linked into `worlds/`. Both honour
+`AP_ROOT`, which defaults to a path on the original author's machine, so set it.
+
+**They do run in a cloud session** — this file said otherwise for a long time,
+and three batches of store logic went out on the strength of it. The network
+policy lets a public clone through, and pip works:
+
+    git clone --depth 1 --branch 0.6.7 https://github.com/ArchipelagoMW/Archipelago.git $AP
+    python3 -m venv $VENV && $VENV/bin/pip install -r $AP/requirements.txt
+    ln -sfn "$PWD/phase10" $AP/worlds/phase10
+
+then run everything below with `$VENV/bin/python` and `AP_ROOT=$AP`. Several
+other games fail to import for want of their own extras and log tracebacks
+about it; that is noise, and AP_10 loads regardless. Tag 0.6.7 is the
+`minimum_ap_version`, so it is the version worth proving against.
 
     AP_ROOT=/path/to/Archipelago python tools/check_store_balance.py
     AP_ROOT=/path/to/Archipelago python tools/check_multiworld.py
@@ -65,16 +77,16 @@ The world's own tests run from the AP root, and that run is the authority:
 
     SKIP_REQUIREMENTS_UPDATE=1 python -m unittest discover -s worlds/phase10/test -t .
 
-**Most of them run here too**, which this file used to deny:
+With a checkout set up as above, that is all 236 of them. Without one, most
+still run:
 
     python tools/run_world_tests.py
 
 `phase10/__init__.py` reaches for `worlds.AutoWorld`, and that is the only
 reason the session, store, data and persistence tests would not import — so
 the runner mounts `worlds.phase10` at the real directory without executing
-that `__init__`. The five modules that build a multiworld still cannot run,
-and are named as needing a checkout rather than counted as passing. 99 of them
-do run. They had gone three batches unrun on the strength of the old claim,
+that `__init__`. The five modules that build a multiworld need the checkout,
+and are named as needing one rather than counted as passing. They had gone three batches unrun on the strength of the old claim,
 and the first run found a `NameError` that crashed the Python client whenever
 a seat won a run, and a goal that fired at half the seed.
 
@@ -213,6 +225,15 @@ which permits commits, branches and pull requests but not tags or releases, so
 the tag push and every `gh release` call come back 403. Tried, and confirmed by
 the error rather than assumed. Bump the version, land it, and run the script on
 a machine you are signed in on.
+
+**The YAML template comes from whichever AP_10 the Archipelago at `AP_ROOT`
+loads**, not from this repository. v1.5.0 shipped a 1.2.0 template — old text,
+four options missing — because an old `phase10.apworld` sat in that install's
+`custom_worlds/` and nothing compared the two. `export_template.py` now refuses
+a template whose version or option set does not match this build, and names the
+file Archipelago actually loaded, so the release stops before it publishes.
+After a release you can check the attached YAML's `AP_10:` line yourself: the
+download URL is public.
 
 **Version floor and `websockets`:** AP pins `websockets==13.1` and uses APIs
 removed in 14. Any machine doing AP networking needs the venv with that pin, or
