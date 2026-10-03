@@ -42,18 +42,12 @@ class SkipMode(Choice):
     """
     What playing a Skip does.
 
-    dig:  look at the top three of the draw pile and keep one, free. Not the
-          printed rule, and the one the phase difficulty is balanced around.
+    dig:  look at the top three cards of the draw pile and keep one, free. The
+          phase difficulty is balanced around this.
     deny: the printed rule. Discard the Skip and choose who sits out a turn.
 
-    **`deny` makes a seed harder.** A denied turn is worth little when the
-    round is a race against your draw budget rather than against the table,
-    so the Skip goes from the strongest item in the pool to nearly nothing --
-    worth about a twentieth of what the dig is worth. Pick it if you want the
-    printed rule and a tougher seed, not if you want Skips to feel useful.
-
-    `skip_card_items` still wants leaving alone either way: more Skips helps a
-    little under `deny` and never hurts.
+    `deny` makes a seed noticeably harder: a lost turn matters little when you
+    are racing your own draw budget, so Skips become much weaker.
     """
     display_name = "Skip Mode"
     option_dig = 0
@@ -94,12 +88,9 @@ class ExtraDrawItems(Range):
     """
     How many Extra Draw items go in the pool. Each adds one draw per hand.
 
-    The floor of 5 is what logic requires -- the No Wilds check asks for five
-    of them -- so a smaller pool would leave those checks unreachable.
-
-    The ceiling is low because draws stop buying anything past about eight in
-    total. At the default `starting_draws` of 4 you are already there, so
-    lower that if you want every copy to matter.
+    Draws stop helping past about eight per hand, so at the default
+    `starting_draws` of 4 only the first few matter. Lower `starting_draws` if
+    you want every one to count.
     """
     display_name = "Extra Draw Items"
     range_start = 5
@@ -151,16 +142,8 @@ class ChecksPerPhase(Range):
     3: also clear it without using a single wild.
     4: also shed your whole hand and go out.
 
-    It is a prefix, so a lower number drops the hardest tiers rather than the
-    easiest.
-
-    More checks means more filler in the pool, not more meaningful items --
-    there are only so many wilds and draws worth having, and the rest is
-    Mulligans. Two is the size the item pool was built for. Raise it if you
-    would rather have more checks than better ones.
-
-    Going out is the last tier because playing solo it is unreachable on eight
-    of the twenty phases.
+    More checks mostly means more filler, not more useful items. Two is what
+    the item pool was built for.
     """
     display_name = "Checks Per Phase"
     range_start = 1
@@ -208,16 +191,11 @@ class TrapChance(Range):
 
 class StoreSlots(Range):
     """
-    How many checks the store sells for AP Points.
+    How many checks the store sells for AP Points, which arrive as items.
 
-    The store is a second track beside the phases: AP Points arrive as items,
-    and a slot can be bought once you hold enough of them. Prices ascend
-    (1, 1, 1, 1, 2, 2, 3, 3), and a slot opens once you could have afforded
-    every cheaper one -- so you can buy them in any order. Connected, each slot
-    says what it is holding.
-
-    The store brings its own locations, so it is close to free. At
-    `checks_per_phase: 1` there is little room and it trims itself to fit.
+    How the slots open is set by `store_gating`. Connected to a room, each slot
+    shows what it holds. With `checks_per_phase: 1` there may be room for fewer
+    slots than you ask for.
 
     0 turns the store off.
     """
@@ -251,21 +229,13 @@ class StoreGating(Choice):
 
 class StoreBuffPoints(Range):
     """
-    Extra AP Points the seed carries for the store's one-use cards.
+    Extra AP Points for the store's one-use cards: a One-Use Wild for 2 points
+    or a One-Use Skip for 1, bought as often as you can afford and gone once
+    played. These are on top of what the slots cost, so buying cards never costs
+    you a check.
 
-    The store also sells a card rather than a check: a One-Use Wild for two
-    points or a One-Use Skip for one, as often as you can afford them, gone
-    the moment you play them. They are there for the run where you are three
-    rounds into phase 17 and the deck will not give you a fourth nine.
-
-    This is the spending money for them, on top of what the slots cost, so
-    buying cards can never cost you a check.
-
-    **Past 12 this starts costing you Wild Card items** at the default two
-    checks a phase -- trading wilds that are in the deck every round for wilds
-    you get once. At three or four checks a phase there is room for the lot.
-
-    0 turns the one-use cards off and leaves the store selling checks alone.
+    Past 12, at the default two checks a phase, this starts replacing Wild Card
+    items. 0 turns the one-use cards off.
     """
 
     display_name = "Store Buff Points"

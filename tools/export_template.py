@@ -18,7 +18,10 @@ because a path is unset is not.
 from __future__ import annotations
 
 import argparse
+import ast
+import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -72,8 +75,66 @@ def main() -> int:
         shutil.copyfile(made, out)
 
     text = out.read_text(encoding="utf-8")
-    print(f"{out}  {len(text.splitlines())} lines")
+    problems = mismatches(text)
+    if problems:
+        out.unlink()
+        print(f"! the template Archipelago rendered is not this build's. It "
+              f"loaded AP_10 from:\n    {loaded_from()}\n  "
+              + "\n  ".join(problems)
+              + "\n  Remove or replace that copy so Archipelago loads this "
+                "repository's world, then run this again.", file=sys.stderr)
+        return 1
+    print(f"{out}  {len(text.splitlines())} lines, AP_10 {built_version()}")
     return 0
+
+
+# -- is it ours? ----------------------------------------------------------------
+# Archipelago renders the template for whichever AP_10 it loaded, and that is
+# whatever is installed in the checkout -- an old phase10.apworld left in
+# custom_worlds/ wins as easily as this repository does. v1.5.0 shipped exactly
+# that: a 1.2.0 template, old option text and no store_gating, beside a 1.5.0
+# apworld, because nothing compared the two. Now the template has to name this
+# build's version and carry every option this build declares, or it is refused.
+
+def built_version() -> str:
+    manifest = PROJECT_ROOT / "phase10" / "archipelago.json"
+    return json.loads(manifest.read_text(encoding="utf-8"))["world_version"]
+
+
+def declared_options() -> set[str]:
+    """The option names this build's options dataclass declares.
+
+    Read from the source rather than imported, so the check cannot be fooled
+    by the same stale copy it is looking for.
+    """
+    tree = ast.parse((PROJECT_ROOT / "phase10" / "options.py").read_text(encoding="utf-8"))
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef) and node.name == "Phase10Options":
+            return {item.target.id for item in node.body
+                    if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name)}
+    raise SystemExit("! no Phase10Options in phase10/options.py")
+
+
+def mismatches(text: str) -> list[str]:
+    problems = []
+    found = re.search(rf"^\s+{GAME}:\s*([\d.]+)", text, re.M)
+    version = found.group(1) if found else None
+    if version != built_version():
+        problems.append(f"it says {GAME} {version}; this build is {built_version()}")
+    keys = set(re.findall(r"^  ([a-z_]+):", text, re.M))
+    missing = sorted(declared_options() - keys)
+    if missing:
+        problems.append(f"it is missing options this build has: {', '.join(missing)}")
+    return problems
+
+
+def loaded_from() -> str:
+    try:
+        from worlds.AutoWorld import AutoWorldRegister
+        world = AutoWorldRegister.world_types[GAME]
+        return sys.modules[world.__module__].__file__ or world.__module__
+    except Exception as err:  # pragma: no cover - environment dependent
+        return f"(could not tell: {err})"
 
 
 if __name__ == "__main__":

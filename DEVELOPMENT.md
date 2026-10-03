@@ -48,6 +48,7 @@ while to find and would be easy to reintroduce.
   - [It runs alongside the phases](#it-runs-alongside-the-phases)
 - [The build was not reproducible across platforms](#the-build-was-not-reproducible-across-platforms)
 - [The option help is for choosing, not for showing work](#the-option-help-is-for-choosing-not-for-showing-work)
+  - [The template that was not this build's](#the-template-that-was-not-this-builds)
 - [The Skip, in a seed](#the-skip-in-a-seed)
   - [A played Skip could be picked up again](#a-played-skip-could-be-picked-up-again)
 - [The goal, and two ways it was wrong](#the-goal-and-two-ways-it-was-wrong)
@@ -889,6 +890,26 @@ lost with it:
     shorter rather than merely busier.
   * **Skips shuffled into the deck turn up about 0.34 times a hand**, which is
     why Archipelago grants them instead and leaves `skips_in_deck` at zero.
+
+
+### The template that was not this build's
+
+v1.5.0 went out with an `AP_10.yaml` that said `AP_10: 1.2.0`, carried the long
+measured-out help text this section had already removed, and had no
+`phases_to_win`, `skip_mode`, `store_buff_points` or `store_gating` at all. The
+apworld beside it was 1.5.0.
+
+`export_template.py` asks the Archipelago at `AP_ROOT` to render the template,
+and Archipelago renders whichever AP_10 *it* loads — an old `phase10.apworld`
+in that install's `custom_worlds/` wins as easily as this repository does.
+Reproduced exactly with a 1.2.0 build in a scratch checkout's `custom_worlds/`:
+the output matched the released file on every AP_10 line.
+
+The exporter now checks what it got against this build — the `AP_10:` version
+against `archipelago.json`, and the option keys against `Phase10Options` read
+from source, so the check cannot be fooled by the stale copy it is looking for —
+and refuses with the path of the file Archipelago really loaded. `cut_release.py`
+treats that as a failure, so the release stops before anything is tagged.
 
 ## The Skip, in a seed
 
