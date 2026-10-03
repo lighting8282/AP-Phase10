@@ -37,6 +37,8 @@ from ..data import (
     buff_price,
     milestone_location_name,
     phase_location_name,
+    STORE_ALL_AT_ONCE,
+    STORE_LADDER,
     store_gate,
     store_location_name,
     store_prices,
@@ -61,6 +63,10 @@ class Phase10Session:
     death_link: bool = False
     opponents: int = 3
     store_slots: int = 0
+    #: "ladder" or "all_at_once". A seed from before the option sends
+    #: nothing and reads as the ladder, which is what it was generated as --
+    #: reading it any other way would gate slots the server does not.
+    store_gating: str = STORE_LADDER
     #: "dig" or "deny". Only the free-play client sends the latter; an
     #: Archipelago seed never does, because its access rules are built on the
     #: dig's measured numbers.
@@ -108,6 +114,9 @@ class Phase10Session:
             death_link=bool(slot_data.get("death_link", False)),
             opponents=int(slot_data.get("opponents", 3)),
             store_slots=int(slot_data.get("store_slots", 0)),
+            store_gating=(STORE_ALL_AT_ONCE
+                          if slot_data.get("store_gating") == STORE_ALL_AT_ONCE
+                          else STORE_LADDER),
             # Absent in seeds generated before the option existed, where the
             # world's own rule asked for every phase.
             phases_to_win=int(slot_data.get("phases_to_win", PHASE_COUNT)),
@@ -318,7 +327,7 @@ class Phase10Session:
 
     @property
     def points_spent(self) -> int:
-        bought = sum(store_prices(self.store_slots)[slot - 1]
+        bought = sum(self.store_price(slot)
                      for slot in self.bought_slots
                      if 1 <= slot <= self.store_slots)
         return bought + self.buff_points_spent
@@ -352,7 +361,11 @@ class Phase10Session:
         return max(0, self.points - self.points_spent)
 
     def store_price(self, slot: int) -> int:
-        return store_prices(self.store_slots)[slot - 1]
+        return store_prices(self.store_slots, self.store_gating)[slot - 1]
+
+    def store_gate(self, slot: int) -> int:
+        """Points received before `slot` opens, for this seed's shape."""
+        return store_gate(slot, self.store_slots, self.store_gating)
 
     def can_buy(self, slot: int) -> str | None:
         """Returns None if the slot is buyable right now, else why not."""
@@ -362,7 +375,7 @@ class Phase10Session:
             return f"The store has slots 1 to {self.store_slots}."
         if slot in self.bought_slots:
             return f"Slot {slot} is already bought."
-        gate = store_gate(slot)
+        gate = self.store_gate(slot)
         if self.points < gate:
             # The gate is on points received, not points left: it is what the
             # seed's logic was built on, so checking it here is what keeps the

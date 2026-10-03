@@ -17,7 +17,7 @@ import {
   AP_POINT, BUFF_SKIP, BUFF_WILD, LOCATION_NAME_TO_ID, MULLIGAN, PHASE_COUNT,
   SKIP_CARD,
   SCORE_REDUCTION, SCORE_REDUCTION_VALUE, phaseUnlock, storeGate,
-  storeLocationName,
+  storeLocationName, STORE_ALL_AT_ONCE, STORE_GATINGS, STORE_LADDER,
 } from "../src/data.js";
 import { isWild } from "../src/cards.js";
 
@@ -311,9 +311,10 @@ fixtures.sequences.forEach((script, index) => {
 // The mirror of TestStore in phase10/test/test_session.py. Two numbers: a slot
 // opens at a gate on points received, and costs a price out of points unspent.
 {
-  const store = (slots, points) => {
+  const store = (slots, points, gating) => {
     const s = Phase10Session.fromSlotData(
-      { goal: 0, starting_draws: 4, checks_per_phase: 4, store_slots: slots },
+      { goal: 0, starting_draws: 4, checks_per_phase: 4, store_slots: slots,
+        ...(gating ? { store_gating: gating } : {}) },
       new Phase10Game({ seed: 0 }),
     );
     s.setItems(Array(points).fill(AP_POINT));
@@ -349,19 +350,40 @@ fixtures.sequences.forEach((script, index) => {
     rest.forEach((v, i) => permute([...rest.slice(0, i), ...rest.slice(i + 1)], [...acc, v]));
   };
   permute([1, 2, 3, 4, 5, 6], []);
-  let stranded = null;
-  for (let points = 0; points <= POINTS && !stranded; points += 1) {
-    for (const order of orders) {
-      const s = store(6, points);
-      for (const slot of order) {
-        const refusal = s.canBuy(slot);
-        if (refusal === null) s.buySlot(slot);
-        else if (refusal.includes("costs")) { stranded = `${points}: ${refusal}`; break; }
+  // Both shapes: all at once shares one gate across every slot, so it has to
+  // cover the whole store, and this is what proves that it does.
+  for (const gating of STORE_GATINGS) {
+    let stranded = null;
+    for (let points = 0; points <= POINTS && !stranded; points += 1) {
+      for (const order of orders) {
+        const s = store(6, points, gating);
+        for (const slot of order) {
+          const refusal = s.canBuy(slot);
+          if (refusal === null) s.buySlot(slot);
+          else if (refusal.includes("costs")) { stranded = `${points}: ${refusal}`; break; }
+        }
+        if (stranded) break;
       }
-      if (stranded) break;
     }
+    check(`an open slot is always affordable, in any order (${gating})`, stranded, null);
   }
-  check("an open slot is always affordable, in any order", stranded, null);
+
+  // All at once: nothing, then everything, and the last slot as open as the first.
+  const opened = (s) => [1, 2, 3, 4, 5, 6].filter((slot) => s.canBuy(slot) === null);
+  check("all at once: nothing at 5 points", opened(store(6, 5, STORE_ALL_AT_ONCE)), []);
+  check("all at once: everything at 6", opened(store(6, 6, STORE_ALL_AT_ONCE)), [1, 2, 3, 4, 5, 6]);
+  const chooser = store(6, 6, STORE_ALL_AT_ONCE);
+  if (chooser.canBuy(6) === null) chooser.buySlot(6);
+  check("all at once: the last slot can be bought first", chooser.pointsLeft, 5);
+  check("and the first is still open after it", chooser.canBuy(1), null);
+  check("all at once: every slot costs one",
+    [1, 2, 3, 4, 5, 6, 7, 8].map((slot) => store(8, 0, STORE_ALL_AT_ONCE).storePrice(slot)),
+    [1, 1, 1, 1, 1, 1, 1, 1]);
+  check("all at once: the refusal names the one gate",
+    (store(6, 4, STORE_ALL_AT_ONCE).canBuy(3) ?? "").includes("opens at 6"), true);
+  check("the slot data word is read", store(6, 0, "all_at_once").storeGating, STORE_ALL_AT_ONCE);
+  check("a seed from before the option is a ladder", store(6, 0).storeGating, STORE_LADDER);
+  check("an unknown word is a ladder too", store(6, 0, "nonsense").storeGating, STORE_LADDER);
 
   const full = store(6, POINTS);
   for (const slot of [6, 5, 4, 3, 2, 1]) {

@@ -18,11 +18,12 @@ import {
   SCORE_REDUCTION_VALUE, SKIP_CARD, TIERS, WILD_CARD,
   WILD_THEFT, milestoneLocationName, phaseLocationName, phaseUnlock,
   buffPrice, storeGate, storeLocationName, storePrices,
-} from "./data.js?v=13b79947";
-import { SKIP, STOCK_WILDS, WILD } from "./cards.js?v=13b79947";
-import { HAND_STATE, Table, gameConfig } from "./engine.js?v=13b79947";
-import { MID, NAMES as OPPONENT_NAMES, buildOpponents } from "./opponents.js?v=13b79947";
-import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js?v=13b79947";
+  STORE_ALL_AT_ONCE, STORE_LADDER,
+} from "./data.js?v=7dc84a86";
+import { SKIP, STOCK_WILDS, WILD } from "./cards.js?v=7dc84a86";
+import { HAND_STATE, Table, gameConfig } from "./engine.js?v=7dc84a86";
+import { MID, NAMES as OPPONENT_NAMES, buildOpponents } from "./opponents.js?v=7dc84a86";
+import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js?v=7dc84a86";
 
 export const LEAN_DEAL_PENALTY = 2;
 
@@ -32,6 +33,10 @@ export class Phase10Session {
     this.startingDraws = opts.startingDraws ?? 4;
     this.checksPerPhase = opts.checksPerPhase ?? 4;
     this.storeSlots = opts.storeSlots ?? 0;
+    //: "ladder" or "all_at_once". A seed from before the option sends
+    //: nothing and reads as the ladder, which is what it was generated as --
+    //: reading it any other way would gate slots the server does not.
+    this.storeGating = opts.storeGating ?? STORE_LADDER;
     //: "dig" or "deny". Only free play sends the latter; an Archipelago seed
     //: never does, because its access rules are built on the dig's numbers.
     this.skipMode = opts.skipMode ?? "dig";
@@ -78,6 +83,8 @@ export class Phase10Session {
       startingDraws: Number(slotData.starting_draws ?? 4),
       checksPerPhase: Number(slotData.checks_per_phase ?? 4),
       storeSlots: Number(slotData.store_slots ?? 0),
+      storeGating: slotData.store_gating === STORE_ALL_AT_ONCE
+        ? STORE_ALL_AT_ONCE : STORE_LADDER,
       // Absent in seeds generated before the option existed, where the
       // world's own rule asked for every phase.
       phasesToWin: Number(slotData.phases_to_win ?? PHASE_COUNT),
@@ -200,10 +207,9 @@ export class Phase10Session {
   }
 
   get pointsSpent() {
-    const prices = storePrices(this.storeSlots);
     let spent = 0;
     for (const slot of this.boughtSlots) {
-      if (slot >= 1 && slot <= this.storeSlots) spent += prices[slot - 1];
+      if (slot >= 1 && slot <= this.storeSlots) spent += this.storePrice(slot);
     }
     return spent + this.buffPointsSpent;
   }
@@ -249,7 +255,12 @@ export class Phase10Session {
   }
 
   storePrice(slot) {
-    return storePrices(this.storeSlots)[slot - 1];
+    return storePrices(this.storeSlots, this.storeGating)[slot - 1];
+  }
+
+  /** Points received before `slot` opens, for this seed's shape. */
+  storeGate(slot) {
+    return storeGate(slot, this.storeSlots, this.storeGating);
   }
 
   /** Returns null if the slot is buyable right now, else why not. */
@@ -259,7 +270,7 @@ export class Phase10Session {
       return `The store has slots 1 to ${this.storeSlots}.`;
     }
     if (this.boughtSlots.has(slot)) return `Slot ${slot} is already bought.`;
-    const gate = storeGate(slot);
+    const gate = this.storeGate(slot);
     if (this.points < gate) {
       // The gate is on points received, not points left: it is what the seed's
       // logic was built on, so checking it here is what keeps the client from

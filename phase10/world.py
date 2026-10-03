@@ -5,7 +5,9 @@ from worlds.AutoWorld import World
 
 from . import items, locations, regions, rules, web_world
 from . import options as phase10_options
-from .data import GAME_NAME, HANDS_WON_MILESTONES, PHASE_COUNT
+from .data import (
+    GAME_NAME, HANDS_WON_MILESTONES, PHASE_COUNT, STORE_ALL_AT_ONCE, STORE_LADDER,
+)
 
 
 class Phase10World(World):
@@ -44,7 +46,7 @@ class Phase10World(World):
         floor = PHASE_COUNT + MIN_WILD_CARDS + MIN_EXTRA_DRAWS
         slots, points = items.plan_store(
             base, int(self.options.store_slots), floor,
-            int(self.options.store_buff_points))
+            int(self.options.store_buff_points), self.store_gating)
         self.options.store_slots.value = slots
         self.store_points = points
 
@@ -76,4 +78,11 @@ class Phase10World(World):
         # would make the two agree only by coincidence.
         data["skip_mode"] = ("deny" if int(self.options.skip_mode)
                              == phase10_options.SkipMode.option_deny else "dig")
+        data["store_gating"] = self.store_gating
         return data
+
+    @property
+    def store_gating(self) -> str:
+        """The word for `store_gating`, as the data helpers and clients take it."""
+        return (STORE_ALL_AT_ONCE if int(self.options.store_gating)
+                == phase10_options.StoreGating.option_all_at_once else STORE_LADDER)

@@ -6,7 +6,8 @@ from BaseClasses import Item, ItemClassification
 
 from .data import (
     AP_POINT, FILLERS, GAME_NAME, ITEM_NAME_TO_ID, MULLIGAN, PHASE_COUNT,
-    PHASE_UNLOCK, SCORE_REDUCTION, SKIP_CARD, STORE_PRICES, STORE_SLACK, TRAPS,
+    PHASE_UNLOCK, SCORE_REDUCTION, SKIP_CARD, STORE_LADDER, STORE_SLACK, TRAPS,
+    store_prices,
 )
 from .rules import MIN_EXTRA_DRAWS, MIN_WILD_CARDS
 
@@ -108,7 +109,8 @@ def choose_starting_phases(world: Phase10World) -> list[int]:
 
 
 def plan_store(base_locations: int, slots: int, floor: int,
-               buff_points: int = 0) -> tuple[int, int]:
+               buff_points: int = 0,
+               gating: str = STORE_LADDER) -> tuple[int, int]:
     """The largest store that still fits, as (slots, points).
 
     A store of S slots brings S locations with it, so it pays for itself up to
@@ -128,8 +130,11 @@ def plan_store(base_locations: int, slots: int, floor: int,
     where it landed before the buffs existed. At two checks and up the ladder,
     the slack and the buff budget all survive.
     """
+    # All at once, every slot costs one point, so the store always pays for
+    # itself and only the spare points can ever be trimmed. Same loop: it is
+    # the ladder's cost that changes, not the rule for what fits.
     for count in range(slots, 0, -1):
-        ladder = sum(STORE_PRICES[:count])
+        ladder = sum(store_prices(count, gating))
         for spare in range(STORE_SLACK + buff_points, -1, -1):
             points = ladder + spare
             if floor + points <= base_locations + count:

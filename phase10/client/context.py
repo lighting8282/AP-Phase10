@@ -25,7 +25,7 @@ from NetUtils import ClientStatus
 
 from ..data import (
     BUFF_SKIP, BUFF_WILD, BUFFS, GAME_NAME, LOCATION_NAME_TO_ID, PHASE_COUNT,
-    buff_price, store_gate, store_location_name,
+    buff_price, store_location_name,
 )
 from ..game.autoplay import play_out
 from ..game.engine import SORT_BY_COLOR, SORT_BY_RANK, HandState
@@ -328,7 +328,7 @@ class Phase10CommandProcessor(ClientCommandProcessor):
                 star = " *" if stock["progression"] else ""
                 shelf = f"  [{stock['name']}{who}{star}]"
             self.output(f"  {mark}  Slot {slot}: {price} point(s)"
-                        f"  opens at {store_gate(slot)}{shelf}{why}")
+                        f"  opens at {s.store_gate(slot)}{shelf}{why}")
         # The rebuyable half, reported with what is actually spendable rather
         # than with what is unspent: the slots you have not bought are owed
         # their prices, because the seed's logic reasons about points received

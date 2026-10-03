@@ -228,6 +228,27 @@ class StoreSlots(Range):
     default = 6
 
 
+class StoreGating(Choice):
+    """
+    How the store's slots open.
+
+    ladder:       prices ascend (1, 1, 1, 1, 2, 2, 3, 3) and the slots open one
+                  at a time, the first at 1 point.
+    all_at_once:  every slot costs 1 point, and they all open together once you
+                  hold enough to buy every one -- 6 points at 6 slots. Then you
+                  pick the order, with each slot showing what it holds.
+
+    `all_at_once` is quieter early -- no store check until the whole store
+    opens -- but reaches every slot sooner, and fits a full store into seeds
+    the ladder has to trim. Spending money for the one-use cards is the same
+    either way; `store_buff_points` sets that.
+    """
+    display_name = "Store Gating"
+    option_ladder = 0
+    option_all_at_once = 1
+    default = option_ladder
+
+
 class StoreBuffPoints(Range):
     """
     Extra AP Points the seed carries for the store's one-use cards.
@@ -266,6 +287,7 @@ class Phase10Options(PerGameCommonOptions):
     hand_size_upgrades: HandSizeUpgrades
     checks_per_phase: ChecksPerPhase
     store_slots: StoreSlots
+    store_gating: StoreGating
     store_buff_points: StoreBuffPoints
     skip_card_items: SkipCardItems
     trap_chance: TrapChance
@@ -274,7 +296,7 @@ class Phase10Options(PerGameCommonOptions):
 
 option_groups = [
     OptionGroup("Goal", [Goal, PhasesToWin, ChecksPerPhase, StoreSlots,
-                         StoreBuffPoints, StartingPhases]),
+                         StoreGating, StoreBuffPoints, StartingPhases]),
     OptionGroup("Difficulty", [Opponents, StartingDraws, ExtraDrawItems,
                                WildCardItems, HandSizeUpgrades, SkipCardItems,
                                SkipMode]),

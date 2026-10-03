@@ -41,6 +41,7 @@ while to find and would be easy to reintroduce.
 - [Fillers](#fillers)
 - [The store](#the-store)
   - [The gate is not the price](#the-gate-is-not-the-price)
+  - [All at once](#all-at-once)
   - [Sizing it, measured](#sizing-it-measured)
   - [The slots say what they hold](#the-slots-say-what-they-hold)
   - [The rebuyable half](#the-rebuyable-half)
@@ -682,6 +683,47 @@ prices ascend, since any set of slots whose gates you have met costs at most
 the largest of those gates. The check stays anyway — it is what would catch a
 future ladder that stopped ascending — and both ports test the invariant
 exhaustively, over every point count against all 720 purchase orders.
+
+### All at once
+
+`store_gating: all_at_once` is the second shape: every slot costs 1 and every
+slot shares one gate, the store's total — 6 points at 6 slots. Nothing opens
+until then, and then everything does, so the player picks the order. Asked for
+because the ladder's "any order" was true only in a narrow sense: holding one
+point, slot 1 is the *only* thing buyable, and the choice appears once enough
+is open that you can afford all of it anyway.
+
+The gate cannot be flattened to anything lower. One gate for every slot means
+the gate has to cover the whole store, or the logic would say slot 6 is
+reachable at a point count where the player could only have bought five. So
+"all at once" is the total, which is also the last rung of a ladder of ones —
+the same invariant as the ladder, in the one shape that lets every slot share
+it. The exhaustive 720-order test runs under both shapes in both ports.
+
+Two consequences, both measured with the real `plan_store`:
+
+- **It does not change the spending money.** The pool is sized to what the
+  store costs, so a store of ones carries fewer points (16 at six slots against
+  the ladder's 18), not more to spend. What is left once every slot is bought
+  is `store_buff_points` plus the slack in both shapes. This was claimed the
+  other way while the option was being designed, and was wrong; a test pins it.
+- **It fits where the ladder does not.** A slot that costs one point and brings
+  one location pays for itself exactly, so at `checks_per_phase: 1` — where the
+  ladder trims to five slots and six points — all at once keeps all eight, with
+  nine.
+
+Seeds that predate the option send no `store_gating` and both clients read that
+as the ladder, which is what those seeds were generated as. Any other reading
+would gate slots differently from the server.
+
+Writing it turned up two things that had been broken since the card budget
+landed, both invisible because they need an Archipelago checkout:
+`test_the_pool_carries_the_points` expected 10 points against the 18 the world
+generates, and `check_store_balance.py`'s ceiling left out the budget, so it
+would have failed every untrimmed store. Both fixed; neither has been run here.
+And `check_js_tables.py` never compared the store's prices or gates between the
+ports at all — it now computes every gate for every store size in both shapes,
+and fails on a single gate off by one (tried).
 
 ### Sizing it, measured
 

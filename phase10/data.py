@@ -103,17 +103,41 @@ MAX_STORE_SLOTS = len(STORE_PRICES)
 STORE_SLACK = 2
 
 
-def store_prices(slots: int) -> list[int]:
+#: How the store's slots open, from `store_gating`. Sent to the clients as the
+#: word, like `skip_mode`, and a seed that predates the option sends nothing
+#: and is a ladder -- which is what it was generated as.
+#:
+#:   ladder       prices ascend and each slot opens in turn, the first at 1 point
+#:   all_at_once  every slot costs 1, and all of them open together the moment
+#:                you hold enough to buy the lot -- so you choose the order
+STORE_LADDER = "ladder"
+STORE_ALL_AT_ONCE = "all_at_once"
+STORE_GATINGS = (STORE_LADDER, STORE_ALL_AT_ONCE)
+
+
+def store_prices(slots: int, gating: str = STORE_LADDER) -> list[int]:
+    if gating == STORE_ALL_AT_ONCE:
+        return [1] * slots
     return STORE_PRICES[:slots]
 
 
-def store_gate(slot: int) -> int:
+def store_gate(slot: int, slots: int = MAX_STORE_SLOTS,
+               gating: str = STORE_LADDER) -> int:
     """Points needed before slot `slot` (1-based) may be bought at all.
 
-    The sum of the cheapest `slot` prices rather than this slot's own price:
-    that is what makes any purchase order legal, because a player holding this
-    many points could have bought the cheapest `slot` slots instead.
+    One invariant behind both shapes: a player who has met a slot's gate could
+    have paid for every slot they might have bought on the way to it, in any
+    order. That is what lets the logic reason about points *received* while
+    the player is spending them.
+
+    On the ladder that is the sum of the cheapest `slot` prices rather than
+    this slot's own price. All at once, every slot has the same gate, so it
+    has to cover the whole store -- the total, which is also the last rung of
+    a ladder of ones. `slots` only matters there; on the ladder a slot's gate
+    does not depend on how many come after it.
     """
+    if gating == STORE_ALL_AT_ONCE:
+        return sum(store_prices(slots, gating))
     return sum(STORE_PRICES[:slot])
 
 
@@ -148,11 +172,12 @@ def buff_price(buff: str) -> int:
     return BUFF_PRICES[buff]
 
 
-def store_points(slots: int, buff_points: int = 0) -> int:
+def store_points(slots: int, buff_points: int = 0,
+                 gating: str = STORE_LADDER) -> int:
     """How many points the pool carries for a store of this size."""
     if not slots:
         return 0
-    return sum(store_prices(slots)) + STORE_SLACK + buff_points
+    return sum(store_prices(slots, gating)) + STORE_SLACK + buff_points
 
 
 def store_location_name(slot: int) -> str:
