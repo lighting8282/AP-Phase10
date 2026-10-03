@@ -114,7 +114,7 @@ game: AP_10
 requires:
   version: 0.6.7
   game:
-    AP_10: 1.5.1
+    AP_10: 1.6.0
 ```
 
 A seed is generated against one version of the world. After updating, generate
@@ -265,7 +265,7 @@ explanation; these are the ones that change the shape of a run most.
 | `phases_to_win` | 20 | How many phases `all_phases` asks for; `random-range-10-20` for a random length |
 | `skip_mode` | `dig` | What a Skip does: `dig` looks at three cards, `deny` costs somebody a turn |
 | `store_slots` | 6 | Checks you can buy outright with AP Points; 0 for none |
-| `store_gating` | `ladder` | `ladder` opens slots one at a time; `all_at_once` opens every slot together and lets you pick the order |
+| `store_gating` | `ladder` | `ladder` opens slots one at a time; `always_open` sells every slot from the start, priced by what it holds |
 | `store_buff_points` | 8 | Spending money for the store's one-use cards; 0 for none |
 | `starting_phases` | 2 | How many phases you open with |
 | `opponents` | 3 | Computer players at the table; 0 for the pure solo game |
@@ -289,10 +289,12 @@ build both back up.
 - **`ladder`** (the default) — prices climb 1, 1, 1, 1, 2, 2, 3, 3 and the
   slots open one at a time: your first point opens slot 1, your second slot 2,
   and so on. A store check from your very first point, but the order is set.
-- **`all_at_once`** — every slot costs 1, and they all open together once you
-  hold enough to buy the lot: 6 points at 6 slots. Nothing until then, but
-  then you choose the order. It also fits a full store into tight seeds that
-  the ladder has to trim.
+- **`always_open`** — every slot can be bought from the start, with no
+  points to save up first. A slot's price is set by what it holds: trap or
+  filler **1**, useful **2**, progression **3** — except your own AP Point,
+  which costs 1, so buying it back is never a loss. Whatever the slots don't
+  end up costing is spending money for the one-use cards. It needs more room
+  in the item pool, so with `checks_per_phase: 1` there is no store at all.
 
 Either way, spending can't strand you: once a slot is open you can always
 afford it, whatever you bought before.

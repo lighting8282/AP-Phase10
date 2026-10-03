@@ -108,34 +108,76 @@ STORE_SLACK = 2
 #: and is a ladder -- which is what it was generated as.
 #:
 #:   ladder       prices ascend and each slot opens in turn, the first at 1 point
-#:   all_at_once  every slot costs 1, and all of them open together the moment
-#:                you hold enough to buy the lot -- so you choose the order
+#:   always_open  every slot can be bought from the start, priced by what it
+#:                holds: trap or filler 1, useful 2, progression 3
+#:   all_at_once  1.5.0 only, and kept so its seeds still play: every slot costs
+#:                1 and all open together at the store's total. The option now
+#:                maps that word to always_open, so no new seed is generated
+#:                with it.
 STORE_LADDER = "ladder"
+STORE_ALWAYS_OPEN = "always_open"
 STORE_ALL_AT_ONCE = "all_at_once"
-STORE_GATINGS = (STORE_LADDER, STORE_ALL_AT_ONCE)
+STORE_GATINGS = (STORE_LADDER, STORE_ALWAYS_OPEN, STORE_ALL_AT_ONCE)
+#: The shapes a new seed can be generated with.
+STORE_GENERATED_GATINGS = (STORE_LADDER, STORE_ALWAYS_OPEN)
+
+#: What an always-open slot costs, by the classification of the item in it.
+#: Highest flag wins: a progression item that is also useful is progression.
+PRICE_TRAP_OR_FILLER = 1
+PRICE_USEFUL = 2
+PRICE_PROGRESSION = 3
 
 
 def store_prices(slots: int, gating: str = STORE_LADDER) -> list[int]:
+    """What the slots cost, as far as generation can know.
+
+    Always open, that is the worst case -- every slot holding progression --
+    because the real price depends on what fill puts there, and the pool and
+    the logic are both sized before fill runs. The real prices go to the
+    clients in slot data once fill has decided them.
+    """
+    if gating == STORE_ALWAYS_OPEN:
+        return [PRICE_PROGRESSION] * slots
     if gating == STORE_ALL_AT_ONCE:
         return [1] * slots
     return STORE_PRICES[:slots]
 
 
+def price_for(advancement: bool, useful: bool) -> int:
+    """An always-open slot's price, from its item's classification."""
+    if advancement:
+        return PRICE_PROGRESSION
+    if useful:
+        return PRICE_USEFUL
+    return PRICE_TRAP_OR_FILLER
+
+
 def store_gate(slot: int, slots: int = MAX_STORE_SLOTS,
                gating: str = STORE_LADDER) -> int:
-    """Points needed before slot `slot` (1-based) may be bought at all.
+    """Points received before the *logic* counts slot `slot` (1-based) as
+    reachable. The access rule, not necessarily when a client lets you buy.
 
-    One invariant behind both shapes: a player who has met a slot's gate could
+    One invariant behind every shape: a player who has met a slot's gate could
     have paid for every slot they might have bought on the way to it, in any
     order. That is what lets the logic reason about points *received* while
     the player is spending them.
 
     On the ladder that is the sum of the cheapest `slot` prices rather than
-    this slot's own price. All at once, every slot has the same gate, so it
-    has to cover the whole store -- the total, which is also the last rung of
-    a ladder of ones. `slots` only matters there; on the ladder a slot's gate
-    does not depend on how many come after it.
+    this slot's own price. All at once, every slot shares one gate, so it has
+    to cover the whole store.
+
+    Always open is the exception, and knowingly: three points, enough to buy
+    any one slot. A slot's price depends on what fill puts in it, and the rule
+    is written before fill, so an exact rule would have to wait for every
+    slot's worst case -- and that version failed to generate in 2 of 150 seeds
+    at six slots and 90 of 150 at eight. This is the rule Archipelago shops
+    use. It does not model spending; what keeps it safe is that the pool
+    carries the whole worst case and more, and a player buying in random order
+    never got stuck in 750 simulated playthroughs (DEVELOPMENT.md).
+    `slots` only matters for the shared gate.
     """
+    if gating == STORE_ALWAYS_OPEN:
+        return PRICE_PROGRESSION
     if gating == STORE_ALL_AT_ONCE:
         return sum(store_prices(slots, gating))
     return sum(STORE_PRICES[:slot])

@@ -14,8 +14,10 @@ with this world available to it.
 
 from __future__ import annotations
 
+import argparse
 import collections
 import os
+import random
 import sys
 
 AP = os.environ.get("AP_ROOT", "C:/Users/turtl/Archipelago")
@@ -26,13 +28,14 @@ import ModuleUpdate  # noqa: E402
 
 ModuleUpdate.update_ran = True
 
+from BaseClasses import CollectionState  # noqa: E402
 from Fill import distribute_items_restrictive  # noqa: E402
 from test.general import setup_multiworld  # noqa: E402
 
 from worlds.phase10 import Phase10World  # noqa: E402
 from worlds.phase10.data import (  # noqa: E402
-    AP_POINT, DEFAULT_BUFF_POINTS, FILLERS, MAX_STORE_SLOTS, STORE_GATINGS, TRAPS,
-    store_points, store_prices,
+    AP_POINT, DEFAULT_BUFF_POINTS, FILLERS, MAX_STORE_SLOTS, STORE_GENERATED_GATINGS, TRAPS,
+    STORE_ALWAYS_OPEN, store_location_name, store_points, store_prices,
 )
 
 CHECKS = (1, 2, 3, 4)
@@ -77,19 +80,71 @@ def run(checks_per_phase: int, slots: int, gating: str,
     unreachable = [l.name for l in locations if not l.can_reach(state)]
     if unreachable:
         return f"UNREACHABLE {unreachable[0]}", facts
+    if gating == STORE_ALWAYS_OPEN and facts["slots"]:
+        for player in range(CARELESS_PLAYERS):
+            if not careless_playthrough(multiworld, random.Random(seed * 100 + player)):
+                return f"SOFTLOCK (careless player {player})", facts
     return "ok", facts
 
 
+#: How many random-order buyers play each always-open seed.
+CARELESS_PLAYERS = 5
+
+
+def careless_playthrough(multiworld, rng) -> bool:
+    """Play the seed the way an always-open store allows: take every check you
+    can reach, and when stuck, buy any slot you can afford, chosen at random.
+
+    The always-open rule counts a slot reachable at three points, enough for
+    any one slot, and Archipelago's own beatability check does not model
+    spending. So this is what proves the store cannot strand a player who buys
+    in the wrong order -- the one way that rule could go wrong.
+    """
+    world = multiworld.worlds[1]
+    slots = int(world.options.store_slots)
+    prices = world.fill_slot_data()["store_prices"]
+    store = {multiworld.get_location(store_location_name(s), 1): prices[s - 1]
+             for s in range(1, slots + 1)}
+    others = [l for l in multiworld.get_locations() if l.item and l not in store]
+    state, done, received, spent = CollectionState(multiworld), set(), 0, 0
+    while True:
+        moved = False
+        for location in others:
+            if location not in done and location.can_reach(state):
+                done.add(location)
+                state.collect(location.item, True, location)
+                received += location.item.name == AP_POINT and location.item.player == 1
+                moved = True
+        if moved:
+            continue
+        affordable = [l for l in store if l not in done and store[l] <= received - spent]
+        if not affordable:
+            return multiworld.can_beat_game(state)
+        location = rng.choice(affordable)
+        spent += store[location]
+        done.add(location)
+        state.collect(location.item, True, location)
+        received += location.item.name == AP_POINT and location.item.player == 1
+
+
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--seeds", type=int, default=1,
+                        help="seeds per combination; 150 is what always_open "
+                             "was measured at")
+    seeds = range(1, parser.parse_args().seeds + 1)
     failures = []
     print(f"{'gating':>11} {'checks':>6} {'asked':>5} {'slots':>5} {'points':>6} "
           f"{'filler':>6} {'locations':>9}  result")
-    for gating in STORE_GATINGS:
+    for gating in STORE_GENERATED_GATINGS:
         for checks in CHECKS:
             for slots in SLOTS:
-                verdict, facts = run(checks, slots, gating, seed=1)
-                if verdict != "ok":
-                    failures.append(f"{gating} checks={checks} slots={slots}: {verdict}")
+                for seed in seeds:
+                    verdict, facts = run(checks, slots, gating, seed=seed)
+                    if verdict != "ok":
+                        failures.append(f"{gating} checks={checks} slots={slots} "
+                                        f"seed={seed}: {verdict}")
+                        break
                 print(f"{gating:>11} {checks:>6} {slots:>5} {facts['slots']:>5} "
                       f"{facts['points']:>6} {facts['filler']:>6} "
                       f"{facts['locations']:>9}  {verdict}")
@@ -99,8 +154,9 @@ def main() -> int:
         for line in failures:
             print(f"FAIL  {line}")
         return 1
-    print("every store size, in both shapes, fills, is beatable, and leaves "
-          "nothing unreachable")
+    print(f"every store size, in both shapes, over {len(seeds)} seed(s): fills, is "
+          f"beatable, leaves nothing unreachable, and an always-open store "
+          f"strands none of {CARELESS_PLAYERS} random-order buyers")
     return 0
 
 

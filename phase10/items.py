@@ -6,8 +6,8 @@ from BaseClasses import Item, ItemClassification
 
 from .data import (
     AP_POINT, FILLERS, GAME_NAME, ITEM_NAME_TO_ID, MULLIGAN, PHASE_COUNT,
-    PHASE_UNLOCK, SCORE_REDUCTION, SKIP_CARD, STORE_LADDER, STORE_SLACK, TRAPS,
-    store_prices,
+    PHASE_UNLOCK, SCORE_REDUCTION, SKIP_CARD, STORE_ALWAYS_OPEN, STORE_LADDER, STORE_SLACK,
+    TRAPS, store_prices,
 )
 from .rules import MIN_EXTRA_DRAWS, MIN_WILD_CARDS
 
@@ -159,7 +159,17 @@ def create_all_items(world: Phase10World) -> None:
     # above their floors are not, so sizing power first would spend the
     # store's own locations on Wild Cards and leave the points homeless.
     points = world.store_points
-    itempool += [world.create_item(AP_POINT) for _ in range(points)]
+    # Always open, the store's worst case -- three a slot -- is progression,
+    # so fill puts every point the slots could cost somewhere reachable; that
+    # is what the store's softlock-freedom stands on. The rest is slack and
+    # spending money, and leaving it progression too packed a solo seed tight
+    # enough to fail fill. The ladder keeps every point progression, as it
+    # always has.
+    needed = points
+    if world.store_gating == STORE_ALWAYS_OPEN and points:
+        needed = sum(store_prices(int(world.options.store_slots), STORE_ALWAYS_OPEN))
+    itempool += [world.create_item(AP_POINT) for _ in range(needed)]
+    itempool += [create_surplus(world, AP_POINT) for _ in range(points - needed)]
 
     floors = {"Wild Card": MIN_WILD_CARDS, "Extra Draw": MIN_EXTRA_DRAWS,
               "Hand Size Upgrade": 0, SKIP_CARD: 0}

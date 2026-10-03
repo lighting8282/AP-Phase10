@@ -10,9 +10,10 @@ one job is to make every purchase order legal.
 from collections import Counter
 
 from BaseClasses import ItemClassification
+from Fill import distribute_items_restrictive
 
 from ..data import (
-    AP_POINT, DEFAULT_BUFF_POINTS, MAX_STORE_SLOTS, STORE_ALL_AT_ONCE,
+    AP_POINT, DEFAULT_BUFF_POINTS, MAX_STORE_SLOTS, STORE_ALWAYS_OPEN,
     STORE_LADDER, STORE_PRICES, STORE_SLACK, store_gate,
     store_location_name, store_points, store_prices,
 )
@@ -154,31 +155,64 @@ class TestStoreInATightSeed(Phase10TestBase):
         )
 
 
-class TestStoreAllAtOnce(Phase10TestBase):
-    """`store_gating: all_at_once` in a real world: every slot one point, and
-    one gate for all of them at the store's total."""
+class TestStoreAlwaysOpen(Phase10TestBase):
+    """`store_gating: always_open` in a real world: every slot sellable from the
+    start, priced by what it holds, with the logic waiting for the worst case."""
 
-    options = {"checks_per_phase": 2, "store_slots": 6, "store_gating": "all_at_once"}
+    options = {"checks_per_phase": 2, "store_slots": 6, "store_gating": "always_open"}
 
-    def test_nothing_opens_one_point_short(self) -> None:
+    def test_a_slot_is_in_logic_at_one_slots_worth(self) -> None:
+        """Three points, enough for the dearest single slot."""
         points = self.get_items_by_name(AP_POINT)
-        self.collect(points[:5])
+        self.collect(points[:2])
         for slot in range(1, 7):
             self.assertFalse(self.can_reach_location(store_location_name(slot)), slot)
-
-    def test_everything_opens_together(self) -> None:
-        points = self.get_items_by_name(AP_POINT)
-        self.collect(points[:6])
+        self.collect(points[2])
         for slot in range(1, 7):
             self.assertTrue(self.can_reach_location(store_location_name(slot)), slot)
 
-    def test_the_pool_carries_the_flat_store(self) -> None:
-        pool = Counter(item.name for item in self.multiworld.itempool)
-        self.assertEqual(pool[AP_POINT],
-                         store_points(6, DEFAULT_BUFF_POINTS, STORE_ALL_AT_ONCE))
+    def test_the_pool_carries_the_worst_case_as_progression(self) -> None:
+        """Three a slot, as progression, so fill puts every point the store
+        could cost somewhere reachable. The rest is spending money, `useful`,
+        because leaving it progression packed a solo seed too tight to fill."""
+        points = [i for i in self.multiworld.itempool if i.name == AP_POINT]
+        worst = sum(store_prices(6, STORE_ALWAYS_OPEN))
+        self.assertEqual(sum(i.advancement for i in points), worst)
+        self.assertGreater(len(points), worst)
+        self.assertLessEqual(len(points), store_points(6, DEFAULT_BUFF_POINTS, STORE_ALWAYS_OPEN))
 
     def test_the_clients_are_told_the_shape(self) -> None:
-        self.assertEqual(self.world.fill_slot_data()["store_gating"], STORE_ALL_AT_ONCE)
+        self.assertEqual(self.world.fill_slot_data()["store_gating"], STORE_ALWAYS_OPEN)
+
+    def test_before_fill_every_slot_is_priced_at_the_worst_case(self) -> None:
+        self.assertEqual(self.world.fill_slot_data()["store_prices"], [3] * 6)
+
+    def test_after_fill_each_price_is_its_items(self) -> None:
+        """The whole point: trap or filler 1, useful 2, progression 3, read
+        from what fill actually put in each slot."""
+        distribute_items_restrictive(self.multiworld)
+        prices = self.world.fill_slot_data()["store_prices"]
+        for slot, price in enumerate(prices, start=1):
+            item = self.multiworld.get_location(store_location_name(slot), self.player).item
+            if item.player == self.player and item.name == AP_POINT:
+                expected = 1   # your own point back: change, not a purchase
+            else:
+                expected = 3 if item.advancement else 2 if item.useful else 1
+            self.assertEqual(price, expected, f"slot {slot}: {item.name}")
+
+    def test_your_own_ap_point_costs_one(self) -> None:
+        """Across seeds, every slot holding this world's point costs exactly 1."""
+        seen = 0
+        for seed in range(8):
+            self.world_setup(seed)
+            distribute_items_restrictive(self.multiworld)
+            prices = self.world.fill_slot_data()["store_prices"]
+            for slot, price in enumerate(prices, start=1):
+                item = self.multiworld.get_location(store_location_name(slot), self.player).item
+                if item.player == self.player and item.name == AP_POINT:
+                    seen += 1
+                    self.assertEqual(price, 1, f"seed {seed}, slot {slot}")
+        self.assertGreater(seen, 0, "no seed put a point in the store to check")
 
     def test_the_pool_still_fits(self) -> None:
         self.assertEqual(
@@ -187,21 +221,30 @@ class TestStoreAllAtOnce(Phase10TestBase):
         )
 
 
-class TestStoreAllAtOnceInATightSeed(Phase10TestBase):
-    """Where the ladder trims to five slots, a store of ones pays for itself
-    exactly -- one point, one location -- so the whole store fits."""
+class TestStoreAlwaysOpenInATightSeed(Phase10TestBase):
+    """At one check a phase there is no room for three points a slot, so the
+    store gives way entirely rather than failing the seed."""
 
     options = {"checks_per_phase": 1, "store_slots": MAX_STORE_SLOTS,
-               "store_gating": "all_at_once"}
+               "store_gating": "always_open"}
 
-    def test_the_whole_store_fits(self) -> None:
-        self.assertEqual(int(self.world.options.store_slots), MAX_STORE_SLOTS)
+    def test_the_store_is_dropped(self) -> None:
+        self.assertEqual(int(self.world.options.store_slots), 0)
 
     def test_the_pool_still_fits(self) -> None:
         self.assertEqual(
             len(self.multiworld.get_unfilled_locations(self.player)),
             len(self.multiworld.itempool),
         )
+
+
+class TestTheOldNameMeansAlwaysOpen(Phase10TestBase):
+    """A YAML written for 1.5.0 says all_at_once. It gets the open store."""
+
+    options = {"checks_per_phase": 2, "store_slots": 6, "store_gating": "all_at_once"}
+
+    def test_all_at_once_is_read_as_always_open(self) -> None:
+        self.assertEqual(self.world.store_gating, STORE_ALWAYS_OPEN)
 
 
 class TestStoreLadderIsTheDefault(Phase10TestBase):
