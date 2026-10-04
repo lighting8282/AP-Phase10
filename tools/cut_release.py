@@ -1,4 +1,4 @@
-"""Cut the release: check, build, tag, publish, and clear out the old one.
+"""Cut the release: check, build, tag and publish.
 
 The version is read from `phase10/archipelago.json`, which is the only place
 it lives. Bump it there, merge that, and run this -- nothing here takes a
@@ -18,10 +18,10 @@ one, a local branch behind its remote, a failing check, a tag that already
 exists: each stops the run before anything reaches GitHub, and says which one
 it was.
 
-**Older releases and tags are deleted.** That is the convention for this
-repository -- only the current release should exist -- and it is the whole
-reason this is a script rather than a note in DEVELOPMENT.md, because doing it
-by hand is where the wrong tag gets deleted.
+**Older releases are left alone.** This used to delete every older release
+and its tag once the new one was published, so only the current one existed.
+The repository owner asked to keep them up for now; the code that did it is in
+the history if that changes. The newest release is the one GitHub marks Latest.
 
 Needs the `gh` CLI, authenticated (`gh auth login`). This cannot run from a
 cloud session: that GitHub access is brokered by a proxy which permits commits,
@@ -188,13 +188,6 @@ def make_template() -> pathlib.Path | None:
                      f"published -- fix the above and run this again.")
 
 
-def old_releases(keep: str) -> list[str]:
-    """Every published release tag except the one being cut."""
-    listed = run(["gh", "release", "list", "--limit", "100",
-                  "--json", "tagName", "--jq", ".[].tagName"])
-    return [tag for tag in listed.splitlines() if tag.strip() and tag != keep]
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true",
@@ -230,15 +223,12 @@ def main() -> int:
     run([sys.executable, "tools/build_apworld.py", "--verify", str(ARTIFACT)])
     print(f"  ok   {ARTIFACT.relative_to(ROOT)} built and verified")
 
-    stale = old_releases(tag)
     if args.dry_run:
         print(f"\n--dry-run, so stopping here. Would have:")
         print(f"  tagged {run(['git', 'rev-parse', '--short', 'HEAD'])} as {tag} "
               f"and pushed it")
         print(f"  published {tag} with "
               f"{', '.join(p.name for p in uploads)} attached")
-        for old in stale:
-            print(f"  deleted release {old} and its tag")
         return 0
 
     run(["git", "tag", "-a", tag, "-m", f"AP_10 {version()}"])
@@ -254,13 +244,7 @@ def main() -> int:
          "--title", f"AP_10 {version()}", "--notes", "\n\n".join(notes)])
     print(f"  ok   published {tag}")
 
-    # Last, and only once the new one exists: a failure earlier should leave
-    # the old release standing rather than leave the repository with none.
-    for old in stale:
-        run(["gh", "release", "delete", old, "--yes", "--cleanup-tag"])
-        print(f"  ok   deleted the old release {old} and its tag")
-
-    print(f"\n{tag} is the only release.")
+    print(f"\n{tag} is published; older releases are left as they were.")
     return 0
 
 
