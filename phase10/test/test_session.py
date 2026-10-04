@@ -3,7 +3,9 @@
 import random
 import unittest
 
-from ..client.session import LEAN_DEAL_PENALTY, Phase10Session
+from ..client.session import (
+    LEAN_DEAL_PENALTY, SCORE_TRAP_CYCLE, Phase10Session, read_score_record, score_key,
+)
 from ..data import (
     AP_POINT,
     BASE_HAND_SIZE, EXTRA_DRAW, HAND_SIZE_UPGRADE, LEAN_DEAL, LOCATION_NAME_TO_ID,
@@ -1011,3 +1013,211 @@ class TestRunEnds(unittest.TestCase):
         s.advance_opponents()
         for phase in s.opponent_phases:
             self.assertLessEqual(phase, s.phase_cap + 1)
+
+
+class TestScoreDeathLink(unittest.TestCase):
+    """DeathLink by round score: one death per `score_threshold` points."""
+
+    def linked(self, score=500, every=500, **slot) -> Phase10Session:
+        s = session(death_link=True, score_threshold=every, **slot)
+        s.game.rounds.append(RoundResult(number=1, phase=1, state=HandState.FAILED,
+                                         score=score, draws_used=6, wilds_used=0,
+                                         skips_played=0))
+        return s
+
+    def test_crossing_the_threshold_sends_one(self) -> None:
+        s = self.linked(score=520)
+        self.assertEqual(s.score_mark_due(), 500)
+        self.assertIsNone(s.score_mark_due(), "the same threshold twice")
+
+    def test_below_it_sends_nothing(self) -> None:
+        self.assertIsNone(self.linked(score=499).score_mark_due())
+
+    def test_at_most_one_per_round(self) -> None:
+        """A round that jumps two thresholds sends one, not a burst."""
+        s = self.linked(score=260, every=100)
+        self.assertEqual(s.score_mark_due(), 200)
+        self.assertIsNone(s.score_mark_due())
+        self.assertEqual(s.next_score_mark, 300)
+
+    def test_an_incoming_death_is_absorbed_not_returned(self) -> None:
+        s = self.linked(score=510)
+        self.assertIsNone(s.score_mark_due(absorb=True))
+        self.assertIsNone(s.score_mark_due(), "absorbed thresholds stay spent")
+        self.assertEqual(s.next_score_mark, 1000)
+
+    def test_score_reduction_pushes_the_next_death_away(self) -> None:
+        s = self.linked(score=490)
+        s.set_items([SCORE_REDUCTION])
+        self.assertEqual(s.total_score, 465)
+        self.assertIsNone(s.score_mark_due())
+        self.assertEqual(s.next_score_mark, 500)
+
+    def test_the_count_survives_a_reconnect(self) -> None:
+        s = self.linked(score=520)
+        s.score_mark_due()
+        fresh = session(death_link=True, score_threshold=500)
+        self.assertTrue(fresh.load_payload(s.to_payload()))
+        self.assertEqual(fresh.score_marks, 1)
+        self.assertIsNone(fresh.score_mark_due(), "a reconnect must not resend")
+
+    def test_an_old_save_is_caught_up_not_replayed(self) -> None:
+        """A run already past several thresholds sends nothing on upgrade."""
+        s = self.linked(score=1240)
+        payload = s.to_payload()
+        del payload["score_marks"]
+        fresh = session(death_link=True, score_threshold=500)
+        self.assertTrue(fresh.load_payload(payload))
+        self.assertEqual(fresh.score_marks, 2)
+        self.assertIsNone(fresh.score_mark_due())
+
+    def test_the_setting_is_read_and_held_to_its_range(self) -> None:
+        for given, expected in ((250, 250), (50, 100), (5000, 1000), ("x", 500), (None, 500)):
+            slot = {} if given is None else {"score_threshold": given}
+            self.assertEqual(session(**slot).score_threshold, expected, given)
+
+
+def with_rounds(s: Phase10Session, *scores: int, went_out: int = 0) -> Phase10Session:
+    """Append finished rounds: the given failed scores, then `went_out` rounds
+    of going out."""
+    n = len(s.game.rounds)
+    for score in scores:
+        n += 1
+        s.game.rounds.append(RoundResult(number=n, phase=1, state=HandState.FAILED,
+                                         score=score, draws_used=6, wilds_used=0,
+                                         skips_played=0))
+    for _ in range(went_out):
+        n += 1
+        s.game.rounds.append(RoundResult(number=n, phase=1, state=HandState.WENT_OUT,
+                                         score=0, draws_used=6, wilds_used=0,
+                                         skips_played=0))
+    return s
+
+
+class TestScoreTraps(unittest.TestCase):
+    """Passing a threshold sets off one of your own traps on the next hand."""
+
+    def trapped(self, **slot) -> Phase10Session:
+        return session(score_traps=True, score_threshold=100, **slot)
+
+    def test_traps_take_turns(self) -> None:
+        s = self.trapped()
+        seen = []
+        for _ in range(4):
+            with_rounds(s, 100)
+            s.score_mark_due()
+            seen.append(s.last_score_trap)
+        self.assertEqual(seen, [LEAN_DEAL, WILD_THEFT, LEAN_DEAL, WILD_THEFT])
+        self.assertEqual(SCORE_TRAP_CYCLE, (LEAN_DEAL, WILD_THEFT))
+
+    def test_a_trap_hits_the_next_hand_and_is_spent_by_it(self) -> None:
+        s = self.trapped()
+        s.set_items([PHASE_UNLOCK.format(1)])
+        normal = s.config.hand_size
+        with_rounds(s, 120)
+        s.score_mark_due()
+        self.assertEqual(s.pending(LEAN_DEAL), 1)
+        self.assertEqual(s.config.hand_size, normal - LEAN_DEAL_PENALTY)
+        s.start_hand(1)
+        self.assertEqual(s.pending(LEAN_DEAL), 0)
+
+    def test_it_adds_to_traps_received(self) -> None:
+        s = self.trapped()
+        s.set_items([LEAN_DEAL])
+        with_rounds(s, 100)
+        s.score_mark_due()
+        self.assertEqual(s.pending(LEAN_DEAL), 2)
+
+    def test_off_means_off(self) -> None:
+        s = session(score_traps=False, score_threshold=100)
+        with_rounds(s, 300)
+        s.score_mark_due()
+        self.assertIsNone(s.last_score_trap)
+        self.assertEqual(s.pending(LEAN_DEAL), 0)
+
+    def test_without_death_link_it_still_fires(self) -> None:
+        s = self.trapped(death_link=False)
+        with_rounds(s, 150)
+        self.assertEqual(s.score_mark_due(), 100)
+        self.assertEqual(s.last_score_trap, LEAN_DEAL)
+
+    def test_an_incoming_death_sets_off_no_trap(self) -> None:
+        s = self.trapped()
+        with_rounds(s, 150)
+        s.score_mark_due(absorb=True)
+        self.assertIsNone(s.last_score_trap)
+        self.assertEqual(s.score_traps_fired, 0)
+
+    def test_fired_traps_survive_a_reconnect(self) -> None:
+        s = self.trapped()
+        with_rounds(s, 250)
+        s.score_mark_due()
+        fresh = self.trapped()
+        self.assertTrue(fresh.load_payload(s.to_payload()))
+        self.assertEqual(fresh.score_traps_fired, 1)
+        self.assertEqual(fresh.pending(LEAN_DEAL), 1)
+
+    def test_the_option_is_read(self) -> None:
+        self.assertTrue(session(score_traps=True).score_traps)
+        self.assertFalse(session().score_traps)
+
+
+class TestCardPointsFromGoingOut(unittest.TestCase):
+    """Going out earns one point to spend on one-use cards, and only on them."""
+
+    def test_one_per_round_gone_out(self) -> None:
+        s = with_rounds(session(store_slots=6), 40, 5, went_out=3)
+        self.assertEqual(s.card_points_earned, 3)
+
+    def test_they_add_to_the_card_budget_not_to_slot_money(self) -> None:
+        s = with_rounds(session(store_slots=6), went_out=2)
+        s.set_items([AP_POINT] * 3)
+        self.assertEqual(s.points_left, 3)
+        self.assertEqual(s.buff_points_left, 2, "slots still owe their prices")
+
+    def test_they_are_spent_before_ap_points(self) -> None:
+        s = with_rounds(session(store_slots=6), went_out=2)
+        s.set_items([AP_POINT] * 3 + [PHASE_UNLOCK.format(1)])
+        s.start_hand(1)
+        s.buy_buff(BUFF_WILD)
+        self.assertEqual(s.points_left, 3, "a Wild paid from earned points")
+        self.assertEqual(s.buff_points_left, 0)
+
+    def test_buying_cards_can_never_strand_a_slot(self) -> None:
+        """Exhaustive over earned points, AP Points and purchase order: cards
+        never take AP Points the unbought slots are owed."""
+        for earned in range(0, 5):
+            for points in range(0, 14):
+                for first, second in ((BUFF_WILD, BUFF_SKIP), (BUFF_SKIP, BUFF_WILD)):
+                    s = with_rounds(session(store_slots=6), went_out=earned)
+                    s.set_items([AP_POINT] * points + [PHASE_UNLOCK.format(1)])
+                    s.start_hand(1)
+                    floor = min(s.points_left, s.points_reserved)
+                    for buff in [first, second] * 6:
+                        if s.can_buy_buff(buff) is None:
+                            s.buy_buff(buff)
+                    self.assertGreaterEqual(s.points_left, floor, (earned, points, first))
+
+
+class TestPublicScore(unittest.TestCase):
+    """What the other AP_10 players see of a run, and reading theirs."""
+
+    def test_the_record_is_score_won_and_cleared(self) -> None:
+        s = with_rounds(session(), 40, went_out=2)
+        record = s.score_record()
+        self.assertEqual(record, {"score": 40, "won": 2, "cleared": len(s.cleared_phases)})
+
+    def test_a_record_reads_back(self) -> None:
+        self.assertEqual(read_score_record({"score": 5, "won": 1, "cleared": 1, "x": 9}),
+                         {"score": 5, "won": 1, "cleared": 1})
+
+    def test_anything_else_is_refused(self) -> None:
+        """It arrives from a client this one does not control."""
+        for bad in (None, [], "5", {}, {"score": 5, "won": 1},
+                    {"score": -1, "won": 0, "cleared": 0},
+                    {"score": True, "won": 0, "cleared": 0},
+                    {"score": "5", "won": 0, "cleared": 0}):
+            self.assertIsNone(read_score_record(bad), repr(bad))
+
+    def test_the_key_names_team_and_slot(self) -> None:
+        self.assertEqual(score_key(0, 3), "phase10_score_0_3")

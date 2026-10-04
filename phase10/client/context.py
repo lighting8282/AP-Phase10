@@ -30,7 +30,7 @@ from ..data import (
 from ..game.autoplay import play_out
 from ..game.engine import SORT_BY_COLOR, SORT_BY_RANK, HandState
 from ..game.phases import PHASES, describe_meld, phase_description
-from .session import Phase10Session
+from .session import Phase10Session, read_score_record, score_key
 
 
 def render_hand(hand) -> str:
@@ -75,6 +75,18 @@ class Phase10CommandProcessor(ClientCommandProcessor):
                 mark = "  --"
             self.output(f"  {mark}  Phase {phase:>2}: {phase_description(phase)}")
 
+    def _cmd_scores(self) -> None:
+        """Your score beside the other AP_10 players in the room."""
+        mine = self.ctx.session.score_record()
+        self.output(f"You: {mine['score']} pts, {mine['cleared']} cleared, {mine['won']} won")
+        if not self.ctx.rivals:
+            self.output("Nobody else in this room is playing AP_10.")
+            return
+        for name, record in sorted(self.ctx.rivals.values(),
+                                   key=lambda r: r[1]["score"] if r[1] else float("inf")):
+            self.output(f"{name}: {record['score']} pts, {record['cleared']} cleared, "
+                        f"{record['won']} won" if record else f"{name}: not started")
+
     def _cmd_status(self) -> None:
         """Show the deck and draw budget your items have built."""
         s = self.ctx.session
@@ -90,6 +102,8 @@ class Phase10CommandProcessor(ClientCommandProcessor):
         self.output(
             f"round {s.game.round_number} | {s.hands_won} won | "
             f"{s.total_score} points (lower is better)"
+            + (f" | next score mark {s.next_score_mark}"
+               if s.death_link or s.score_traps else "")
         )
         if s.mulligans_left or s.score_reduction:
             self.output(
@@ -340,7 +354,9 @@ class Phase10CommandProcessor(ClientCommandProcessor):
         reserved = s.points_reserved
         held = (f"  ({reserved} held for the {s.slots_left} slot(s) left)"
                 if reserved else "")
-        self.output(f"One-use cards: {budget} point(s) to spend{held}")
+        earned = s.card_points_earned
+        from_play = f", {earned} earned by going out" if earned else ""
+        self.output(f"One-use cards: {budget} point(s) to spend{held}{from_play}")
         for buff in BUFFS:
             refusal = s.can_buy_buff(buff)
             mark = "  --" if refusal else " buy"
@@ -511,12 +527,17 @@ class Phase10Context(CommonContext):
         # with the empty one we just built from slot_data.
         self.restore_state = "needed"
         self.save_pending = False
-        self.death_link_pending = False
+        #: Deaths owed to the room, by the score threshold that earned each.
+        #: A list, not a flag: a /grind can cross two before the loop sends.
+        self.score_deaths_pending: list[int] = []
         self.tags_pending = False
         #: What each store slot is holding, by location id, once the room has
         #: been asked. Empty until the scout lands, and the store reads that as
         #: "not known yet" rather than as "nothing there".
         self.store_stock: dict[int, dict[str, Any]] = {}
+        #: The other AP_10 players in the room, by slot: (name, the score
+        #: record they last published or None). Empty when alone.
+        self.rivals: dict[int, tuple[str, dict | None]] = {}
 
     @property
     def save_key(self) -> str:
@@ -540,13 +561,39 @@ class Phase10Context(CommonContext):
             self.tags_pending = self.session.death_link
             self.sync_items()
             self.scout_store()
+            self.watch_rivals()
             logger.info("Connected. /phases to see what you can play, /play <n> to start.")
         elif cmd == "ReceivedItems":
             self.sync_items()
         elif cmd == "LocationInfo":
             self.read_store_stock(args.get("locations", []))
         elif cmd == "Retrieved":
-            self.restore_from(args.get("keys", {}))
+            keys = args.get("keys", {})
+            self.restore_from(keys)
+            self.read_rivals(keys)
+        elif cmd == "SetReply":
+            self.read_rivals({args.get("key"): args.get("value")})
+
+    def watch_rivals(self) -> None:
+        """Read the other AP_10 players' published scores, and ask to be told
+        when they change. Each client writes a small public record beside its
+        private save; a player who has not played yet has none."""
+        self.rivals = {
+            slot: (info.name, None)
+            for slot, info in self.slot_info.items()
+            if info.game == GAME_NAME and slot != self.slot
+        }
+        if not self.rivals:
+            return
+        keys = [score_key(self.team, slot) for slot in self.rivals]
+        async_start(self.send_msgs([{"cmd": "Get", "keys": keys},
+                                    {"cmd": "SetNotify", "keys": keys}]))
+
+    def read_rivals(self, keys: dict[str, Any]) -> None:
+        for slot, (name, _) in list(self.rivals.items()):
+            key = score_key(self.team, slot)
+            if key in keys:
+                self.rivals[slot] = (name, read_score_record(keys[key]))
 
     def scout_store(self) -> None:
         """Ask the room what each store slot is holding.
@@ -631,7 +678,6 @@ class Phase10Context(CommonContext):
 
     def settle(self, hand, quiet: bool = False, send_death: bool = True) -> None:
         """Finish a hand and queue whatever checks it earned."""
-        died = hand.state is HandState.FAILED
         # Read before finish_hand, which takes the hand off the game.
         lost_to = None
         if hand.events and hand.events[-1].kind == "hand_failed":
@@ -647,8 +693,17 @@ class Phase10Context(CommonContext):
         if new:
             self.pending_locations.extend(new)
         self.save_pending = True
-        if died and send_death and self.session.death_link:
-            self.death_link_pending = True
+        # DeathLink goes out by score, not by losing: every `score_threshold`
+        # points of round score sends one. A hand an incoming death ended is
+        # absorbed instead, or linked players could bounce deaths forever.
+        s = self.session
+        if s.death_link or s.score_traps:
+            reached = s.score_mark_due(absorb=not send_death)
+            if reached is not None and s.death_link:
+                self.score_deaths_pending.append(reached)
+            if s.last_score_trap and not quiet:
+                logger.info(f"Your score passed {reached}: {s.last_score_trap} "
+                            f"will hit your next hand.")
 
     def report_table(self) -> None:
         """Read out what the seats did since anybody last looked.
@@ -681,9 +736,10 @@ class Phase10Context(CommonContext):
                 self.tags_pending = False
                 await self.update_death_link(self.session.death_link)
 
-            if connected and self.death_link_pending:
-                self.death_link_pending = False
-                await self.send_death(f"{self.player_names.get(self.slot, 'A player')} ran out of draws.")
+            while connected and self.score_deaths_pending:
+                reached = self.score_deaths_pending.pop(0)
+                name = self.player_names.get(self.slot, "A player")
+                await self.send_death(f"{name} reached {reached} points.")
 
             if connected and self.restore_state == "needed":
                 self.restore_state = "requested"
@@ -698,6 +754,15 @@ class Phase10Context(CommonContext):
                     "want_reply": False,
                     "operations": [
                         {"operation": "replace", "value": self.session.to_payload()}
+                    ],
+                }, {
+                    # The public half: what the other AP_10 players see.
+                    "cmd": "Set",
+                    "key": score_key(self.team, self.slot),
+                    "default": {},
+                    "want_reply": False,
+                    "operations": [
+                        {"operation": "replace", "value": self.session.score_record()}
                     ],
                 }])
 

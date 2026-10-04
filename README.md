@@ -68,6 +68,9 @@ Same page. Put in the server address, your slot name and any password, and
 press **Connect**. Your phases, wilds, draws and skips arrive as Archipelago
 items, and your cleared phases send checks.
 
+If anybody else in the room is playing AP_10, their score, rounds won and
+phases cleared show under yours, updated as they play.
+
 Works on a phone.
 
 ### From the Archipelago launcher
@@ -93,6 +96,7 @@ plays through commands in the client console:
     /buy skip   buy a One-Use Skip into your hand
     /table      what the opponents have down
     /score      the scorecard: recent rounds and the running total
+    /scores     your score beside the other AP_10 players in the room
     /auto       play the current hand out with the built-in player
     /grind <n> [k]  autoplay k rounds of phase n
 
@@ -114,7 +118,7 @@ game: AP_10
 requires:
   version: 0.6.7
   game:
-    AP_10: 1.6.0
+    AP_10: 1.7.0
 ```
 
 A seed is generated against one version of the world. After updating, generate
@@ -269,13 +273,15 @@ explanation; these are the ones that change the shape of a run most.
 | `store_buff_points` | 8 | Spending money for the store's one-use cards; 0 for none |
 | `starting_phases` | 2 | How many phases you open with |
 | `opponents` | 3 | Computer players at the table; 0 for the pure solo game |
-| `starting_draws` | 4 | Draws per hand before Extra Draw items |
+| `starting_draws` | 6 | Draws per hand before Extra Draw items |
 | `extra_draw_items` | 5 | Extra Draw items in the pool |
 | `wild_card_items` | 8 | Wilds put back into the deck, which starts with none |
 | `skip_card_items` | 4 | Skips dealt into your hand each round |
 | `hand_size_upgrades` | 2 | Extra cards dealt each round |
 | `trap_chance` | 0 | Percentage of filler replaced by traps |
-| `death_link` | off | A death is a lost hand |
+| `death_link` | off | Every `score_threshold` points of round score sends a death; one received costs your current hand |
+| `score_threshold` | 500 | Points of round score that set off `death_link` and `score_traps`, 100–1000; about 30 points a round |
+| `score_traps` | off | Each `score_threshold` points also sets off one of your own traps on your next hand |
 
 ## Items and locations
 
@@ -315,9 +321,14 @@ unbought slots still cost and only lets you spend what is left over, so no
 amount of buying can strand a location. `store_buff_points` sets how much
 spending money the seed carries beyond the slots; 0 turns the cards off.
 
+**Going out earns spending money too:** every round you finish with an empty
+hand gives you one point for the one-use cards, about one round in five. Those
+points only buy cards, never a slot.
+
 **Filler.** A **Mulligan** throws back a dead opening hand before your first
 draw. A **Score Reduction** takes 25 points off your total, which is what a
-Wild left in your hand costs you.
+Wild left in your hand costs you — and so pushes your next `score_threshold`
+further away.
 
 **Traps**, when enabled: **Phase Lock** pins you to the phase you just lost,
 **Lean Deal** costs you two cards on one hand, **Wild Theft** takes a wild out
@@ -402,9 +413,8 @@ Packaging:
     python tools/cut_release.py                            # and do it
 
 `cut_release.py` takes the version from `phase10/archipelago.json`, runs the
-whole battery, builds and verifies the apworld, tags, publishes, and then
-retires every older release and tag -- only the current one should exist. It
-needs the `gh` CLI and refuses on a dirty tree, the wrong branch, a branch that
+whole battery, builds and verifies the apworld, tags and publishes. Older
+releases are left up. It needs the `gh` CLI and refuses on a dirty tree, the wrong branch, a branch that
 is not level with origin, a failing check, or a tag that already exists.
 
 It attaches two files: the apworld, and the YAML options template when

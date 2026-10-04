@@ -19,13 +19,38 @@ import {
   WILD_THEFT, milestoneLocationName, phaseLocationName, phaseUnlock,
   buffPrice, storeGate, storeLocationName, storePrices,
   STORE_ALL_AT_ONCE, STORE_ALWAYS_OPEN, STORE_GATINGS, STORE_LADDER, PRICE_PROGRESSION,
-} from "./data.js?v=fc5b86ab";
-import { SKIP, STOCK_WILDS, WILD } from "./cards.js?v=fc5b86ab";
-import { HAND_STATE, Table, gameConfig } from "./engine.js?v=fc5b86ab";
-import { MID, NAMES as OPPONENT_NAMES, buildOpponents } from "./opponents.js?v=fc5b86ab";
-import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js?v=fc5b86ab";
+  DEFAULT_SCORE_THRESHOLD, MAX_SCORE_THRESHOLD, MIN_SCORE_THRESHOLD,
+} from "./data.js?v=77099614";
+import { SKIP, STOCK_WILDS, WILD } from "./cards.js?v=77099614";
+import { HAND_STATE, Table, gameConfig } from "./engine.js?v=77099614";
+import { MID, NAMES as OPPONENT_NAMES, buildOpponents } from "./opponents.js?v=77099614";
+import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js?v=77099614";
 
 export const LEAN_DEAL_PENALTY = 2;
+
+/** The traps a score threshold sets off, in turn. See session.py. */
+export const SCORE_TRAP_CYCLE = Object.freeze([LEAN_DEAL, WILD_THEFT]);
+
+/**
+ * Data Storage key for a slot's public score, which every AP_10 client in the
+ * room writes and the others read. Mirrors score_key in session.py.
+ */
+export const scoreKey = (team, slot) => `phase10_score_${team}_${slot}`;
+
+/** Another player's published score, or null if it is not one. */
+export function readScoreRecord(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const fields = ["score", "won", "cleared"];
+  if (!fields.every((f) => Number.isInteger(value[f]) && value[f] >= 0)) return null;
+  return Object.fromEntries(fields.map((f) => [f, value[f]]));
+}
+
+/** The DeathLink threshold, held to the option's range; absent is the default. */
+function readScoreThreshold(slotData) {
+  const value = slotData.score_threshold ?? DEFAULT_SCORE_THRESHOLD;
+  if (!Number.isInteger(value)) return DEFAULT_SCORE_THRESHOLD;
+  return Math.min(MAX_SCORE_THRESHOLD, Math.max(MIN_SCORE_THRESHOLD, value));
+}
 
 /** The always-open prices from slot data, or null if absent or malformed. */
 function readSlotPrices(slotData) {
@@ -67,6 +92,18 @@ export class Phase10Session {
     //: ended by a seat -- an opponent finishing is not an Archipelago notion.
     this.raceToEnd = opts.raceToEnd ?? false;
     this.deathLink = opts.deathLink ?? false;
+    //: Every this many points of round score sends one DeathLink death.
+    this.scoreThreshold = opts.scoreThreshold ?? DEFAULT_SCORE_THRESHOLD;
+    //: Thresholds already accounted for -- sent, or absorbed by a hand an
+    //: incoming death took. A saved high-water mark, so a reload or a switch
+    //: of client never sends one twice.
+    this.scoreMarks = 0;
+    //: Whether passing a threshold also sets off one of your own traps.
+    this.scoreTraps = opts.scoreTraps ?? false;
+    //: How many score traps have gone off. Saved; the cycle says which each was.
+    this.scoreTrapsFired = 0;
+    //: The trap the last threshold set off, for the client to announce.
+    this.lastScoreTrap = null;
     this.opponents = opts.opponents ?? 3;
 
     this.items = new Map();
@@ -104,6 +141,8 @@ export class Phase10Session {
       skipsInDeck: Number(slotData.skips_in_deck ?? 0),
       raceToEnd: Boolean(slotData.race_to_end ?? false),
       deathLink: Boolean(slotData.death_link ?? false),
+      scoreThreshold: readScoreThreshold(slotData),
+      scoreTraps: Boolean(slotData.score_traps ?? false),
       opponents: Number(slotData.opponents ?? 3),
       game: game ?? new Phase10Game(),
     });
@@ -137,6 +176,38 @@ export class Phase10Session {
     return Math.max(0, this.game.totalScore - this.scoreReduction);
   }
 
+  // -- DeathLink by score -----------------------------------------------------
+  /** The total score at which the next death goes out. */
+  get nextScoreMark() {
+    return (this.scoreMarks + 1) * this.scoreThreshold;
+  }
+
+  /**
+   * Whether the score has crossed a new threshold; marks it handled. Returns
+   * the threshold reached when a death should go out now, else null. At most
+   * one per call, which is one per round. `absorb` marks without sending, for
+   * a hand an incoming death ended. A high-water mark: Score Reduction pushes
+   * the next death further away. Mirrors score_mark_due in session.py.
+   */
+  scoreMarkDue({ absorb = false } = {}) {
+    this.lastScoreTrap = null;
+    const crossed = Math.floor(this.totalScore / this.scoreThreshold);
+    if (crossed <= this.scoreMarks) return null;
+    this.scoreMarks = crossed;
+    if (absorb) return null;
+    if (this.scoreTraps) {
+      this.lastScoreTrap = SCORE_TRAP_CYCLE[this.scoreTrapsFired % SCORE_TRAP_CYCLE.length];
+      this.scoreTrapsFired += 1;
+    }
+    return crossed * this.scoreThreshold;
+  }
+
+  // -- the public score -----------------------------------------------------
+  /** What the other AP_10 players see of this run. */
+  scoreRecord() {
+    return { score: this.totalScore, won: this.handsWon, cleared: this.clearedPhases.size };
+  }
+
   // -- items ---------------------------------------------------------------
   /** Counter semantics: absent means zero, never undefined. */
   count(name) {
@@ -156,7 +227,15 @@ export class Phase10Session {
   }
 
   pending(trap) {
-    return Math.max(0, this.count(trap) - (this.consumedTraps.get(trap) ?? 0));
+    return Math.max(0, this.trapCount(trap) - (this.consumedTraps.get(trap) ?? 0));
+  }
+
+  /** Traps of this kind received, plus those your score set off. */
+  trapCount(trap) {
+    const turn = SCORE_TRAP_CYCLE.indexOf(trap);
+    if (turn < 0) return this.count(trap);
+    const n = SCORE_TRAP_CYCLE.length;
+    return this.count(trap) + Math.max(0, Math.floor((this.scoreTrapsFired - turn + n - 1) / n));
   }
 
   get unlockedPhases() {
@@ -223,7 +302,16 @@ export class Phase10Session {
     for (const slot of this.boughtSlots) {
       if (slot >= 1 && slot <= this.storeSlots) spent += this.storePrice(slot);
     }
-    return spent + this.buffPointsSpent;
+    // Cards spend earned points first; only the rest comes out of AP Points.
+    return spent + Math.max(0, this.buffPointsSpent - this.cardPointsEarned);
+  }
+
+  /**
+   * One per round you went out in. Card money only, derived from the
+   * scorecard so both clients agree. Mirrors card_points_earned in session.py.
+   */
+  get cardPointsEarned() {
+    return this.game.rounds.filter((r) => r.state === HAND_STATE.WENT_OUT).length;
   }
 
   get buffPointsSpent() {
@@ -257,9 +345,13 @@ export class Phase10Session {
     return left;
   }
 
-  /** Points you may spend on a card rather than a check. */
+  /**
+   * Points you may spend on a card rather than a check: earned points not yet
+   * spent, plus AP Points beyond what the unbought slots owe.
+   */
   get buffPointsLeft() {
-    return Math.max(0, this.pointsLeft - this.pointsReserved);
+    const earnedLeft = Math.max(0, this.cardPointsEarned - this.buffPointsSpent);
+    return earnedLeft + Math.max(0, this.pointsLeft - this.pointsReserved);
   }
 
   get pointsLeft() {
@@ -623,6 +715,8 @@ export class Phase10Session {
       // would be free to anybody willing to refresh the page.
       buffs_bought: Object.fromEntries(this.buffsBought),
       locked_phase: this.lockedPhase,
+      score_marks: this.scoreMarks,
+      score_traps_fired: this.scoreTrapsFired,
     };
   }
 
@@ -683,6 +777,15 @@ export class Phase10Session {
         }
       }
     }
+
+    // Absent in saves written before deaths were sent by score. Caught up
+    // rather than zeroed, so an update never sends a surprise death.
+    const sent = payload.score_marks;
+    this.scoreMarks = Number.isInteger(sent) && sent >= 0
+      ? sent : Math.floor(this.totalScore / this.scoreThreshold);
+
+    const fired = payload.score_traps_fired;
+    this.scoreTrapsFired = Number.isInteger(fired) && fired >= 0 ? fired : 0;
 
     const locked = payload.locked_phase;
     this.lockedPhase =

@@ -47,6 +47,7 @@ while to find and would be easy to reintroduce.
   - [The rebuyable half](#the-rebuyable-half)
   - [It runs alongside the phases](#it-runs-alongside-the-phases)
 - [The build was not reproducible across platforms](#the-build-was-not-reproducible-across-platforms)
+- [Six starting draws, not four](#six-starting-draws-not-four)
 - [The option help is for choosing, not for showing work](#the-option-help-is-for-choosing-not-for-showing-work)
   - [The template that was not this build's](#the-template-that-was-not-this-builds)
 - [The Skip, in a seed](#the-skip-in-a-seed)
@@ -65,6 +66,7 @@ while to find and would be easy to reintroduce.
   - [Serving it on Pages](#serving-it-on-pages)
 - [Multiworld](#multiworld)
 - [DeathLink](#deathlink)
+  - [Score traps, going-out points, and the other players' scores](#score-traps-going-out-points-and-the-other-players-scores)
 - [A word on the version floor](#a-word-on-the-version-floor)
 - [Packaging](#packaging)
   - [Two things packaging broke that source never would](#two-things-packaging-broke-that-source-never-would)
@@ -870,6 +872,36 @@ The alternative, a `.gitattributes` with `eol=lf`, would fix the checkout
 rather than the builder. That is worth having too, but it only helps people who
 re-clone, and the builder is the thing that must not care.
 
+## Six starting draws, not four
+
+Raised after play-testing found four "way too low". Measured with the
+autoplayer against three MID opponents, 300 rounds per phase:
+
+| draws | easy | medium | hard | easy rounds lost to the draw budget |
+|---|---|---|---|---|
+| 4 | 59% | 20% | 2% | 90% |
+| 5 | 65% | 28% | 4% | 86% |
+| **6** | **72%** | **39%** | **8%** | **76%** |
+| 7 | 73% | 44% | 12% | 63% |
+| 8 | 76% | 51% | 14% | 53% |
+| 10 | 82% | 56% | 29% | 32% |
+
+That is the start of a run, with no Wild Card items yet. At four draws nine
+easy-round losses in ten were the budget, not the table, so a round was a fight
+with the draw limit rather than the game. Four to six is the biggest step per
+draw: medium phases nearly double. Six rather than eight, because past about
+eight the opponents become what ends rounds and Extra Draw items stop buying
+anything; at six, three-quarters of losses are still the budget, so those items
+still matter.
+
+**The logic was not changed.** Its Extra Draw thresholds are fixed counts set
+against four starting draws — medium phases want two, hard ones four, No Wilds
+five. At six they ask for more than the game now needs, which is the safe
+direction: items gate checks a little later than strictly necessary, never
+earlier. Rewriting them as totals (`max(0, total - starting_draws)`) would be
+exact, but it moves the Extra Draw floor with the option and needs the pool
+sizing reworked to match; not done.
+
 ## The option help is for choosing, not for showing work
 
 The YAML template is generated from the option docstrings, so every word in
@@ -1587,20 +1619,80 @@ Pointed at the single-slot set it must fail, and does:
 
 Off by default; `death_link: true` in your YAML turns it on.
 
-A card game has nothing to kill, so a death is **a lost hand**: when someone
-else dies your hand in progress fails on the spot, and when a hand of yours
-runs out of draws everyone linked loses theirs. Between rounds you have nothing
-to lose and an incoming death passes harmlessly -- inventing a penalty a player
-cannot see coming would be worse than letting one through.
+A card game has nothing to kill, so an incoming death is **a lost hand**: when
+someone else dies your hand in progress fails on the spot. Between rounds you
+have nothing to lose and an incoming death passes harmlessly -- inventing a
+penalty a player cannot see coming would be worse than letting one through.
 
-Settling a hand that was killed by a death never sends one back, or two linked
-players would bounce deaths at each other forever.
+**Outgoing deaths go by round score**, not by losing. Every `score_threshold`
+points (100–1000, default 500) sends one. It used to be every hand that ran out
+of draws, which at the old four-draw default was most lost rounds -- a death
+every two or three rounds, far harsher than anybody linked had signed up for.
+Measured at about 32 points a round (a cleared round leaves ~6, a lost one ~60),
+500 is a death every sixteen rounds or so. This also gave the round score a
+purpose in a seed, which it had lacked: it was shown and affected nothing, and
+the Score Reduction filler was dead weight. Now a reduction pushes the next
+death further away.
+
+The rules, the same in both clients (`score_mark_due` / `scoreMarkDue`):
+
+- **A high-water mark, saved.** `score_marks` counts thresholds already
+  handled and travels in the save payload, so a reconnect or a switch between
+  clients never sends one twice. A reduction lowers the total under the mark,
+  so the points have to be earned back before the next death.
+- **At most one per round.** A round that jumps two thresholds at a low setting
+  sends one, not a burst.
+- **Absorbed, not returned.** A hand that an incoming death ended counts its
+  points but sends nothing, or two linked players could bounce deaths at each
+  other for as long as each loss crossed a line.
+- **Old saves catch up.** A save without the count restores it at the current
+  total's threshold, so a run already at 1200 points does not send a surprise
+  death on its first round after the update.
+
+The browser leaves a threshold owed while disconnected and sends it on the next
+settled round; the Python client queues it and sends on reconnect.
 
 The semantics live in the session (`kill_hand` / `killHand`), not in either
 client, so the desktop and browser versions cannot disagree about what a death
 does. Verified live in both directions and across both clients: a third client
 sent a death and the browser lost its hand; the browser then lost a hand of its
 own and the Python client, holding one open, lost that.
+
+### Score traps, going-out points, and the other players' scores
+
+Three more uses for the round score, built together.
+
+**Score traps.** `score_traps` makes each `score_threshold` also set off one of
+your own traps on your next hand: Lean Deal, then Wild Theft, in turn. It shares
+DeathLink's threshold and its saved high-water mark, so one setting drives both
+and they stack when both are on. A fired trap simply adds to that trap's count,
+so it goes through exactly the code a received Lean Deal does; the count of
+fired traps is saved, and which trap each was follows from the count. A hand an
+incoming death ended sets off nothing, for the same reason it sends nothing.
+Phase Lock is left out of the cycle: it waits for a later *lost* hand, which
+would read as unrelated to the score that caused it.
+
+**Going out earns card money.** Each round finished with an empty hand gives
+one point to spend on one-use cards — derived from the scorecard, not saved, so
+both clients agree by construction. Measured at six draws against three
+opponents: going out is 21% of rounds, while "at or under ten points" was 45%,
+which would have been nearly free money. Earned points are spent before AP
+Points and never count toward a slot, so — tested exhaustively over earned
+points, AP Points and purchase order — cards still can never take what an
+unbought slot is owed.
+
+**The other AP_10 players.** Each client publishes a small record (score,
+rounds won, phases cleared) to its own Data Storage key, `phase10_score_<team>_<slot>`,
+beside the private save, and watches everyone else's with `SetNotify`. The
+browser shows them under the summary line; the Python client has `/scores`.
+Records from other clients are untrusted input and checked field by field.
+
+**Proved against a real server.** `tools/check_live_room.py` generates a
+two-player seed, hosts it with `MultiServer.py`, plays both seats with the
+browser client and reads the room with the Python client. Its first run caught
+a bug no unit test could: the browser client saved *before* marking a threshold
+handled, so after a reconnect the next round resent the death and refired the
+trap. It also confirmed the two clients read each other's scores.
 
 ## A word on the version floor
 

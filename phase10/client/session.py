@@ -13,6 +13,9 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..data import (
+    DEFAULT_SCORE_THRESHOLD,
+    MAX_SCORE_THRESHOLD,
+    MIN_SCORE_THRESHOLD,
     AP_POINT,
     BASE_HAND_SIZE,
     BUFF_PRICES,
@@ -57,6 +60,41 @@ TRAP_NAMES = (PHASE_LOCK, LEAN_DEAL, WILD_THEFT)
 
 LEAN_DEAL_PENALTY = 2
 
+#: The traps a score threshold sets off, in turn. Both hit the next hand, so the
+#: cost lands where the points were earned. Phase Lock is left out: it waits for
+#: a later lost hand, which reads as unrelated to the score that caused it.
+SCORE_TRAP_CYCLE = (LEAN_DEAL, WILD_THEFT)
+
+
+def read_score_threshold(slot_data) -> int:
+    """The DeathLink threshold, held to the option's range; absent is the default."""
+    value = slot_data.get("score_threshold", DEFAULT_SCORE_THRESHOLD)
+    if not isinstance(value, int) or isinstance(value, bool):
+        return DEFAULT_SCORE_THRESHOLD
+    return min(MAX_SCORE_THRESHOLD, max(MIN_SCORE_THRESHOLD, value))
+
+
+def score_key(team: int, slot: int) -> str:
+    """Data Storage key for a slot's public score, which every AP_10 client in
+    the room writes and the others read. Separate from the save, which is
+    private and large."""
+    return f"phase10_score_{team}_{slot}"
+
+
+def read_score_record(value) -> dict | None:
+    """Another player's published score, or None if it is not one.
+
+    Arrives over the network from a client this one does not control, so every
+    field is checked rather than trusted.
+    """
+    if not isinstance(value, dict):
+        return None
+    fields = ("score", "won", "cleared")
+    if not all(isinstance(value.get(f), int) and not isinstance(value.get(f), bool)
+               and value.get(f) >= 0 for f in fields):
+        return None
+    return {f: value[f] for f in fields}
+
 
 def read_slot_prices(slot_data) -> list[int] | None:
     """The always-open prices from slot data, or None if absent or malformed."""
@@ -75,6 +113,19 @@ class Phase10Session:
     starting_draws: int = 4
     checks_per_phase: int = 4
     death_link: bool = False
+    #: Every this many points of round score sends one DeathLink death.
+    score_threshold: int = DEFAULT_SCORE_THRESHOLD
+    #: How many of those thresholds are already accounted for -- sent, or
+    #: absorbed by a hand an incoming death took. A high-water mark, saved,
+    #: so a reconnect or a switch of client never sends one twice.
+    score_marks: int = 0
+    #: Whether passing a threshold also sets off one of your own traps.
+    score_traps: bool = False
+    #: How many score traps have gone off. Saved; which trap each was is
+    #: the cycle below, so the count is all either client needs.
+    score_traps_fired: int = 0
+    #: The trap the last threshold set off, for the clients to announce.
+    last_score_trap: str | None = None
     opponents: int = 3
     store_slots: int = 0
     #: "ladder" or "all_at_once". A seed from before the option sends
@@ -129,6 +180,8 @@ class Phase10Session:
             starting_draws=int(slot_data.get("starting_draws", 4)),
             checks_per_phase=int(slot_data.get("checks_per_phase", 4)),
             death_link=bool(slot_data.get("death_link", False)),
+            score_threshold=read_score_threshold(slot_data),
+            score_traps=bool(slot_data.get("score_traps", False)),
             opponents=int(slot_data.get("opponents", 3)),
             store_slots=int(slot_data.get("store_slots", 0)),
             store_gating=(slot_data.get("store_gating")
@@ -172,6 +225,43 @@ class Phase10Session:
         """
         return max(0, self.game.total_score - self.score_reduction)
 
+    # -- DeathLink by score -------------------------------------------------
+    @property
+    def next_score_mark(self) -> int:
+        """The total score at which the next death goes out."""
+        return (self.score_marks + 1) * self.score_threshold
+
+    def score_mark_due(self, *, absorb: bool = False) -> int | None:
+        """Whether the score has crossed a new threshold; marks it handled.
+
+        Returns the threshold reached -- 500, 1000 -- when a death should go
+        out now, else None. At most one per call, which is one per round: a
+        round that jumps two thresholds at a low setting sends one, not a
+        burst. `absorb` marks the threshold without sending, for a hand an
+        incoming death ended -- otherwise two linked players could bounce
+        deaths back and forth for as long as each loss crossed a line.
+
+        The mark is a high-water one. Score Reduction lowers the total, so the
+        next death needs those points earned back before it goes out.
+        """
+        self.last_score_trap = None
+        crossed = self.total_score // self.score_threshold
+        if crossed <= self.score_marks:
+            return None
+        self.score_marks = crossed
+        if absorb:
+            return None
+        if self.score_traps:
+            self.last_score_trap = SCORE_TRAP_CYCLE[self.score_traps_fired % len(SCORE_TRAP_CYCLE)]
+            self.score_traps_fired += 1
+        return crossed * self.score_threshold
+
+    # -- the public score ---------------------------------------------------
+    def score_record(self) -> dict:
+        """What the other AP_10 players see of this run."""
+        return {"score": self.total_score, "won": self.hands_won,
+                "cleared": len(self.cleared_phases)}
+
     # -- items -------------------------------------------------------------
     def set_items(self, item_names: list[str]) -> None:
         """Replace the received-item tally. AP resends the full list, so this
@@ -179,7 +269,15 @@ class Phase10Session:
         self.items = Counter(item_names)
 
     def pending(self, trap: str) -> int:
-        return max(0, self.items[trap] - self.consumed_traps[trap])
+        return max(0, self.trap_count(trap) - self.consumed_traps[trap])
+
+    def trap_count(self, trap: str) -> int:
+        """Traps of this kind received, plus those your score set off."""
+        if trap not in SCORE_TRAP_CYCLE:
+            return self.items[trap]
+        turn = SCORE_TRAP_CYCLE.index(trap)
+        fired = (self.score_traps_fired - turn + len(SCORE_TRAP_CYCLE) - 1) // len(SCORE_TRAP_CYCLE)
+        return self.items[trap] + max(0, fired)
 
     @property
     def unlocked_phases(self) -> set[int]:
@@ -345,10 +443,24 @@ class Phase10Session:
 
     @property
     def points_spent(self) -> int:
+        """AP Points spent: slots, and whatever cards the earned points did
+        not cover."""
         bought = sum(self.store_price(slot)
                      for slot in self.bought_slots
                      if 1 <= slot <= self.store_slots)
-        return bought + self.buff_points_spent
+        return bought + max(0, self.buff_points_spent - self.card_points_earned)
+
+    @property
+    def card_points_earned(self) -> int:
+        """One per round you went out in -- shed your whole hand.
+
+        Spending money for the one-use cards only: they cannot buy a slot, so
+        they cannot change what the logic expects. Derived from the scorecard
+        rather than saved, so both clients agree by construction. Going out
+        rather than a low score, because at or under ten points is nearly
+        every other round (45%) and going out is about one in five.
+        """
+        return sum(1 for r in self.game.rounds if r.state is HandState.WENT_OUT)
 
     @property
     def buff_points_spent(self) -> int:
@@ -371,8 +483,10 @@ class Phase10Session:
 
     @property
     def buff_points_left(self) -> int:
-        """Points you may spend on a card rather than a check."""
-        return max(0, self.points_left - self.points_reserved)
+        """Points you may spend on a card rather than a check: earned points
+        not yet spent, plus AP Points beyond what the unbought slots owe."""
+        earned_left = max(0, self.card_points_earned - self.buff_points_spent)
+        return earned_left + max(0, self.points_left - self.points_reserved)
 
     @property
     def points_left(self) -> int:
@@ -617,6 +731,8 @@ class Phase10Session:
             # cards would be free to anybody willing to restart the client.
             "buffs_bought": dict(self.buffs_bought),
             "locked_phase": self.locked_phase,
+            "score_marks": self.score_marks,
+            "score_traps_fired": self.score_traps_fired,
         }
 
     def load_payload(self, payload: object) -> bool:
@@ -674,6 +790,19 @@ class Phase10Session:
                 name: count for name, count in buffs.items()
                 if name in BUFF_PRICES and isinstance(count, int) and count >= 0
             }
+
+        # Absent in saves written before deaths were sent by score. Caught up
+        # rather than zeroed: a run already at 1200 points should not send a
+        # surprise death the first round after the update.
+        sent = payload.get("score_marks")
+        if isinstance(sent, int) and not isinstance(sent, bool) and sent >= 0:
+            self.score_marks = sent
+        else:
+            self.score_marks = self.total_score // self.score_threshold
+
+        fired = payload.get("score_traps_fired")
+        self.score_traps_fired = (fired if isinstance(fired, int) and not isinstance(fired, bool)
+                                  and fired >= 0 else 0)
 
         locked = payload.get("locked_phase")
         self.locked_phase = (

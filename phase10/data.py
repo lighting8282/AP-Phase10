@@ -210,6 +210,15 @@ BUFFS = [BUFF_WILD, BUFF_SKIP]
 DEFAULT_BUFF_POINTS = 8
 
 
+#: DeathLink by round score: every this many points sends one death. Measured
+#: at about 32 points a round (a cleared round leaves ~6, a lost one ~60), so
+#: 500 is a death every sixteen rounds or so, 100 every three, 1000 every
+#: thirty-two.
+MIN_SCORE_THRESHOLD = 100
+MAX_SCORE_THRESHOLD = 1000
+DEFAULT_SCORE_THRESHOLD = 500
+
+
 def buff_price(buff: str) -> int:
     return BUFF_PRICES[buff]
 

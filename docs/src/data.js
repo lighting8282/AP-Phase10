@@ -143,6 +143,11 @@ export const BUFFS = Object.freeze([BUFF_WILD, BUFF_SKIP]);
 
 export const buffPrice = (buff) => BUFF_PRICES[buff];
 
+/** DeathLink by round score: every this many points sends one death. See data.py. */
+export const MIN_SCORE_THRESHOLD = 100;
+export const MAX_SCORE_THRESHOLD = 1000;
+export const DEFAULT_SCORE_THRESHOLD = 500;
+
 export const phaseLocationName = (phase, tier) => `Phase ${phase} - ${tier}`;
 export const milestoneLocationName = (hands) => `Hands Won: ${hands}`;
 export const storeLocationName = (slot) => `Store Slot ${slot}`;

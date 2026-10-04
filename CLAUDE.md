@@ -72,6 +72,7 @@ about it; that is noise, and AP_10 loads regardless. Tag 0.6.7 is the
 
     AP_ROOT=/path/to/Archipelago python tools/check_store_balance.py
     AP_ROOT=/path/to/Archipelago python tools/check_multiworld.py
+    AP_ROOT=/path/to/Archipelago python tools/check_live_room.py   # a real server, two players
 
 The world's own tests run from the AP root, and that run is the authority:
 
@@ -217,8 +218,9 @@ whatever else is sitting there and the seed is not the one you meant to make.
 
 **Cutting a release:** `python tools/cut_release.py`, which reads the version
 from `phase10/archipelago.json`, runs the battery, builds and verifies the
-apworld, tags, publishes, and *then* deletes every older release and tag —
-only the current one should exist. `--dry-run` says what it would do.
+apworld, tags and publishes. **Older releases stay up** — it used to delete
+them, and the owner asked for that to stop for now; do not delete releases or
+tags unless asked. `--dry-run` says what it would do.
 
 It cannot run from a cloud session. That GitHub access is brokered by a proxy
 which permits commits, branches and pull requests but not tags or releases, so

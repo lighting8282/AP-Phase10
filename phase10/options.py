@@ -2,7 +2,10 @@ from dataclasses import dataclass
 
 from Options import Choice, DeathLink, OptionGroup, PerGameCommonOptions, Range, Toggle
 
-from .data import DEFAULT_BUFF_POINTS, MAX_STORE_SLOTS, PHASE_COUNT
+from .data import (
+    DEFAULT_BUFF_POINTS, DEFAULT_SCORE_THRESHOLD, MAX_SCORE_THRESHOLD, MAX_STORE_SLOTS,
+    MIN_SCORE_THRESHOLD, PHASE_COUNT,
+)
 
 
 class Goal(Choice):
@@ -66,7 +69,7 @@ class StartingDraws(Range):
     display_name = "Starting Draws"
     range_start = 2
     range_end = 12
-    default = 4
+    default = 6
 
 
 class Opponents(Range):
@@ -89,8 +92,8 @@ class ExtraDrawItems(Range):
     How many Extra Draw items go in the pool. Each adds one draw per hand.
 
     Draws stop helping past about eight per hand, so at the default
-    `starting_draws` of 4 only the first few matter. Lower `starting_draws` if
-    you want every one to count.
+    `starting_draws` of 6 only the first two or so matter. Lower
+    `starting_draws` if you want every one to count.
     """
     display_name = "Extra Draw Items"
     range_start = 5
@@ -172,11 +175,39 @@ class Phase10DeathLink(DeathLink):
     """
     Share deaths with the rest of the multiworld.
 
-    There is nothing to kill in a card game, so a death is a lost hand: when
-    someone else dies your current hand fails on the spot, and when a hand of
-    yours runs out of draws everyone linked loses theirs. Between rounds you
-    have nothing to lose, so an incoming death passes harmlessly.
+    You send one every `score_threshold` points of round score -- the points
+    left in your hand when rounds end. Score Reduction items push the next one
+    further away. When someone else dies, your current hand is lost; between
+    rounds there is nothing to lose, so it passes harmlessly.
     """
+
+
+class ScoreThreshold(Range):
+    """
+    How many points of round score set off `death_link` and `score_traps`.
+
+    Each time your running score passes another multiple of this, you send a
+    DeathLink death if `death_link` is on, and one of your own traps hits your
+    next hand if `score_traps` is on. Both can be on.
+
+    A round costs about 30 points on average -- a few when you clear it, about
+    60 when you don't -- so 500 is roughly once every 16 rounds, 100 every 3,
+    and 1000 every 30.
+    """
+    display_name = "Score Threshold"
+    range_start = MIN_SCORE_THRESHOLD
+    range_end = MAX_SCORE_THRESHOLD
+    default = DEFAULT_SCORE_THRESHOLD
+
+
+class ScoreTraps(Toggle):
+    """
+    Each time your score passes `score_threshold`, a trap hits your next hand:
+    Lean Deal (two fewer cards) and Wild Theft (one fewer wild), taking turns.
+
+    A cost for a high score that does not need DeathLink.
+    """
+    display_name = "Score Traps"
 
 
 class TrapChance(Range):
@@ -266,6 +297,8 @@ class Phase10Options(PerGameCommonOptions):
     skip_card_items: SkipCardItems
     trap_chance: TrapChance
     death_link: Phase10DeathLink
+    score_threshold: ScoreThreshold
+    score_traps: ScoreTraps
 
 
 option_groups = [
@@ -274,7 +307,7 @@ option_groups = [
     OptionGroup("Difficulty", [Opponents, StartingDraws, ExtraDrawItems,
                                WildCardItems, HandSizeUpgrades, SkipCardItems,
                                SkipMode]),
-    OptionGroup("Deck", [TrapChance, Phase10DeathLink]),
+    OptionGroup("Deck", [TrapChance, Phase10DeathLink, ScoreThreshold, ScoreTraps]),
 ]
 
 option_presets = {
