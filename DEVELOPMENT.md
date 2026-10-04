@@ -47,6 +47,7 @@ while to find and would be easy to reintroduce.
   - [The rebuyable half](#the-rebuyable-half)
   - [It runs alongside the phases](#it-runs-alongside-the-phases)
 - [The build was not reproducible across platforms](#the-build-was-not-reproducible-across-platforms)
+- [Six starting draws, not four](#six-starting-draws-not-four)
 - [The option help is for choosing, not for showing work](#the-option-help-is-for-choosing-not-for-showing-work)
   - [The template that was not this build's](#the-template-that-was-not-this-builds)
 - [The Skip, in a seed](#the-skip-in-a-seed)
@@ -869,6 +870,36 @@ building one deliberately and watching it fail.
 The alternative, a `.gitattributes` with `eol=lf`, would fix the checkout
 rather than the builder. That is worth having too, but it only helps people who
 re-clone, and the builder is the thing that must not care.
+
+## Six starting draws, not four
+
+Raised after play-testing found four "way too low". Measured with the
+autoplayer against three MID opponents, 300 rounds per phase:
+
+| draws | easy | medium | hard | easy rounds lost to the draw budget |
+|---|---|---|---|---|
+| 4 | 59% | 20% | 2% | 90% |
+| 5 | 65% | 28% | 4% | 86% |
+| **6** | **72%** | **39%** | **8%** | **76%** |
+| 7 | 73% | 44% | 12% | 63% |
+| 8 | 76% | 51% | 14% | 53% |
+| 10 | 82% | 56% | 29% | 32% |
+
+That is the start of a run, with no Wild Card items yet. At four draws nine
+easy-round losses in ten were the budget, not the table, so a round was a fight
+with the draw limit rather than the game. Four to six is the biggest step per
+draw: medium phases nearly double. Six rather than eight, because past about
+eight the opponents become what ends rounds and Extra Draw items stop buying
+anything; at six, three-quarters of losses are still the budget, so those items
+still matter.
+
+**The logic was not changed.** Its Extra Draw thresholds are fixed counts set
+against four starting draws — medium phases want two, hard ones four, No Wilds
+five. At six they ask for more than the game now needs, which is the safe
+direction: items gate checks a little later than strictly necessary, never
+earlier. Rewriting them as totals (`max(0, total - starting_draws)`) would be
+exact, but it moves the Extra Draw floor with the option and needs the pool
+sizing reworked to match; not done.
 
 ## The option help is for choosing, not for showing work
 

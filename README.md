@@ -269,7 +269,7 @@ explanation; these are the ones that change the shape of a run most.
 | `store_buff_points` | 8 | Spending money for the store's one-use cards; 0 for none |
 | `starting_phases` | 2 | How many phases you open with |
 | `opponents` | 3 | Computer players at the table; 0 for the pure solo game |
-| `starting_draws` | 4 | Draws per hand before Extra Draw items |
+| `starting_draws` | 6 | Draws per hand before Extra Draw items |
 | `extra_draw_items` | 5 | Extra Draw items in the pool |
 | `wild_card_items` | 8 | Wilds put back into the deck, which starts with none |
 | `skip_card_items` | 4 | Skips dealt into your hand each round |

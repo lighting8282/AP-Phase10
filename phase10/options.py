@@ -66,7 +66,7 @@ class StartingDraws(Range):
     display_name = "Starting Draws"
     range_start = 2
     range_end = 12
-    default = 4
+    default = 6
 
 
 class Opponents(Range):
@@ -89,8 +89,8 @@ class ExtraDrawItems(Range):
     How many Extra Draw items go in the pool. Each adds one draw per hand.
 
     Draws stop helping past about eight per hand, so at the default
-    `starting_draws` of 4 only the first few matter. Lower `starting_draws` if
-    you want every one to count.
+    `starting_draws` of 6 only the first two or so matter. Lower
+    `starting_draws` if you want every one to count.
     """
     display_name = "Extra Draw Items"
     range_start = 5
