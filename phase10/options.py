@@ -2,7 +2,10 @@ from dataclasses import dataclass
 
 from Options import Choice, DeathLink, OptionGroup, PerGameCommonOptions, Range, Toggle
 
-from .data import DEFAULT_BUFF_POINTS, MAX_STORE_SLOTS, PHASE_COUNT
+from .data import (
+    DEFAULT_BUFF_POINTS, DEFAULT_DEATH_LINK_SCORE, MAX_DEATH_LINK_SCORE, MAX_STORE_SLOTS,
+    MIN_DEATH_LINK_SCORE, PHASE_COUNT,
+)
 
 
 class Goal(Choice):
@@ -172,11 +175,25 @@ class Phase10DeathLink(DeathLink):
     """
     Share deaths with the rest of the multiworld.
 
-    There is nothing to kill in a card game, so a death is a lost hand: when
-    someone else dies your current hand fails on the spot, and when a hand of
-    yours runs out of draws everyone linked loses theirs. Between rounds you
-    have nothing to lose, so an incoming death passes harmlessly.
+    You send one every `death_link_score` points of round score -- the points
+    left in your hand when rounds end. Score Reduction items push the next one
+    further away. When someone else dies, your current hand is lost; between
+    rounds there is nothing to lose, so it passes harmlessly.
     """
+
+
+class DeathLinkScore(Range):
+    """
+    With `death_link` on, how many points of round score send one death.
+
+    A round costs about 30 points on average -- a few when you clear it, about
+    60 when you don't -- so 500 is roughly one death every 16 rounds, 100 one
+    every 3, and 1000 one every 30.
+    """
+    display_name = "Death Link Score"
+    range_start = MIN_DEATH_LINK_SCORE
+    range_end = MAX_DEATH_LINK_SCORE
+    default = DEFAULT_DEATH_LINK_SCORE
 
 
 class TrapChance(Range):
@@ -266,6 +283,7 @@ class Phase10Options(PerGameCommonOptions):
     skip_card_items: SkipCardItems
     trap_chance: TrapChance
     death_link: Phase10DeathLink
+    death_link_score: DeathLinkScore
 
 
 option_groups = [
@@ -274,7 +292,7 @@ option_groups = [
     OptionGroup("Difficulty", [Opponents, StartingDraws, ExtraDrawItems,
                                WildCardItems, HandSizeUpgrades, SkipCardItems,
                                SkipMode]),
-    OptionGroup("Deck", [TrapChance, Phase10DeathLink]),
+    OptionGroup("Deck", [TrapChance, Phase10DeathLink, DeathLinkScore]),
 ]
 
 option_presets = {

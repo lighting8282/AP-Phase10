@@ -13,6 +13,9 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..data import (
+    DEFAULT_DEATH_LINK_SCORE,
+    MAX_DEATH_LINK_SCORE,
+    MIN_DEATH_LINK_SCORE,
     AP_POINT,
     BASE_HAND_SIZE,
     BUFF_PRICES,
@@ -58,6 +61,14 @@ TRAP_NAMES = (PHASE_LOCK, LEAN_DEAL, WILD_THEFT)
 LEAN_DEAL_PENALTY = 2
 
 
+def read_death_link_score(slot_data) -> int:
+    """The DeathLink threshold, held to the option's range; absent is the default."""
+    value = slot_data.get("death_link_score", DEFAULT_DEATH_LINK_SCORE)
+    if not isinstance(value, int) or isinstance(value, bool):
+        return DEFAULT_DEATH_LINK_SCORE
+    return min(MAX_DEATH_LINK_SCORE, max(MIN_DEATH_LINK_SCORE, value))
+
+
 def read_slot_prices(slot_data) -> list[int] | None:
     """The always-open prices from slot data, or None if absent or malformed."""
     prices = slot_data.get("store_prices")
@@ -75,6 +86,12 @@ class Phase10Session:
     starting_draws: int = 4
     checks_per_phase: int = 4
     death_link: bool = False
+    #: Every this many points of round score sends one DeathLink death.
+    death_link_score: int = DEFAULT_DEATH_LINK_SCORE
+    #: How many of those thresholds are already accounted for -- sent, or
+    #: absorbed by a hand an incoming death took. A high-water mark, saved,
+    #: so a reconnect or a switch of client never sends one twice.
+    score_deaths: int = 0
     opponents: int = 3
     store_slots: int = 0
     #: "ladder" or "all_at_once". A seed from before the option sends
@@ -129,6 +146,7 @@ class Phase10Session:
             starting_draws=int(slot_data.get("starting_draws", 4)),
             checks_per_phase=int(slot_data.get("checks_per_phase", 4)),
             death_link=bool(slot_data.get("death_link", False)),
+            death_link_score=read_death_link_score(slot_data),
             opponents=int(slot_data.get("opponents", 3)),
             store_slots=int(slot_data.get("store_slots", 0)),
             store_gating=(slot_data.get("store_gating")
@@ -171,6 +189,31 @@ class Phase10Session:
         cost -- a reduction forgives points, it does not rewrite history.
         """
         return max(0, self.game.total_score - self.score_reduction)
+
+    # -- DeathLink by score -------------------------------------------------
+    @property
+    def next_score_death(self) -> int:
+        """The total score at which the next death goes out."""
+        return (self.score_deaths + 1) * self.death_link_score
+
+    def score_death_due(self, *, absorb: bool = False) -> int | None:
+        """Whether the score has crossed a new threshold; marks it handled.
+
+        Returns the threshold reached -- 500, 1000 -- when a death should go
+        out now, else None. At most one per call, which is one per round: a
+        round that jumps two thresholds at a low setting sends one, not a
+        burst. `absorb` marks the threshold without sending, for a hand an
+        incoming death ended -- otherwise two linked players could bounce
+        deaths back and forth for as long as each loss crossed a line.
+
+        The mark is a high-water one. Score Reduction lowers the total, so the
+        next death needs those points earned back before it goes out.
+        """
+        crossed = self.total_score // self.death_link_score
+        if crossed <= self.score_deaths:
+            return None
+        self.score_deaths = crossed
+        return None if absorb else crossed * self.death_link_score
 
     # -- items -------------------------------------------------------------
     def set_items(self, item_names: list[str]) -> None:
@@ -617,6 +660,7 @@ class Phase10Session:
             # cards would be free to anybody willing to restart the client.
             "buffs_bought": dict(self.buffs_bought),
             "locked_phase": self.locked_phase,
+            "score_deaths": self.score_deaths,
         }
 
     def load_payload(self, payload: object) -> bool:
@@ -674,6 +718,15 @@ class Phase10Session:
                 name: count for name, count in buffs.items()
                 if name in BUFF_PRICES and isinstance(count, int) and count >= 0
             }
+
+        # Absent in saves written before deaths were sent by score. Caught up
+        # rather than zeroed: a run already at 1200 points should not send a
+        # surprise death the first round after the update.
+        sent = payload.get("score_deaths")
+        if isinstance(sent, int) and not isinstance(sent, bool) and sent >= 0:
+            self.score_deaths = sent
+        else:
+            self.score_deaths = self.total_score // self.death_link_score
 
         locked = payload.get("locked_phase")
         self.locked_phase = (

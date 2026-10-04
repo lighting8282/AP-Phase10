@@ -19,13 +19,21 @@ import {
   WILD_THEFT, milestoneLocationName, phaseLocationName, phaseUnlock,
   buffPrice, storeGate, storeLocationName, storePrices,
   STORE_ALL_AT_ONCE, STORE_ALWAYS_OPEN, STORE_GATINGS, STORE_LADDER, PRICE_PROGRESSION,
-} from "./data.js?v=fc5b86ab";
-import { SKIP, STOCK_WILDS, WILD } from "./cards.js?v=fc5b86ab";
-import { HAND_STATE, Table, gameConfig } from "./engine.js?v=fc5b86ab";
-import { MID, NAMES as OPPONENT_NAMES, buildOpponents } from "./opponents.js?v=fc5b86ab";
-import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js?v=fc5b86ab";
+  DEFAULT_DEATH_LINK_SCORE, MAX_DEATH_LINK_SCORE, MIN_DEATH_LINK_SCORE,
+} from "./data.js?v=1189a53f";
+import { SKIP, STOCK_WILDS, WILD } from "./cards.js?v=1189a53f";
+import { HAND_STATE, Table, gameConfig } from "./engine.js?v=1189a53f";
+import { MID, NAMES as OPPONENT_NAMES, buildOpponents } from "./opponents.js?v=1189a53f";
+import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js?v=1189a53f";
 
 export const LEAN_DEAL_PENALTY = 2;
+
+/** The DeathLink threshold, held to the option's range; absent is the default. */
+function readDeathLinkScore(slotData) {
+  const value = slotData.death_link_score ?? DEFAULT_DEATH_LINK_SCORE;
+  if (!Number.isInteger(value)) return DEFAULT_DEATH_LINK_SCORE;
+  return Math.min(MAX_DEATH_LINK_SCORE, Math.max(MIN_DEATH_LINK_SCORE, value));
+}
 
 /** The always-open prices from slot data, or null if absent or malformed. */
 function readSlotPrices(slotData) {
@@ -67,6 +75,12 @@ export class Phase10Session {
     //: ended by a seat -- an opponent finishing is not an Archipelago notion.
     this.raceToEnd = opts.raceToEnd ?? false;
     this.deathLink = opts.deathLink ?? false;
+    //: Every this many points of round score sends one DeathLink death.
+    this.deathLinkScore = opts.deathLinkScore ?? DEFAULT_DEATH_LINK_SCORE;
+    //: Thresholds already accounted for -- sent, or absorbed by a hand an
+    //: incoming death took. A saved high-water mark, so a reload or a switch
+    //: of client never sends one twice.
+    this.scoreDeaths = 0;
     this.opponents = opts.opponents ?? 3;
 
     this.items = new Map();
@@ -104,6 +118,7 @@ export class Phase10Session {
       skipsInDeck: Number(slotData.skips_in_deck ?? 0),
       raceToEnd: Boolean(slotData.race_to_end ?? false),
       deathLink: Boolean(slotData.death_link ?? false),
+      deathLinkScore: readDeathLinkScore(slotData),
       opponents: Number(slotData.opponents ?? 3),
       game: game ?? new Phase10Game(),
     });
@@ -135,6 +150,26 @@ export class Phase10Session {
    */
   get totalScore() {
     return Math.max(0, this.game.totalScore - this.scoreReduction);
+  }
+
+  // -- DeathLink by score -----------------------------------------------------
+  /** The total score at which the next death goes out. */
+  get nextScoreDeath() {
+    return (this.scoreDeaths + 1) * this.deathLinkScore;
+  }
+
+  /**
+   * Whether the score has crossed a new threshold; marks it handled. Returns
+   * the threshold reached when a death should go out now, else null. At most
+   * one per call, which is one per round. `absorb` marks without sending, for
+   * a hand an incoming death ended. A high-water mark: Score Reduction pushes
+   * the next death further away. Mirrors score_death_due in session.py.
+   */
+  scoreDeathDue({ absorb = false } = {}) {
+    const crossed = Math.floor(this.totalScore / this.deathLinkScore);
+    if (crossed <= this.scoreDeaths) return null;
+    this.scoreDeaths = crossed;
+    return absorb ? null : crossed * this.deathLinkScore;
   }
 
   // -- items ---------------------------------------------------------------
@@ -623,6 +658,7 @@ export class Phase10Session {
       // would be free to anybody willing to refresh the page.
       buffs_bought: Object.fromEntries(this.buffsBought),
       locked_phase: this.lockedPhase,
+      score_deaths: this.scoreDeaths,
     };
   }
 
@@ -683,6 +719,12 @@ export class Phase10Session {
         }
       }
     }
+
+    // Absent in saves written before deaths were sent by score. Caught up
+    // rather than zeroed, so an update never sends a surprise death.
+    const sent = payload.score_deaths;
+    this.scoreDeaths = Number.isInteger(sent) && sent >= 0
+      ? sent : Math.floor(this.totalScore / this.deathLinkScore);
 
     const locked = payload.locked_phase;
     this.lockedPhase =

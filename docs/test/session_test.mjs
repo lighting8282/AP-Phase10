@@ -650,6 +650,50 @@ fixtures.sequences.forEach((script, index) => {
     dealt.startHand(1).skipsInHand, 2);
 }
 
+// -- DeathLink by score: mirrors TestScoreDeathLink in test_session.py ---------
+{
+  const linked = (score, every = 500) => {
+    const s = Phase10Session.fromSlotData(
+      { goal: 0, starting_draws: 6, checks_per_phase: 4, death_link: true, death_link_score: every },
+      new Phase10Game({ seed: 0 }),
+    );
+    s.game.rounds.push({ number: 1, phase: 1, state: "failed", score,
+      drawsUsed: 6, wildsUsed: 0, skipsPlayed: 0 });
+    return s;
+  };
+  const crossed = linked(520);
+  check("crossing the threshold sends one", crossed.scoreDeathDue(), 500);
+  check("and not the same one twice", crossed.scoreDeathDue(), null);
+  check("below it sends nothing", linked(499).scoreDeathDue(), null);
+  const jump = linked(260, 100);
+  check("a round that jumps two thresholds sends one", jump.scoreDeathDue(), 200);
+  check("and the next is the one after", [jump.scoreDeathDue(), jump.nextScoreDeath], [null, 300]);
+  const hit = linked(510);
+  check("an incoming death is absorbed, not returned", hit.scoreDeathDue({ absorb: true }), null);
+  check("and the absorbed threshold stays spent", [hit.scoreDeathDue(), hit.nextScoreDeath], [null, 1000]);
+  const reduced = linked(490);
+  reduced.setItems([SCORE_REDUCTION]);
+  check("Score Reduction pushes the next death away",
+    [reduced.totalScore, reduced.scoreDeathDue(), reduced.nextScoreDeath], [465, null, 500]);
+  const sent = linked(520);
+  sent.scoreDeathDue();
+  const back = linked(0);
+  check("the count survives a reload", back.loadPayload(sent.toPayload()), true);
+  check("so nothing is resent", [back.scoreDeaths, back.scoreDeathDue()], [1, null]);
+  const old = linked(1240);
+  const oldPayload = old.toPayload();
+  delete oldPayload.score_deaths;
+  const upgraded = linked(0);
+  check("an old save loads", upgraded.loadPayload(oldPayload), true);
+  check("and is caught up rather than replayed", [upgraded.scoreDeaths, upgraded.scoreDeathDue()], [2, null]);
+  for (const [given, expected] of [[250, 250], [50, 100], [5000, 1000], ["x", 500]]) {
+    const read = Phase10Session.fromSlotData({ death_link_score: given }, new Phase10Game({ seed: 0 }));
+    check(`the setting is held to its range (${given})`, read.deathLinkScore, expected);
+  }
+  check("absent is the default",
+    Phase10Session.fromSlotData({}, new Phase10Game({ seed: 0 })).deathLinkScore, 500);
+}
+
 for (const line of failures) console.log(`  FAIL ${line}`);
 console.log(`\n${passed} passed, ${failures.length} failed`);
 process.exit(failures.length ? 1 : 0);

@@ -1618,14 +1618,38 @@ Pointed at the single-slot set it must fail, and does:
 
 Off by default; `death_link: true` in your YAML turns it on.
 
-A card game has nothing to kill, so a death is **a lost hand**: when someone
-else dies your hand in progress fails on the spot, and when a hand of yours
-runs out of draws everyone linked loses theirs. Between rounds you have nothing
-to lose and an incoming death passes harmlessly -- inventing a penalty a player
-cannot see coming would be worse than letting one through.
+A card game has nothing to kill, so an incoming death is **a lost hand**: when
+someone else dies your hand in progress fails on the spot. Between rounds you
+have nothing to lose and an incoming death passes harmlessly -- inventing a
+penalty a player cannot see coming would be worse than letting one through.
 
-Settling a hand that was killed by a death never sends one back, or two linked
-players would bounce deaths at each other forever.
+**Outgoing deaths go by round score**, not by losing. Every `death_link_score`
+points (100–1000, default 500) sends one. It used to be every hand that ran out
+of draws, which at the old four-draw default was most lost rounds -- a death
+every two or three rounds, far harsher than anybody linked had signed up for.
+Measured at about 32 points a round (a cleared round leaves ~6, a lost one ~60),
+500 is a death every sixteen rounds or so. This also gave the round score a
+purpose in a seed, which it had lacked: it was shown and affected nothing, and
+the Score Reduction filler was dead weight. Now a reduction pushes the next
+death further away.
+
+The rules, the same in both clients (`score_death_due` / `scoreDeathDue`):
+
+- **A high-water mark, saved.** `score_deaths` counts thresholds already
+  handled and travels in the save payload, so a reconnect or a switch between
+  clients never sends one twice. A reduction lowers the total under the mark,
+  so the points have to be earned back before the next death.
+- **At most one per round.** A round that jumps two thresholds at a low setting
+  sends one, not a burst.
+- **Absorbed, not returned.** A hand that an incoming death ended counts its
+  points but sends nothing, or two linked players could bounce deaths at each
+  other for as long as each loss crossed a line.
+- **Old saves catch up.** A save without the count restores it at the current
+  total's threshold, so a run already at 1200 points does not send a surprise
+  death on its first round after the update.
+
+The browser leaves a threshold owed while disconnected and sends it on the next
+settled round; the Python client queues it and sends on reconnect.
 
 The semantics live in the session (`kill_hand` / `killHand`), not in either
 client, so the desktop and browser versions cannot disagree about what a death

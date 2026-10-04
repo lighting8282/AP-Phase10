@@ -9,17 +9,17 @@
 // before the restore lands would overwrite a real one with that empty rebuild.
 // Nothing is saved until restoreState is "done".
 
-import { Client } from "../node_modules/archipelago.js/dist/index.js?v=fc5b86ab";
+import { Client } from "../node_modules/archipelago.js/dist/index.js?v=1189a53f";
 
 import {
   GAME_NAME, LOCATION_NAME_TO_ID, MULLIGAN, PHASE_COUNT, WILD_CARD, phaseUnlock,
   storeLocationName,
 }
-  from "./data.js?v=fc5b86ab";
-import { STOCK_SKIPS } from "./cards.js?v=fc5b86ab";
-import { Phase10Game, roundToString } from "./game.js?v=fc5b86ab";
-import { Phase10Session } from "./session.js?v=fc5b86ab";
-import { describeMeldCards } from "./phases.js?v=fc5b86ab";
+  from "./data.js?v=1189a53f";
+import { STOCK_SKIPS } from "./cards.js?v=1189a53f";
+import { Phase10Game, roundToString } from "./game.js?v=1189a53f";
+import { Phase10Session } from "./session.js?v=1189a53f";
+import { describeMeldCards } from "./phases.js?v=1189a53f";
 
 /**
  * The deck a free-play run is dealt, with no Archipelago to hand items out.
@@ -480,7 +480,6 @@ export class Phase10Client {
   }
 
   async settle(hand, { sendDeath = true } = {}) {
-    const died = hand.state === "failed";
     this.#reportFinalTable();
     const fresh = this.session.finishHand(hand);
     const result = this.session.lastResult;
@@ -499,11 +498,17 @@ export class Phase10Client {
     }
     await this.save();
 
-    if (died && sendDeath && this.session.deathLink && this.connected) {
-      this.client.deathLink.sendDeathLink(
-        this.client.players.self?.name ?? "A player",
-        "ran out of draws",
-      );
+    // DeathLink goes out by score, not by losing: every `death_link_score`
+    // points sends one. Left owed while disconnected, so the next settle sends
+    // it; a hand an incoming death ended is absorbed, or linked players could
+    // bounce deaths forever. Mirrors settle in context.py.
+    if (this.session.deathLink && (this.connected || !sendDeath)) {
+      const reached = this.session.scoreDeathDue({ absorb: !sendDeath });
+      if (reached !== null) {
+        const name = this.client.players.self?.name ?? "A player";
+        this.client.deathLink.sendDeathLink(name, `reached ${reached} points`);
+        this.onLog(`DeathLink sent: you reached ${reached} points.`);
+      }
     }
 
     if (this.session.goalMet && !this.goalSent && this.connected) {

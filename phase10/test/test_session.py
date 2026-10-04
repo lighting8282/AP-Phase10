@@ -1011,3 +1011,65 @@ class TestRunEnds(unittest.TestCase):
         s.advance_opponents()
         for phase in s.opponent_phases:
             self.assertLessEqual(phase, s.phase_cap + 1)
+
+
+class TestScoreDeathLink(unittest.TestCase):
+    """DeathLink by round score: one death per `death_link_score` points."""
+
+    def linked(self, score=500, every=500, **slot) -> Phase10Session:
+        s = session(death_link=True, death_link_score=every, **slot)
+        s.game.rounds.append(RoundResult(number=1, phase=1, state=HandState.FAILED,
+                                         score=score, draws_used=6, wilds_used=0,
+                                         skips_played=0))
+        return s
+
+    def test_crossing_the_threshold_sends_one(self) -> None:
+        s = self.linked(score=520)
+        self.assertEqual(s.score_death_due(), 500)
+        self.assertIsNone(s.score_death_due(), "the same threshold twice")
+
+    def test_below_it_sends_nothing(self) -> None:
+        self.assertIsNone(self.linked(score=499).score_death_due())
+
+    def test_at_most_one_per_round(self) -> None:
+        """A round that jumps two thresholds sends one, not a burst."""
+        s = self.linked(score=260, every=100)
+        self.assertEqual(s.score_death_due(), 200)
+        self.assertIsNone(s.score_death_due())
+        self.assertEqual(s.next_score_death, 300)
+
+    def test_an_incoming_death_is_absorbed_not_returned(self) -> None:
+        s = self.linked(score=510)
+        self.assertIsNone(s.score_death_due(absorb=True))
+        self.assertIsNone(s.score_death_due(), "absorbed thresholds stay spent")
+        self.assertEqual(s.next_score_death, 1000)
+
+    def test_score_reduction_pushes_the_next_death_away(self) -> None:
+        s = self.linked(score=490)
+        s.set_items([SCORE_REDUCTION])
+        self.assertEqual(s.total_score, 465)
+        self.assertIsNone(s.score_death_due())
+        self.assertEqual(s.next_score_death, 500)
+
+    def test_the_count_survives_a_reconnect(self) -> None:
+        s = self.linked(score=520)
+        s.score_death_due()
+        fresh = session(death_link=True, death_link_score=500)
+        self.assertTrue(fresh.load_payload(s.to_payload()))
+        self.assertEqual(fresh.score_deaths, 1)
+        self.assertIsNone(fresh.score_death_due(), "a reconnect must not resend")
+
+    def test_an_old_save_is_caught_up_not_replayed(self) -> None:
+        """A run already past several thresholds sends nothing on upgrade."""
+        s = self.linked(score=1240)
+        payload = s.to_payload()
+        del payload["score_deaths"]
+        fresh = session(death_link=True, death_link_score=500)
+        self.assertTrue(fresh.load_payload(payload))
+        self.assertEqual(fresh.score_deaths, 2)
+        self.assertIsNone(fresh.score_death_due())
+
+    def test_the_setting_is_read_and_held_to_its_range(self) -> None:
+        for given, expected in ((250, 250), (50, 100), (5000, 1000), ("x", 500), (None, 500)):
+            slot = {} if given is None else {"death_link_score": given}
+            self.assertEqual(session(**slot).death_link_score, expected, given)

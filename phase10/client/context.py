@@ -90,6 +90,7 @@ class Phase10CommandProcessor(ClientCommandProcessor):
         self.output(
             f"round {s.game.round_number} | {s.hands_won} won | "
             f"{s.total_score} points (lower is better)"
+            + (f" | DeathLink at {s.next_score_death}" if s.death_link else "")
         )
         if s.mulligans_left or s.score_reduction:
             self.output(
@@ -511,7 +512,9 @@ class Phase10Context(CommonContext):
         # with the empty one we just built from slot_data.
         self.restore_state = "needed"
         self.save_pending = False
-        self.death_link_pending = False
+        #: Deaths owed to the room, by the score threshold that earned each.
+        #: A list, not a flag: a /grind can cross two before the loop sends.
+        self.score_deaths_pending: list[int] = []
         self.tags_pending = False
         #: What each store slot is holding, by location id, once the room has
         #: been asked. Empty until the scout lands, and the store reads that as
@@ -631,7 +634,6 @@ class Phase10Context(CommonContext):
 
     def settle(self, hand, quiet: bool = False, send_death: bool = True) -> None:
         """Finish a hand and queue whatever checks it earned."""
-        died = hand.state is HandState.FAILED
         # Read before finish_hand, which takes the hand off the game.
         lost_to = None
         if hand.events and hand.events[-1].kind == "hand_failed":
@@ -647,8 +649,13 @@ class Phase10Context(CommonContext):
         if new:
             self.pending_locations.extend(new)
         self.save_pending = True
-        if died and send_death and self.session.death_link:
-            self.death_link_pending = True
+        # DeathLink goes out by score, not by losing: every `death_link_score`
+        # points of round score sends one. A hand an incoming death ended is
+        # absorbed instead, or linked players could bounce deaths forever.
+        if self.session.death_link:
+            reached = self.session.score_death_due(absorb=not send_death)
+            if reached is not None:
+                self.score_deaths_pending.append(reached)
 
     def report_table(self) -> None:
         """Read out what the seats did since anybody last looked.
@@ -681,9 +688,10 @@ class Phase10Context(CommonContext):
                 self.tags_pending = False
                 await self.update_death_link(self.session.death_link)
 
-            if connected and self.death_link_pending:
-                self.death_link_pending = False
-                await self.send_death(f"{self.player_names.get(self.slot, 'A player')} ran out of draws.")
+            while connected and self.score_deaths_pending:
+                reached = self.score_deaths_pending.pop(0)
+                name = self.player_names.get(self.slot, "A player")
+                await self.send_death(f"{name} reached {reached} points.")
 
             if connected and self.restore_state == "needed":
                 self.restore_state = "requested"

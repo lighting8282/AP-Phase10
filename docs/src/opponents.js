@@ -13,9 +13,9 @@
 // near turn five. So the race resolves before a large budget can matter -- see
 // the Python module for the numbers and what was done about them.
 
-import { cardToString, handScore, isSkip, points } from "./cards.js?v=fc5b86ab";
-import { cardsShort, removeCard } from "./engine.js?v=fc5b86ab";
-import { PHASES, describeMeldCards, solveMelds } from "./phases.js?v=fc5b86ab";
+import { cardToString, handScore, isSkip, points } from "./cards.js?v=1189a53f";
+import { cardsShort, removeCard } from "./engine.js?v=1189a53f";
+import { PHASES, describeMeldCards, solveMelds } from "./phases.js?v=1189a53f";
 
 /**
  * How well a seat plays. 1.0 / 0.0 is the greedy autoplayer exactly.

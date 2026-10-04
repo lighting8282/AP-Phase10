@@ -114,7 +114,7 @@ game: AP_10
 requires:
   version: 0.6.7
   game:
-    AP_10: 1.6.1
+    AP_10: 1.7.0
 ```
 
 A seed is generated against one version of the world. After updating, generate
@@ -275,7 +275,8 @@ explanation; these are the ones that change the shape of a run most.
 | `skip_card_items` | 4 | Skips dealt into your hand each round |
 | `hand_size_upgrades` | 2 | Extra cards dealt each round |
 | `trap_chance` | 0 | Percentage of filler replaced by traps |
-| `death_link` | off | A death is a lost hand |
+| `death_link` | off | Every `death_link_score` points of round score sends a death; one received costs your current hand |
+| `death_link_score` | 500 | Points of round score per death sent, 100–1000; about 30 points a round |
 
 ## Items and locations
 
