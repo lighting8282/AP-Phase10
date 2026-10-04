@@ -68,6 +68,9 @@ Same page. Put in the server address, your slot name and any password, and
 press **Connect**. Your phases, wilds, draws and skips arrive as Archipelago
 items, and your cleared phases send checks.
 
+If anybody else in the room is playing AP_10, their score, rounds won and
+phases cleared show under yours, updated as they play.
+
 Works on a phone.
 
 ### From the Archipelago launcher
@@ -93,6 +96,7 @@ plays through commands in the client console:
     /buy skip   buy a One-Use Skip into your hand
     /table      what the opponents have down
     /score      the scorecard: recent rounds and the running total
+    /scores     your score beside the other AP_10 players in the room
     /auto       play the current hand out with the built-in player
     /grind <n> [k]  autoplay k rounds of phase n
 
@@ -275,8 +279,9 @@ explanation; these are the ones that change the shape of a run most.
 | `skip_card_items` | 4 | Skips dealt into your hand each round |
 | `hand_size_upgrades` | 2 | Extra cards dealt each round |
 | `trap_chance` | 0 | Percentage of filler replaced by traps |
-| `death_link` | off | Every `death_link_score` points of round score sends a death; one received costs your current hand |
-| `death_link_score` | 500 | Points of round score per death sent, 100–1000; about 30 points a round |
+| `death_link` | off | Every `score_threshold` points of round score sends a death; one received costs your current hand |
+| `score_threshold` | 500 | Points of round score that set off `death_link` and `score_traps`, 100–1000; about 30 points a round |
+| `score_traps` | off | Each `score_threshold` points also sets off one of your own traps on your next hand |
 
 ## Items and locations
 
@@ -316,9 +321,14 @@ unbought slots still cost and only lets you spend what is left over, so no
 amount of buying can strand a location. `store_buff_points` sets how much
 spending money the seed carries beyond the slots; 0 turns the cards off.
 
+**Going out earns spending money too:** every round you finish with an empty
+hand gives you one point for the one-use cards, about one round in five. Those
+points only buy cards, never a slot.
+
 **Filler.** A **Mulligan** throws back a dead opening hand before your first
 draw. A **Score Reduction** takes 25 points off your total, which is what a
-Wild left in your hand costs you.
+Wild left in your hand costs you — and so pushes your next `score_threshold`
+further away.
 
 **Traps**, when enabled: **Phase Lock** pins you to the phase you just lost,
 **Lean Deal** costs you two cards on one hand, **Wild Theft** takes a wild out

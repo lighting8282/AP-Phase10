@@ -66,6 +66,7 @@ while to find and would be easy to reintroduce.
   - [Serving it on Pages](#serving-it-on-pages)
 - [Multiworld](#multiworld)
 - [DeathLink](#deathlink)
+  - [Score traps, going-out points, and the other players' scores](#score-traps-going-out-points-and-the-other-players-scores)
 - [A word on the version floor](#a-word-on-the-version-floor)
 - [Packaging](#packaging)
   - [Two things packaging broke that source never would](#two-things-packaging-broke-that-source-never-would)
@@ -1623,7 +1624,7 @@ someone else dies your hand in progress fails on the spot. Between rounds you
 have nothing to lose and an incoming death passes harmlessly -- inventing a
 penalty a player cannot see coming would be worse than letting one through.
 
-**Outgoing deaths go by round score**, not by losing. Every `death_link_score`
+**Outgoing deaths go by round score**, not by losing. Every `score_threshold`
 points (100–1000, default 500) sends one. It used to be every hand that ran out
 of draws, which at the old four-draw default was most lost rounds -- a death
 every two or three rounds, far harsher than anybody linked had signed up for.
@@ -1633,9 +1634,9 @@ purpose in a seed, which it had lacked: it was shown and affected nothing, and
 the Score Reduction filler was dead weight. Now a reduction pushes the next
 death further away.
 
-The rules, the same in both clients (`score_death_due` / `scoreDeathDue`):
+The rules, the same in both clients (`score_mark_due` / `scoreMarkDue`):
 
-- **A high-water mark, saved.** `score_deaths` counts thresholds already
+- **A high-water mark, saved.** `score_marks` counts thresholds already
   handled and travels in the save payload, so a reconnect or a switch between
   clients never sends one twice. A reduction lowers the total under the mark,
   so the points have to be earned back before the next death.
@@ -1656,6 +1657,42 @@ client, so the desktop and browser versions cannot disagree about what a death
 does. Verified live in both directions and across both clients: a third client
 sent a death and the browser lost its hand; the browser then lost a hand of its
 own and the Python client, holding one open, lost that.
+
+### Score traps, going-out points, and the other players' scores
+
+Three more uses for the round score, built together.
+
+**Score traps.** `score_traps` makes each `score_threshold` also set off one of
+your own traps on your next hand: Lean Deal, then Wild Theft, in turn. It shares
+DeathLink's threshold and its saved high-water mark, so one setting drives both
+and they stack when both are on. A fired trap simply adds to that trap's count,
+so it goes through exactly the code a received Lean Deal does; the count of
+fired traps is saved, and which trap each was follows from the count. A hand an
+incoming death ended sets off nothing, for the same reason it sends nothing.
+Phase Lock is left out of the cycle: it waits for a later *lost* hand, which
+would read as unrelated to the score that caused it.
+
+**Going out earns card money.** Each round finished with an empty hand gives
+one point to spend on one-use cards — derived from the scorecard, not saved, so
+both clients agree by construction. Measured at six draws against three
+opponents: going out is 21% of rounds, while "at or under ten points" was 45%,
+which would have been nearly free money. Earned points are spent before AP
+Points and never count toward a slot, so — tested exhaustively over earned
+points, AP Points and purchase order — cards still can never take what an
+unbought slot is owed.
+
+**The other AP_10 players.** Each client publishes a small record (score,
+rounds won, phases cleared) to its own Data Storage key, `phase10_score_<team>_<slot>`,
+beside the private save, and watches everyone else's with `SetNotify`. The
+browser shows them under the summary line; the Python client has `/scores`.
+Records from other clients are untrusted input and checked field by field.
+
+**Proved against a real server.** `tools/check_live_room.py` generates a
+two-player seed, hosts it with `MultiServer.py`, plays both seats with the
+browser client and reads the room with the Python client. Its first run caught
+a bug no unit test could: the browser client saved *before* marking a threshold
+handled, so after a reconnect the next round resent the death and refired the
+trap. It also confirmed the two clients read each other's scores.
 
 ## A word on the version floor
 

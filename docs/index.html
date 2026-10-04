@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AP_10</title>
-<link rel="stylesheet" href="style.css?v=1189a53f">
+<link rel="stylesheet" href="style.css?v=77099614">
 </head>
 <body>
 <header>
@@ -49,6 +49,9 @@
        across from you, the piles in the middle, your own cards in front. -->
   <section id="center">
     <div id="summary" aria-live="polite"></div>
+    <!-- The other AP_10 players in the room, as their own clients publish it.
+         Absent offline and when nobody else is playing this game. -->
+    <div id="rivals" hidden></div>
     <div id="objective"></div>
 
     <div class="felt">
@@ -214,6 +217,6 @@
   </div>
 </div>
 
-<script type="module" src="src/ui.js?v=1189a53f"></script>
+<script type="module" src="src/ui.js?v=77099614"></script>
 </body>
 </html>

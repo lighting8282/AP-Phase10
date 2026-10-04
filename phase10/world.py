@@ -73,7 +73,7 @@ class Phase10World(World):
         # one-to-one onto the option names.
         data = self.options.as_dict(
             "goal", "phases_to_win", "starting_draws", "checks_per_phase",
-            "death_link", "death_link_score", "opponents", "store_slots",
+            "death_link", "score_threshold", "score_traps", "opponents", "store_slots",
         )
         # Spelled out rather than sent as the Choice's integer: the engine's
         # knob is the word, both clients read the word, and a number here

@@ -72,6 +72,7 @@ about it; that is noise, and AP_10 loads regardless. Tag 0.6.7 is the
 
     AP_ROOT=/path/to/Archipelago python tools/check_store_balance.py
     AP_ROOT=/path/to/Archipelago python tools/check_multiworld.py
+    AP_ROOT=/path/to/Archipelago python tools/check_live_room.py   # a real server, two players
 
 The world's own tests run from the AP root, and that run is the authority:
 

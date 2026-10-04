@@ -214,9 +214,9 @@ DEFAULT_BUFF_POINTS = 8
 #: at about 32 points a round (a cleared round leaves ~6, a lost one ~60), so
 #: 500 is a death every sixteen rounds or so, 100 every three, 1000 every
 #: thirty-two.
-MIN_DEATH_LINK_SCORE = 100
-MAX_DEATH_LINK_SCORE = 1000
-DEFAULT_DEATH_LINK_SCORE = 500
+MIN_SCORE_THRESHOLD = 100
+MAX_SCORE_THRESHOLD = 1000
+DEFAULT_SCORE_THRESHOLD = 500
 
 
 def buff_price(buff: str) -> int:

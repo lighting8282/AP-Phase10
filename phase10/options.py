@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from Options import Choice, DeathLink, OptionGroup, PerGameCommonOptions, Range, Toggle
 
 from .data import (
-    DEFAULT_BUFF_POINTS, DEFAULT_DEATH_LINK_SCORE, MAX_DEATH_LINK_SCORE, MAX_STORE_SLOTS,
-    MIN_DEATH_LINK_SCORE, PHASE_COUNT,
+    DEFAULT_BUFF_POINTS, DEFAULT_SCORE_THRESHOLD, MAX_SCORE_THRESHOLD, MAX_STORE_SLOTS,
+    MIN_SCORE_THRESHOLD, PHASE_COUNT,
 )
 
 
@@ -175,25 +175,39 @@ class Phase10DeathLink(DeathLink):
     """
     Share deaths with the rest of the multiworld.
 
-    You send one every `death_link_score` points of round score -- the points
+    You send one every `score_threshold` points of round score -- the points
     left in your hand when rounds end. Score Reduction items push the next one
     further away. When someone else dies, your current hand is lost; between
     rounds there is nothing to lose, so it passes harmlessly.
     """
 
 
-class DeathLinkScore(Range):
+class ScoreThreshold(Range):
     """
-    With `death_link` on, how many points of round score send one death.
+    How many points of round score set off `death_link` and `score_traps`.
+
+    Each time your running score passes another multiple of this, you send a
+    DeathLink death if `death_link` is on, and one of your own traps hits your
+    next hand if `score_traps` is on. Both can be on.
 
     A round costs about 30 points on average -- a few when you clear it, about
-    60 when you don't -- so 500 is roughly one death every 16 rounds, 100 one
-    every 3, and 1000 one every 30.
+    60 when you don't -- so 500 is roughly once every 16 rounds, 100 every 3,
+    and 1000 every 30.
     """
-    display_name = "Death Link Score"
-    range_start = MIN_DEATH_LINK_SCORE
-    range_end = MAX_DEATH_LINK_SCORE
-    default = DEFAULT_DEATH_LINK_SCORE
+    display_name = "Score Threshold"
+    range_start = MIN_SCORE_THRESHOLD
+    range_end = MAX_SCORE_THRESHOLD
+    default = DEFAULT_SCORE_THRESHOLD
+
+
+class ScoreTraps(Toggle):
+    """
+    Each time your score passes `score_threshold`, a trap hits your next hand:
+    Lean Deal (two fewer cards) and Wild Theft (one fewer wild), taking turns.
+
+    A cost for a high score that does not need DeathLink.
+    """
+    display_name = "Score Traps"
 
 
 class TrapChance(Range):
@@ -283,7 +297,8 @@ class Phase10Options(PerGameCommonOptions):
     skip_card_items: SkipCardItems
     trap_chance: TrapChance
     death_link: Phase10DeathLink
-    death_link_score: DeathLinkScore
+    score_threshold: ScoreThreshold
+    score_traps: ScoreTraps
 
 
 option_groups = [
@@ -292,7 +307,7 @@ option_groups = [
     OptionGroup("Difficulty", [Opponents, StartingDraws, ExtraDrawItems,
                                WildCardItems, HandSizeUpgrades, SkipCardItems,
                                SkipMode]),
-    OptionGroup("Deck", [TrapChance, Phase10DeathLink, DeathLinkScore]),
+    OptionGroup("Deck", [TrapChance, Phase10DeathLink, ScoreThreshold, ScoreTraps]),
 ]
 
 option_presets = {

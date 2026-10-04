@@ -11,10 +11,10 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-import { Phase10Session } from "../src/session.js";
+import { Phase10Session, readScoreRecord, scoreKey } from "../src/session.js";
 import { Phase10Game } from "../src/game.js";
 import {
-  AP_POINT, BUFF_SKIP, BUFF_WILD, LOCATION_NAME_TO_ID, MULLIGAN, PHASE_COUNT,
+  AP_POINT, BUFF_SKIP, BUFF_WILD, LEAN_DEAL, WILD_THEFT, LOCATION_NAME_TO_ID, MULLIGAN, PHASE_COUNT,
   SKIP_CARD,
   SCORE_REDUCTION, SCORE_REDUCTION_VALUE, phaseUnlock, storeGate,
   storeLocationName, STORE_ALL_AT_ONCE, STORE_ALWAYS_OPEN, STORE_GATINGS, STORE_LADDER,
@@ -654,7 +654,7 @@ fixtures.sequences.forEach((script, index) => {
 {
   const linked = (score, every = 500) => {
     const s = Phase10Session.fromSlotData(
-      { goal: 0, starting_draws: 6, checks_per_phase: 4, death_link: true, death_link_score: every },
+      { goal: 0, starting_draws: 6, checks_per_phase: 4, death_link: true, score_threshold: every },
       new Phase10Game({ seed: 0 }),
     );
     s.game.rounds.push({ number: 1, phase: 1, state: "failed", score,
@@ -662,36 +662,122 @@ fixtures.sequences.forEach((script, index) => {
     return s;
   };
   const crossed = linked(520);
-  check("crossing the threshold sends one", crossed.scoreDeathDue(), 500);
-  check("and not the same one twice", crossed.scoreDeathDue(), null);
-  check("below it sends nothing", linked(499).scoreDeathDue(), null);
+  check("crossing the threshold sends one", crossed.scoreMarkDue(), 500);
+  check("and not the same one twice", crossed.scoreMarkDue(), null);
+  check("below it sends nothing", linked(499).scoreMarkDue(), null);
   const jump = linked(260, 100);
-  check("a round that jumps two thresholds sends one", jump.scoreDeathDue(), 200);
-  check("and the next is the one after", [jump.scoreDeathDue(), jump.nextScoreDeath], [null, 300]);
+  check("a round that jumps two thresholds sends one", jump.scoreMarkDue(), 200);
+  check("and the next is the one after", [jump.scoreMarkDue(), jump.nextScoreMark], [null, 300]);
   const hit = linked(510);
-  check("an incoming death is absorbed, not returned", hit.scoreDeathDue({ absorb: true }), null);
-  check("and the absorbed threshold stays spent", [hit.scoreDeathDue(), hit.nextScoreDeath], [null, 1000]);
+  check("an incoming death is absorbed, not returned", hit.scoreMarkDue({ absorb: true }), null);
+  check("and the absorbed threshold stays spent", [hit.scoreMarkDue(), hit.nextScoreMark], [null, 1000]);
   const reduced = linked(490);
   reduced.setItems([SCORE_REDUCTION]);
   check("Score Reduction pushes the next death away",
-    [reduced.totalScore, reduced.scoreDeathDue(), reduced.nextScoreDeath], [465, null, 500]);
+    [reduced.totalScore, reduced.scoreMarkDue(), reduced.nextScoreMark], [465, null, 500]);
   const sent = linked(520);
-  sent.scoreDeathDue();
+  sent.scoreMarkDue();
   const back = linked(0);
   check("the count survives a reload", back.loadPayload(sent.toPayload()), true);
-  check("so nothing is resent", [back.scoreDeaths, back.scoreDeathDue()], [1, null]);
+  check("so nothing is resent", [back.scoreMarks, back.scoreMarkDue()], [1, null]);
   const old = linked(1240);
   const oldPayload = old.toPayload();
-  delete oldPayload.score_deaths;
+  delete oldPayload.score_marks;
   const upgraded = linked(0);
   check("an old save loads", upgraded.loadPayload(oldPayload), true);
-  check("and is caught up rather than replayed", [upgraded.scoreDeaths, upgraded.scoreDeathDue()], [2, null]);
+  check("and is caught up rather than replayed", [upgraded.scoreMarks, upgraded.scoreMarkDue()], [2, null]);
   for (const [given, expected] of [[250, 250], [50, 100], [5000, 1000], ["x", 500]]) {
-    const read = Phase10Session.fromSlotData({ death_link_score: given }, new Phase10Game({ seed: 0 }));
-    check(`the setting is held to its range (${given})`, read.deathLinkScore, expected);
+    const read = Phase10Session.fromSlotData({ score_threshold: given }, new Phase10Game({ seed: 0 }));
+    check(`the setting is held to its range (${given})`, read.scoreThreshold, expected);
   }
   check("absent is the default",
-    Phase10Session.fromSlotData({}, new Phase10Game({ seed: 0 })).deathLinkScore, 500);
+    Phase10Session.fromSlotData({}, new Phase10Game({ seed: 0 })).scoreThreshold, 500);
+}
+
+// -- score traps and going-out card points: mirror test_session.py ------------
+{
+  const fresh = (slot = {}) => Phase10Session.fromSlotData(
+    { goal: 0, starting_draws: 6, checks_per_phase: 4, ...slot }, new Phase10Game({ seed: 0 }));
+  const addRounds = (s, scores, wentOut = 0) => {
+    for (const score of scores) {
+      s.game.rounds.push({ number: s.game.rounds.length + 1, phase: 1, state: "failed",
+        score, drawsUsed: 6, wildsUsed: 0, skipsPlayed: 0 });
+    }
+    for (let i = 0; i < wentOut; i += 1) {
+      s.game.rounds.push({ number: s.game.rounds.length + 1, phase: 1, state: "went_out",
+        score: 0, drawsUsed: 6, wildsUsed: 0, skipsPlayed: 0 });
+    }
+    return s;
+  };
+
+  const turns = fresh({ score_traps: true, score_threshold: 100 });
+  const seen = [];
+  for (let i = 0; i < 4; i += 1) {
+    addRounds(turns, [100]);
+    turns.scoreMarkDue();
+    seen.push(turns.lastScoreTrap);
+  }
+  check("score traps take turns", seen, [LEAN_DEAL, WILD_THEFT, LEAN_DEAL, WILD_THEFT]);
+  check("and count as pending traps", [turns.pending(LEAN_DEAL), turns.pending(WILD_THEFT)], [2, 2]);
+
+  const added = fresh({ score_traps: true, score_threshold: 100 });
+  added.setItems([LEAN_DEAL]);
+  addRounds(added, [100]);
+  added.scoreMarkDue();
+  check("a score trap adds to traps received", added.pending(LEAN_DEAL), 2);
+
+  const off = addRounds(fresh({ score_threshold: 100 }), [300]);
+  off.scoreMarkDue();
+  check("score traps off means none", [off.lastScoreTrap, off.pending(LEAN_DEAL)], [null, 0]);
+
+  const absorbed = addRounds(fresh({ score_traps: true, score_threshold: 100 }), [150]);
+  absorbed.scoreMarkDue({ absorb: true });
+  check("an incoming death sets off no trap", [absorbed.lastScoreTrap, absorbed.scoreTrapsFired], [null, 0]);
+
+  const saved = addRounds(fresh({ score_traps: true, score_threshold: 100 }), [250]);
+  saved.scoreMarkDue();
+  const restored = fresh({ score_traps: true, score_threshold: 100 });
+  check("fired traps survive a reload", restored.loadPayload(saved.toPayload()), true);
+  check("and are still pending", [restored.scoreTrapsFired, restored.pending(LEAN_DEAL)], [1, 1]);
+
+  check("going out earns a card point each",
+    addRounds(fresh({ store_slots: 6 }), [40, 5], 3).cardPointsEarned, 3);
+  const budget = addRounds(fresh({ store_slots: 6 }), [], 2);
+  budget.setItems(Array(3).fill(AP_POINT));
+  check("earned points go to cards, not slots", [budget.pointsLeft, budget.buffPointsLeft], [3, 2]);
+
+  // Exhaustive: buying cards never takes AP Points the unbought slots are owed.
+  let stranded = null;
+  for (let earned = 0; earned < 5 && !stranded; earned += 1) {
+    for (let points = 0; points < 14 && !stranded; points += 1) {
+      const s = addRounds(fresh({ store_slots: 6 }), [], earned);
+      s.setItems([...Array(points).fill(AP_POINT), phaseUnlock(1)]);
+      s.startHand(1);
+      const floor = Math.min(s.pointsLeft, s.pointsReserved);
+      for (let i = 0; i < 12; i += 1) {
+        const buff = i % 2 ? BUFF_SKIP : BUFF_WILD;
+        if (s.canBuyBuff(buff) === null) s.buyBuff(buff);
+      }
+      if (s.pointsLeft < floor) stranded = `${earned} earned, ${points} points`;
+    }
+  }
+  check("buying cards never strands a slot", stranded, null);
+}
+
+// -- the public score: mirrors TestPublicScore ---------------------------------
+{
+  check("a record reads back, extra fields dropped",
+    readScoreRecord({ score: 5, won: 1, cleared: 1, x: 9 }), { score: 5, won: 1, cleared: 1 });
+  for (const bad of [null, [], "5", {}, { score: 5, won: 1 }, { score: -1, won: 0, cleared: 0 },
+    { score: true, won: 0, cleared: 0 }, { score: "5", won: 0, cleared: 0 }]) {
+    check(`a bad record is refused (${JSON.stringify(bad)})`, readScoreRecord(bad), null);
+  }
+  check("the key names team and slot", scoreKey(0, 3), "phase10_score_0_3");
+  const mine = Phase10Session.fromSlotData({ goal: 0, starting_draws: 6, checks_per_phase: 4 },
+    new Phase10Game({ seed: 0 }));
+  mine.game.rounds.push({ number: 1, phase: 1, state: "failed", score: 40,
+    drawsUsed: 6, wildsUsed: 0, skipsPlayed: 0 });
+  check("the record is score, won and cleared", mine.scoreRecord(), { score: 40, won: 0, cleared: 0 });
 }
 
 for (const line of failures) console.log(`  FAIL ${line}`);

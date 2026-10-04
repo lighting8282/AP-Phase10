@@ -189,6 +189,7 @@ class Phase10View(BoxLayout):
             ("Sort by colour", "/sort c"),
             ("Auto", "/auto"),
             ("Score", "/score"),
+            ("All scores", "/scores"),
         ):
             button = Button(text=label, font_size="14sp")
             button.bind(on_release=lambda _w, c=command: self.run(c))

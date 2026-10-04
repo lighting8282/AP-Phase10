@@ -4,18 +4,18 @@
 // client, and holds no game state of its own. Anything it needed to remember
 // would be a second copy of something the session already owns.
 
-import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=1189a53f";
+import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=77099614";
 
 //: Faces used purely as icons in the stat panel.
 const SKIP_FACE = SKIP;
 const WILD_FACE = WILD;
-import { HAND_STATE, SORT_BY_COLOR, SORT_BY_RANK } from "./engine.js?v=1189a53f";
+import { HAND_STATE, SORT_BY_COLOR, SORT_BY_RANK } from "./engine.js?v=77099614";
 import {
   BUFFS, HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, buffPrice,
   STORE_ALL_AT_ONCE, STORE_ALWAYS_OPEN, milestoneLocationName, phaseLocationName, storeLocationName,
-} from "./data.js?v=1189a53f";
-import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=1189a53f";
-import { Phase10Client } from "./client.js?v=1189a53f";
+} from "./data.js?v=77099614";
+import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=77099614";
+import { Phase10Client } from "./client.js?v=77099614";
 
 const el = (id) => document.getElementById(id);
 
@@ -617,6 +617,23 @@ function showSort() {
   button.title = "How your hand is ordered -- it costs nothing and is not a move";
 }
 
+/**
+ * The other AP_10 players in the room: score, rounds won, phases cleared. A
+ * race between friends needs the friends on screen; it changes nothing in play.
+ */
+function renderRivals() {
+  const box = el("rivals");
+  const rivals = [...(app.rivals ?? new Map()).values()];
+  box.hidden = app.offline || !rivals.length;
+  if (box.hidden) return;
+  box.textContent = "Also playing: " + rivals
+    .sort((a, b) => (a.record?.score ?? Infinity) - (b.record?.score ?? Infinity))
+    .map(({ name, record }) => (record
+      ? `${name} ${record.score} pts, ${record.cleared} cleared, ${record.won} won`
+      : `${name} (not started)`))
+    .join("  |  ");
+}
+
 // -- rendering ---------------------------------------------------------------
 function render() {
   const s = app.session;
@@ -631,7 +648,10 @@ function render() {
     : `Round ${s.game.roundNumber} - score ${s.totalScore} (lower is better) - `
       + `won ${s.handsWon} - cleared ${s.clearedPhases.size}/${app.phaseCap}`
       + (s.scoreReduction ? ` - ${s.scoreReduction} reduced` : "")
-      + (s.deathLink && !app.offline ? ` - DeathLink at ${s.nextScoreDeath}` : "");
+      + ((s.deathLink || s.scoreTraps) && !app.offline
+        ? ` - next score mark ${s.nextScoreMark}` : "");
+
+  renderRivals();
 
   if (hand) {
     el("objective").textContent = `Phase ${hand.phase}: ${phaseDescription(hand.phase)}`;

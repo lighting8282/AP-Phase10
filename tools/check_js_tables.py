@@ -45,8 +45,8 @@ def load_python_tables() -> dict:
         # both shapes, so a gate that drifted would make the browser offer a
         # check the server thinks is unreachable. These were never compared
         # until store_gating gave the gate a second shape.
-        "deathLinkScore": [module.MIN_DEATH_LINK_SCORE, module.DEFAULT_DEATH_LINK_SCORE,
-                           module.MAX_DEATH_LINK_SCORE],
+        "scoreThreshold": [module.MIN_SCORE_THRESHOLD, module.DEFAULT_SCORE_THRESHOLD,
+                           module.MAX_SCORE_THRESHOLD],
         "storeGatings": list(module.STORE_GATINGS),
         "storeShapes": {
             f"{gating}/{slots}": {
@@ -75,7 +75,7 @@ def load_js_tables() -> dict:
         fillers: d.FILLERS,
         buffs: d.BUFFS,
         buffPrices: d.BUFF_PRICES,
-        deathLinkScore: [d.MIN_DEATH_LINK_SCORE, d.DEFAULT_DEATH_LINK_SCORE, d.MAX_DEATH_LINK_SCORE],
+        scoreThreshold: [d.MIN_SCORE_THRESHOLD, d.DEFAULT_SCORE_THRESHOLD, d.MAX_SCORE_THRESHOLD],
         storeGatings: d.STORE_GATINGS,
         storeShapes: Object.fromEntries(d.STORE_GATINGS.flatMap((gating) =>
           Array.from({ length: d.MAX_STORE_SLOTS + 1 }, (_, slots) => [

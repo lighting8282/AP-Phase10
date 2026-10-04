@@ -9,17 +9,17 @@
 // before the restore lands would overwrite a real one with that empty rebuild.
 // Nothing is saved until restoreState is "done".
 
-import { Client } from "../node_modules/archipelago.js/dist/index.js?v=1189a53f";
+import { Client } from "../node_modules/archipelago.js/dist/index.js?v=77099614";
 
 import {
   GAME_NAME, LOCATION_NAME_TO_ID, MULLIGAN, PHASE_COUNT, WILD_CARD, phaseUnlock,
   storeLocationName,
 }
-  from "./data.js?v=1189a53f";
-import { STOCK_SKIPS } from "./cards.js?v=1189a53f";
-import { Phase10Game, roundToString } from "./game.js?v=1189a53f";
-import { Phase10Session } from "./session.js?v=1189a53f";
-import { describeMeldCards } from "./phases.js?v=1189a53f";
+  from "./data.js?v=77099614";
+import { STOCK_SKIPS } from "./cards.js?v=77099614";
+import { Phase10Game, roundToString } from "./game.js?v=77099614";
+import { Phase10Session, readScoreRecord, scoreKey } from "./session.js?v=77099614";
+import { describeMeldCards } from "./phases.js?v=77099614";
 
 /**
  * The deck a free-play run is dealt, with no Archipelago to hand items out.
@@ -89,6 +89,11 @@ export class Phase10Client {
     // chat. Without it the browser client can see its own game and
     // nothing of the multiworld it is part of.
     this.onMessage = onMessage;
+    //: Score DeathLink deaths not yet sent, by the threshold that earned each.
+    this.deathsOwed = [];
+    //: The other AP_10 players in the room, by slot: their name and the
+    //: score record they last published. Empty offline and when alone.
+    this.rivals = new Map();
     //: Hold the opponents' turns for the driver to walk one at a time. The DOM
     //: client sets it so the table can be watched; nothing headless wants it.
     this.paced = paced;
@@ -289,9 +294,11 @@ export class Phase10Client {
     if (this.session.deathLink) {
       this.client.deathLink.enableDeathLink();
     }
+    this.#sendOwedDeaths();
 
     this.syncItems();
     await this.restore();
+    await this.watchRivals();
     await this.scoutStore();
     this.onLog(`Connected as ${slotName}.`);
     this.onUpdate();
@@ -374,6 +381,54 @@ export class Phase10Client {
     this.onUpdate();
   }
 
+  /**
+   * This client's own player, or null. archipelago.js throws rather than
+   * returning nothing when there has been no real connection -- a test
+   * harness, or a login that has not landed -- so `?.` is no guard.
+   */
+  #selfPlayer() {
+    try {
+      return this.client.players.self ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Watch the other AP_10 players' published scores, live.
+   *
+   * Each client writes a small public record beside its private save; this
+   * reads everyone else's and asks the server to say when one changes. A
+   * player who has not played yet has no record, and is listed without one.
+   */
+  async watchRivals() {
+    this.rivals = new Map();
+    const self = this.#selfPlayer();
+    if (!self) return;
+    const others = (this.client.players.teams[self.team] ?? [])
+      .filter((p) => p.game === GAME_NAME && p.slot !== self.slot);
+    if (!others.length) return;
+    const bySlot = new Map(others.map((p) => [scoreKey(self.team, p.slot), p]));
+    const take = (key, value) => {
+      const player = bySlot.get(key);
+      if (!player) return;
+      this.rivals.set(player.slot, { name: player.name, record: readScoreRecord(value) });
+    };
+    for (const player of others) this.rivals.set(player.slot, { name: player.name, record: null });
+    try {
+      const now = await this.client.storage.notify([...bySlot.keys()], (key, value) => {
+        take(key, value);
+        this.onUpdate();
+      });
+      for (const [key, value] of Object.entries(now ?? {})) take(key, value);
+    } catch (err) {
+      // The other players' scores are a nicety; failing to read them must not
+      // stop anybody playing.
+      this.onLog(`Could not read the other players' scores: ${err.message}`);
+    }
+    this.onUpdate();
+  }
+
   async save() {
     if (this.restoreState !== "done") return;
     if (this.offline) {
@@ -386,6 +441,13 @@ export class Phase10Client {
         .prepare(this.saveKey, {})
         .replace(this.session.toPayload())
         .commit();
+      const self = this.#selfPlayer();
+      if (self) {
+        await this.client.storage
+          .prepare(scoreKey(self.team, self.slot), {})
+          .replace(this.session.scoreRecord())
+          .commit();
+      }
     } catch (err) {
       this.onLog(`Could not save the scorecard: ${err.message}`);
     }
@@ -479,6 +541,16 @@ export class Phase10Client {
     }
   }
 
+  /** Send any deaths owed, oldest first, if there is a room to send them to. */
+  #sendOwedDeaths() {
+    while (this.connected && this.deathsOwed.length) {
+      const reached = this.deathsOwed.shift();
+      const name = this.client.players.self?.name ?? "A player";
+      this.client.deathLink.sendDeathLink(name, `reached ${reached} points`);
+      this.onLog(`DeathLink sent: you reached ${reached} points.`);
+    }
+  }
+
   async settle(hand, { sendDeath = true } = {}) {
     this.#reportFinalTable();
     const fresh = this.session.finishHand(hand);
@@ -496,20 +568,24 @@ export class Phase10Client {
       // Said once: no round can start after this, so settle cannot run again.
       if (this.session.runOver) this.#announceRun();
     }
-    await this.save();
-
-    // DeathLink goes out by score, not by losing: every `death_link_score`
-    // points sends one. Left owed while disconnected, so the next settle sends
-    // it; a hand an incoming death ended is absorbed, or linked players could
-    // bounce deaths forever. Mirrors settle in context.py.
-    if (this.session.deathLink && (this.connected || !sendDeath)) {
-      const reached = this.session.scoreDeathDue({ absorb: !sendDeath });
-      if (reached !== null) {
-        const name = this.client.players.self?.name ?? "A player";
-        this.client.deathLink.sendDeathLink(name, `reached ${reached} points`);
-        this.onLog(`DeathLink sent: you reached ${reached} points.`);
+    // Every `score_threshold` points: a DeathLink death if death_link is on, a
+    // trap on your next hand if score_traps is. Deaths wait while disconnected
+    // and go out on reconnect; a hand an incoming death ended is absorbed, or
+    // linked players could bounce deaths forever. Mirrors settle in context.py.
+    // Before the save, so the save records the threshold as handled -- the
+    // other way round, a reconnect resent the death and refired the trap.
+    const s = this.session;
+    if (s.deathLink || s.scoreTraps) {
+      const reached = s.scoreMarkDue({ absorb: !sendDeath });
+      if (reached !== null && s.deathLink) this.deathsOwed.push(reached);
+      if (s.lastScoreTrap) {
+        this.onLog(`Your score passed ${reached}: ${s.lastScoreTrap} will hit your next hand.`);
       }
     }
+    await this.save();
+
+    this.#sendOwedDeaths();
+
 
     if (this.session.goalMet && !this.goalSent && this.connected) {
       this.client.goal();
