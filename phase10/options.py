@@ -212,18 +212,22 @@ class StoreGating(Choice):
 
     ladder:       prices ascend (1, 1, 1, 1, 2, 2, 3, 3) and the slots open one
                   at a time, the first at 1 point.
-    all_at_once:  every slot costs 1 point, and they all open together once you
-                  hold enough to buy every one -- 6 points at 6 slots. Then you
-                  pick the order, with each slot showing what it holds.
+    always_open:  every slot can be bought from the start. Its price is set by
+                  what it holds: trap or filler 1 point, useful 2, progression 3.
+                  Your own AP Point costs 1, so buying it back is never a loss.
 
-    `all_at_once` is quieter early -- no store check until the whole store
-    opens -- but reaches every slot sooner, and fits a full store into seeds
-    the ladder has to trim. Spending money for the one-use cards is the same
-    either way; `store_buff_points` sets that.
+    `always_open` needs more points in the pool, which leaves less room for the
+    store in a tight seed: with `checks_per_phase: 1` it does not fit at all.
+    Points the slots end up not costing become spending money for the one-use
+    cards.
     """
     display_name = "Store Gating"
     option_ladder = 0
-    option_all_at_once = 1
+    option_always_open = 1
+    # 1.5.0's name for this option value, which opened every slot together
+    # once the whole store was affordable. Not what was wanted; a YAML that
+    # still says it gets the store it was asking for.
+    alias_all_at_once = option_always_open
     default = option_ladder
 
 

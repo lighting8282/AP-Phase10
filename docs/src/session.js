@@ -18,14 +18,22 @@ import {
   SCORE_REDUCTION_VALUE, SKIP_CARD, TIERS, WILD_CARD,
   WILD_THEFT, milestoneLocationName, phaseLocationName, phaseUnlock,
   buffPrice, storeGate, storeLocationName, storePrices,
-  STORE_ALL_AT_ONCE, STORE_LADDER,
-} from "./data.js?v=7dc84a86";
-import { SKIP, STOCK_WILDS, WILD } from "./cards.js?v=7dc84a86";
-import { HAND_STATE, Table, gameConfig } from "./engine.js?v=7dc84a86";
-import { MID, NAMES as OPPONENT_NAMES, buildOpponents } from "./opponents.js?v=7dc84a86";
-import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js?v=7dc84a86";
+  STORE_ALL_AT_ONCE, STORE_ALWAYS_OPEN, STORE_GATINGS, STORE_LADDER, PRICE_PROGRESSION,
+} from "./data.js?v=fc5b86ab";
+import { SKIP, STOCK_WILDS, WILD } from "./cards.js?v=fc5b86ab";
+import { HAND_STATE, Table, gameConfig } from "./engine.js?v=fc5b86ab";
+import { MID, NAMES as OPPONENT_NAMES, buildOpponents } from "./opponents.js?v=fc5b86ab";
+import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js?v=fc5b86ab";
 
 export const LEAN_DEAL_PENALTY = 2;
+
+/** The always-open prices from slot data, or null if absent or malformed. */
+function readSlotPrices(slotData) {
+  const prices = slotData.store_prices;
+  if (!Array.isArray(prices)) return null;
+  const ok = prices.every((p) => Number.isInteger(p) && p >= 1 && p <= PRICE_PROGRESSION);
+  return ok ? [...prices] : null;
+}
 
 export class Phase10Session {
   constructor(opts = {}) {
@@ -37,6 +45,9 @@ export class Phase10Session {
     //: nothing and reads as the ladder, which is what it was generated as --
     //: reading it any other way would gate slots the server does not.
     this.storeGating = opts.storeGating ?? STORE_LADDER;
+    //: Always open only: each slot's price, decided by the world after fill
+    //: from the item in it. null for the shapes whose prices are fixed.
+    this.slotPrices = opts.slotPrices ?? null;
     //: "dig" or "deny". Only free play sends the latter; an Archipelago seed
     //: never does, because its access rules are built on the dig's numbers.
     this.skipMode = opts.skipMode ?? "dig";
@@ -83,8 +94,9 @@ export class Phase10Session {
       startingDraws: Number(slotData.starting_draws ?? 4),
       checksPerPhase: Number(slotData.checks_per_phase ?? 4),
       storeSlots: Number(slotData.store_slots ?? 0),
-      storeGating: slotData.store_gating === STORE_ALL_AT_ONCE
-        ? STORE_ALL_AT_ONCE : STORE_LADDER,
+      storeGating: STORE_GATINGS.includes(slotData.store_gating)
+        ? slotData.store_gating : STORE_LADDER,
+      slotPrices: readSlotPrices(slotData),
       // Absent in seeds generated before the option existed, where the
       // world's own rule asked for every phase.
       phasesToWin: Number(slotData.phases_to_win ?? PHASE_COUNT),
@@ -255,11 +267,22 @@ export class Phase10Session {
   }
 
   storePrice(slot) {
+    if (this.storeGating === STORE_ALWAYS_OPEN) {
+      // Missing or malformed prices charge the worst case, which can only cost
+      // spending money: the pool carries three a slot.
+      const prices = this.slotPrices ?? [];
+      return prices.length === this.storeSlots ? prices[slot - 1] : PRICE_PROGRESSION;
+    }
     return storePrices(this.storeSlots, this.storeGating)[slot - 1];
   }
 
-  /** Points received before `slot` opens, for this seed's shape. */
+  /**
+   * Points received before `slot` may be bought, for this seed's shape. Always
+   * open, none: buying before the logic's gate is out of logic, not out of
+   * bounds, and a slot bought costs exactly what it releases from the reserve.
+   */
   storeGate(slot) {
+    if (this.storeGating === STORE_ALWAYS_OPEN) return 0;
     return storeGate(slot, this.storeSlots, this.storeGating);
   }
 

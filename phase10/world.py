@@ -6,7 +6,9 @@ from worlds.AutoWorld import World
 from . import items, locations, regions, rules, web_world
 from . import options as phase10_options
 from .data import (
-    GAME_NAME, HANDS_WON_MILESTONES, PHASE_COUNT, STORE_ALL_AT_ONCE, STORE_LADDER,
+    AP_POINT, GAME_NAME, HANDS_WON_MILESTONES, PHASE_COUNT, PRICE_PROGRESSION,
+    PRICE_TRAP_OR_FILLER, STORE_ALWAYS_OPEN,
+    STORE_LADDER, price_for, store_location_name,
 )
 
 
@@ -79,10 +81,36 @@ class Phase10World(World):
         data["skip_mode"] = ("deny" if int(self.options.skip_mode)
                              == phase10_options.SkipMode.option_deny else "dig")
         data["store_gating"] = self.store_gating
+        if self.store_gating == STORE_ALWAYS_OPEN:
+            data["store_prices"] = self.store_slot_prices()
         return data
+
+    def store_slot_prices(self) -> list[int]:
+        """Each always-open slot's price, from the item fill put in it.
+
+        Slot data is written after fill, which is the first moment the price
+        can be known; the logic and the pool were sized for the worst case
+        before it. An empty slot only happens outside a real generation -- a
+        unit test that stops short of fill -- and is priced at the worst case,
+        which overcharges and so can never strand anything.
+        """
+        prices = []
+        for slot in range(1, int(self.options.store_slots) + 1):
+            item = self.get_location(store_location_name(slot)).item
+            if item is None:
+                prices.append(PRICE_PROGRESSION)
+            elif item.player == self.player and item.name == AP_POINT:
+                # Your own AP Point is progression, but charging three for it
+                # would make the slot a loss of two. It costs one: change, not
+                # a purchase. Keeping points out of the store instead made
+                # fill fail in 1 seed in 10 at the default size.
+                prices.append(PRICE_TRAP_OR_FILLER)
+            else:
+                prices.append(price_for(item.advancement, item.useful))
+        return prices
 
     @property
     def store_gating(self) -> str:
         """The word for `store_gating`, as the data helpers and clients take it."""
-        return (STORE_ALL_AT_ONCE if int(self.options.store_gating)
-                == phase10_options.StoreGating.option_all_at_once else STORE_LADDER)
+        return (STORE_ALWAYS_OPEN if int(self.options.store_gating)
+                == phase10_options.StoreGating.option_always_open else STORE_LADDER)

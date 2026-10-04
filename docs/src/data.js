@@ -97,23 +97,39 @@ export const STORE_SLACK = 2;
  * was generated as. See data.py for the invariant both shapes keep.
  */
 export const STORE_LADDER = "ladder";
+export const STORE_ALWAYS_OPEN = "always_open";
+/** 1.5.0 only, kept so its seeds still play. See data.py. */
 export const STORE_ALL_AT_ONCE = "all_at_once";
-export const STORE_GATINGS = Object.freeze([STORE_LADDER, STORE_ALL_AT_ONCE]);
+export const STORE_GATINGS = Object.freeze([STORE_LADDER, STORE_ALWAYS_OPEN, STORE_ALL_AT_ONCE]);
+
+/** What an always-open slot costs, by the classification of the item in it. */
+export const PRICE_TRAP_OR_FILLER = 1;
+export const PRICE_USEFUL = 2;
+export const PRICE_PROGRESSION = 3;
 
 const sum = (prices) => prices.reduce((total, price) => total + price, 0);
 
-export const storePrices = (slots, gating = STORE_LADDER) =>
-  gating === STORE_ALL_AT_ONCE ? Array(slots).fill(1) : STORE_PRICES.slice(0, slots);
+/**
+ * What the slots cost as far as generation can know. Always open, the worst
+ * case: the real prices arrive in slot data, decided after fill.
+ */
+export const storePrices = (slots, gating = STORE_LADDER) => {
+  if (gating === STORE_ALWAYS_OPEN) return Array(slots).fill(PRICE_PROGRESSION);
+  if (gating === STORE_ALL_AT_ONCE) return Array(slots).fill(1);
+  return STORE_PRICES.slice(0, slots);
+};
 
 /**
- * Points needed before slot `slot` (1-based) may be bought at all. On the
- * ladder, the cheapest `slot` prices; all at once, the whole store, which is
- * the only single gate every slot can share honestly.
+ * Points received before the *logic* counts a slot reachable -- the access
+ * rule, not when a client sells it. On the ladder, the cheapest `slot` prices;
+ * all at once, the whole store; always open, enough for any one slot. See
+ * data.py for why always open is the exception.
  */
-export const storeGate = (slot, slots = MAX_STORE_SLOTS, gating = STORE_LADDER) =>
-  gating === STORE_ALL_AT_ONCE
-    ? sum(storePrices(slots, gating))
-    : sum(STORE_PRICES.slice(0, slot));
+export const storeGate = (slot, slots = MAX_STORE_SLOTS, gating = STORE_LADDER) => {
+  if (gating === STORE_ALWAYS_OPEN) return PRICE_PROGRESSION;
+  if (gating === STORE_ALL_AT_ONCE) return sum(storePrices(slots, gating));
+  return sum(STORE_PRICES.slice(0, slot));
+};
 
 /**
  * What the store sells that is not a check: a card, once, now. See data.py for

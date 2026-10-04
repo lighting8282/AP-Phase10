@@ -37,7 +37,10 @@ from ..data import (
     buff_price,
     milestone_location_name,
     phase_location_name,
+    PRICE_PROGRESSION,
     STORE_ALL_AT_ONCE,
+    STORE_ALWAYS_OPEN,
+    STORE_GATINGS,
     STORE_LADDER,
     store_gate,
     store_location_name,
@@ -55,6 +58,17 @@ TRAP_NAMES = (PHASE_LOCK, LEAN_DEAL, WILD_THEFT)
 LEAN_DEAL_PENALTY = 2
 
 
+def read_slot_prices(slot_data) -> list[int] | None:
+    """The always-open prices from slot data, or None if absent or malformed."""
+    prices = slot_data.get("store_prices")
+    if not isinstance(prices, list):
+        return None
+    if not all(isinstance(p, int) and not isinstance(p, bool) and 1 <= p <= PRICE_PROGRESSION
+               for p in prices):
+        return None
+    return list(prices)
+
+
 @dataclass
 class Phase10Session:
     goal: int = 0
@@ -67,6 +81,9 @@ class Phase10Session:
     #: nothing and reads as the ladder, which is what it was generated as --
     #: reading it any other way would gate slots the server does not.
     store_gating: str = STORE_LADDER
+    #: Always open only: what each slot costs, decided by the world after fill
+    #: from the item in it. None for the other shapes, whose prices are fixed.
+    slot_prices: list[int] | None = None
     #: "dig" or "deny". Only the free-play client sends the latter; an
     #: Archipelago seed never does, because its access rules are built on the
     #: dig's measured numbers.
@@ -114,9 +131,10 @@ class Phase10Session:
             death_link=bool(slot_data.get("death_link", False)),
             opponents=int(slot_data.get("opponents", 3)),
             store_slots=int(slot_data.get("store_slots", 0)),
-            store_gating=(STORE_ALL_AT_ONCE
-                          if slot_data.get("store_gating") == STORE_ALL_AT_ONCE
+            store_gating=(slot_data.get("store_gating")
+                          if slot_data.get("store_gating") in STORE_GATINGS
                           else STORE_LADDER),
+            slot_prices=read_slot_prices(slot_data),
             # Absent in seeds generated before the option existed, where the
             # world's own rule asked for every phase.
             phases_to_win=int(slot_data.get("phases_to_win", PHASE_COUNT)),
@@ -361,10 +379,25 @@ class Phase10Session:
         return max(0, self.points - self.points_spent)
 
     def store_price(self, slot: int) -> int:
+        if self.store_gating == STORE_ALWAYS_OPEN:
+            # Missing or malformed prices charge the worst case. Overcharging
+            # can only cost spending money: the pool carries three a slot.
+            prices = self.slot_prices or []
+            if len(prices) == self.store_slots:
+                return prices[slot - 1]
+            return PRICE_PROGRESSION
         return store_prices(self.store_slots, self.store_gating)[slot - 1]
 
     def store_gate(self, slot: int) -> int:
-        """Points received before `slot` opens, for this seed's shape."""
+        """Points received before `slot` may be bought, for this seed's shape.
+
+        Always open, none. The logic waits for the whole store's worst case
+        before it counts a slot reachable, but buying sooner is out of logic,
+        not out of bounds, and a slot bought costs exactly what it releases
+        from the reserve -- so it can never strand another.
+        """
+        if self.store_gating == STORE_ALWAYS_OPEN:
+            return 0
         return store_gate(slot, self.store_slots, self.store_gating)
 
     def can_buy(self, slot: int) -> str | None:

@@ -41,7 +41,7 @@ while to find and would be easy to reintroduce.
 - [Fillers](#fillers)
 - [The store](#the-store)
   - [The gate is not the price](#the-gate-is-not-the-price)
-  - [All at once](#all-at-once)
+  - [Always open](#always-open)
   - [Sizing it, measured](#sizing-it-measured)
   - [The slots say what they hold](#the-slots-say-what-they-hold)
   - [The rebuyable half](#the-rebuyable-half)
@@ -685,46 +685,46 @@ the largest of those gates. The check stays anyway — it is what would catch a
 future ladder that stopped ascending — and both ports test the invariant
 exhaustively, over every point count against all 720 purchase orders.
 
-### All at once
+### Always open
 
-`store_gating: all_at_once` is the second shape: every slot costs 1 and every
-slot shares one gate, the store's total — 6 points at 6 slots. Nothing opens
-until then, and then everything does, so the player picks the order. Asked for
-because the ladder's "any order" was true only in a narrow sense: holding one
-point, slot 1 is the *only* thing buyable, and the choice appears once enough
-is open that you can afford all of it anyway.
+`store_gating: always_open`: every slot sellable from the first point, priced
+by what fill put in it — trap or filler 1, useful 2, progression 3. It replaced
+1.5.0's `all_at_once` (every slot 1, all opening together at the total), which
+was built from a misreading of the request; that YAML word is now an alias for
+`always_open`, and the clients still understand an `all_at_once` seed.
 
-The gate cannot be flattened to anything lower. One gate for every slot means
-the gate has to cover the whole store, or the logic would say slot 6 is
-reachable at a point count where the player could only have bought five. So
-"all at once" is the total, which is also the last rung of a ladder of ones —
-the same invariant as the ladder, in the one shape that lets every slot share
-it. The exhaustive 720-order test runs under both shapes in both ports.
+**The price is only known after fill, and the logic is written before it.**
+That one fact decides the design, and it was measured rather than argued:
 
-Two consequences, both measured with the real `plan_store`:
+| logic rule for each slot | fails to generate, 6 / 8 slots (150 seeds) | random-order buyer stuck |
+|---|---|---|
+| the store's worst case, 3 a slot (exact) | 2 / **90** | 0 |
+| 3 points — any one slot (shipped) | **0 / 0** | **0 of 750** |
 
-- **It does not change the spending money.** The pool is sized to what the
-  store costs, so a store of ones carries fewer points (16 at six slots against
-  the ladder's 18), not more to spend. What is left once every slot is bought
-  is `store_buff_points` plus the slack in both shapes. This was claimed the
-  other way while the option was being designed, and was wrong; a test pins it.
-- **It fits where the ladder does not.** A slot that costs one point and brings
-  one location pays for itself exactly, so at `checks_per_phase: 1` — where the
-  ladder trims to five slots and six points — all at once keeps all eight, with
-  nine.
+The exact rule had to wait for every slot's worst case before counting any slot
+reachable, and in a solo seed that packs too much progression in too early.
+The shipped rule is the one Archipelago shops use. It does not model spending,
+so in principle the logic can count a slot reachable a little before the player
+can afford everything it assumes. What makes that safe in practice is the pool:
+it carries three points a slot *as progression*, so fill puts every point the
+store could cost somewhere reachable, plus the slack and the card budget as
+`useful`. `check_store_balance.py --seeds 150` replays the evidence: for every
+seed it also plays five buyers who pick affordable slots at random, and fails if
+any is stranded. Over the whole grid at 150 seeds, none was — 6,750 playthroughs.
 
-Seeds that predate the option send no `store_gating` and both clients read that
-as the ladder, which is what those seeds were generated as. Any other reading
-would gate slots differently from the server.
+Two things tried and dropped, both measured:
 
-Writing it turned up two things that had been broken since the card budget
-landed, both invisible because they need an Archipelago checkout:
-`test_the_pool_carries_the_points` expected 10 points against the 18 the world
-generates, and `check_store_balance.py`'s ceiling left out the budget, so it
-would have failed every untrimmed store. Both fixed; neither has been run here.
-And `check_js_tables.py` never compared the store's prices or gates between the
-ports at all — it now computes every gate for every store size in both shapes,
-and fails on a single gate off by one (tried).
+- **Marking every point progression** — the first cut — failed fill on 5–25%
+  of seeds. Only the worst case needs to be.
+- **Keeping your own AP Points out of the store** (an item rule, the usual
+  shop fix) brought failures back: 15 of 150 at the default size. Instead your
+  own point is priced at 1, so a slot holding it is change rather than a loss
+  of two. Without either, a third to a half of slots held one.
+
+At the default six slots and two checks a phase, the store costs 8–18
+(averaging 12.4) and the pool carries 27, so about 15 are left for one-use
+cards. At `checks_per_phase: 1` there is no room for three points a slot and
+the store is dropped; the option says so.
 
 ### Sizing it, measured
 

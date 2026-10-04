@@ -327,8 +327,11 @@ class Phase10CommandProcessor(ClientCommandProcessor):
                 who = "" if stock["mine"] else f" -> {stock['receiver']}"
                 star = " *" if stock["progression"] else ""
                 shelf = f"  [{stock['name']}{who}{star}]"
+            # An always-open store has nothing to wait for, so no "opens at".
+            gate = s.store_gate(slot)
+            opens = f"  opens at {gate}" if gate else ""
             self.output(f"  {mark}  Slot {slot}: {price} point(s)"
-                        f"  opens at {s.store_gate(slot)}{shelf}{why}")
+                        f"{opens}{shelf}{why}")
         # The rebuyable half, reported with what is actually spendable rather
         # than with what is unspent: the slots you have not bought are owed
         # their prices, because the seed's logic reasons about points received

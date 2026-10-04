@@ -87,12 +87,11 @@ def set_store_rules(world: Phase10World) -> None:
     """
     slots = int(world.options.store_slots)
     for slot in range(1, slots + 1):
+        location = world.get_location(store_location_name(slot))
         world.set_rule(
-            world.get_location(store_location_name(slot)),
+            location,
             Has(AP_POINT, count=store_gate(slot, slots, world.store_gating)),
         )
-
-
 def set_phase_entrance_rules(world: Phase10World) -> None:
     for phase in range(1, PHASE_COUNT + 1):
         world.set_rule(

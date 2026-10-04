@@ -10,7 +10,7 @@ from ..data import (
     MAX_SKIPS, MULLIGAN, PHASE_COUNT, PHASE_LOCK, PHASE_UNLOCK, SCORE_REDUCTION,
     SCORE_REDUCTION_VALUE, SKIP_CARD, WILD_CARD, WILD_THEFT,
     BUFF_SKIP, BUFF_WILD, DEFAULT_BUFF_POINTS,
-    STORE_ALL_AT_ONCE, STORE_GATINGS, STORE_LADDER,
+    PRICE_PROGRESSION, STORE_ALL_AT_ONCE, STORE_ALWAYS_OPEN, STORE_GATINGS, STORE_LADDER,
     store_gate, store_location_name, store_points, store_prices,
 )
 from ..game.cards import STOCK_WILDS, WILD, Color, number_card
@@ -539,9 +539,10 @@ class TestStore(unittest.TestCase):
         """
         from itertools import permutations
 
-        # Both shapes. All at once has one gate for every slot, so it has to
-        # cover the whole store, and this is what proves that it does.
-        for gating in STORE_GATINGS:
+        # The gated shapes. All at once has one gate for every slot, so it has
+        # to cover the whole store, and this is what proves that it does.
+        # Always open has no gate to meet and its own invariants, below.
+        for gating in (STORE_LADDER, STORE_ALL_AT_ONCE):
             for points in range(store_points(6, gating=gating) + 1):
                 for order in permutations(range(1, 7)):
                     s = self.store(points=points)
@@ -595,6 +596,10 @@ class TestStore(unittest.TestCase):
         self.assertEqual(session(store_slots=6, store_gating="all_at_once").store_gating,
                          STORE_ALL_AT_ONCE)
 
+    def test_the_always_open_word_is_read(self) -> None:
+        self.assertEqual(session(store_slots=6, store_gating="always_open").store_gating,
+                         STORE_ALWAYS_OPEN)
+
     def test_a_seed_from_before_the_option_is_a_ladder(self) -> None:
         """No word means the shape the seed was generated as. Anything else would
         gate slots differently from the server, and that is the failure the gate
@@ -622,8 +627,90 @@ class TestStore(unittest.TestCase):
         for slots in range(1, 9):
             left = {g: store_points(slots, DEFAULT_BUFF_POINTS, g)
                        - sum(store_prices(slots, g))
-                    for g in STORE_GATINGS}
+                    for g in (STORE_LADDER, STORE_ALL_AT_ONCE)}
             self.assertEqual(left[STORE_LADDER], left[STORE_ALL_AT_ONCE], slots)
+
+    # -- always open ---------------------------------------------------------
+    def open_store(self, prices, points=0):
+        s = session(store_slots=len(prices), store_gating=STORE_ALWAYS_OPEN,
+                    store_prices=list(prices))
+        s.set_items([AP_POINT] * points)
+        return s
+
+    def test_always_open_sells_from_the_first_point(self) -> None:
+        """No gate: a one-point slot is buyable with one point."""
+        s = self.open_store([3, 1, 2, 1, 1, 3], points=1)
+        self.assertIsNone(s.can_buy(2))
+        self.assertIsNone(s.can_buy(4))
+        self.assertIn("costs 3", s.can_buy(1))
+
+    def test_always_open_prices_come_from_slot_data(self) -> None:
+        s = self.open_store([3, 1, 2])
+        self.assertEqual([s.store_price(slot) for slot in (1, 2, 3)], [3, 1, 2])
+
+    def test_always_open_bad_prices_charge_the_worst_case(self) -> None:
+        """Overcharging can only cost spending money -- the pool carries three
+        a slot -- so it is the safe way to be wrong."""
+        for bad in (None, "3,1", [1, 2], [0, 1, 1], [4, 1, 1], [True, 1, 1]):
+            s = session(store_slots=3, store_gating=STORE_ALWAYS_OPEN, store_prices=bad)
+            self.assertEqual({s.store_price(slot) for slot in (1, 2, 3)},
+                             {PRICE_PROGRESSION}, repr(bad))
+
+    def test_buying_a_slot_never_touches_the_card_budget(self) -> None:
+        """A slot bought costs exactly what it releases from the reserve, so
+        what is left for one-use cards cannot move -- whatever is bought, in
+        whatever order, out of logic or in it."""
+        from itertools import permutations
+        prices = [3, 1, 2, 1, 3, 2]
+        for points in range(0, 21):
+            for order in list(permutations(range(1, 7)))[::37]:
+                s = self.open_store(prices, points=points)
+                budget = s.buff_points_left
+                for slot in order:
+                    if s.can_buy(slot) is None:
+                        s.buy_slot(slot)
+                        self.assertEqual(s.buff_points_left, budget, (points, order))
+
+    def test_the_logic_counts_a_slot_reachable_at_one_slots_worth(self) -> None:
+        """Three points: enough for any one slot. Not the whole store's worst
+        case -- that rule failed to generate in up to 60% of seeds."""
+        self.assertEqual({store_gate(slot, 6, STORE_ALWAYS_OPEN) for slot in range(1, 7)}, {3})
+
+    def test_with_the_worst_case_in_hand_everything_buys_in_any_order(self) -> None:
+        """What the pool guarantees: it carries three points a slot as
+        progression, and with that many every slot is buyable whatever was
+        bought before it -- for every way fill could have priced the store."""
+        from itertools import permutations, product
+        worst = sum(store_prices(4, STORE_ALWAYS_OPEN))
+        self.assertEqual(worst, 12)
+        orders = list(permutations(range(1, 5)))
+        for prices in product((1, 2, 3), repeat=4):
+            for order in orders:
+                s = self.open_store(prices, points=worst)
+                for slot in order:
+                    self.assertIsNone(s.can_buy(slot), (prices, order))
+                    s.buy_slot(slot)
+
+    def test_always_open_only_ever_refuses_for_cost(self) -> None:
+        from itertools import product
+        for prices in product((1, 2, 3), repeat=3):
+            for points in range(0, 10):
+                s = self.open_store(prices, points=points)
+                for slot in (1, 2, 3):
+                    refusal = s.can_buy(slot)
+                    if refusal is not None:
+                        self.assertIn("costs", refusal, (prices, points))
+
+    def test_always_open_reserves_the_real_prices(self) -> None:
+        """What the store does not end up costing is spending money."""
+        s = self.open_store([1, 1, 1, 1, 1, 1], points=18)
+        self.assertEqual(s.points_reserved, 6)
+        self.assertEqual(s.buff_points_left, 12)
+
+    def test_an_all_at_once_seed_from_1_5_0_still_plays_as_one(self) -> None:
+        s = session(store_slots=6, store_gating=STORE_ALL_AT_ONCE)
+        s.set_items([AP_POINT] * 5)
+        self.assertIn("opens at 6", s.can_buy(1))
 
     def test_a_seed_without_a_store_refuses(self) -> None:
         s = self.store(slots=0, points=10)

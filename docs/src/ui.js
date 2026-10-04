@@ -4,18 +4,18 @@
 // client, and holds no game state of its own. Anything it needed to remember
 // would be a second copy of something the session already owns.
 
-import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=7dc84a86";
+import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=fc5b86ab";
 
 //: Faces used purely as icons in the stat panel.
 const SKIP_FACE = SKIP;
 const WILD_FACE = WILD;
-import { HAND_STATE, SORT_BY_COLOR, SORT_BY_RANK } from "./engine.js?v=7dc84a86";
+import { HAND_STATE, SORT_BY_COLOR, SORT_BY_RANK } from "./engine.js?v=fc5b86ab";
 import {
   BUFFS, HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, buffPrice,
-  STORE_ALL_AT_ONCE, milestoneLocationName, phaseLocationName, storeLocationName,
-} from "./data.js?v=7dc84a86";
-import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=7dc84a86";
-import { Phase10Client } from "./client.js?v=7dc84a86";
+  STORE_ALL_AT_ONCE, STORE_ALWAYS_OPEN, milestoneLocationName, phaseLocationName, storeLocationName,
+} from "./data.js?v=fc5b86ab";
+import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=fc5b86ab";
+import { Phase10Client } from "./client.js?v=fc5b86ab";
 
 const el = (id) => document.getElementById(id);
 
@@ -1099,7 +1099,9 @@ function renderStore(session) {
   summary.textContent =
     session.storeGating === STORE_ALL_AT_ONCE && session.points < opensAt
       ? `The whole store opens at ${opensAt} AP Points -- ${session.points} received`
-      : `${session.pointsLeft} unspent of ${session.points} AP Points received`;
+      : `${session.pointsLeft} unspent of ${session.points} AP Points received`
+        + (session.storeGating === STORE_ALWAYS_OPEN
+          ? " -- each slot is priced by what it holds" : "");
 
   const done = checkedLocations(session);
   for (let slot = 1; slot <= slots; slot += 1) {

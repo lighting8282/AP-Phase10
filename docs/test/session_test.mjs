@@ -17,7 +17,7 @@ import {
   AP_POINT, BUFF_SKIP, BUFF_WILD, LOCATION_NAME_TO_ID, MULLIGAN, PHASE_COUNT,
   SKIP_CARD,
   SCORE_REDUCTION, SCORE_REDUCTION_VALUE, phaseUnlock, storeGate,
-  storeLocationName, STORE_ALL_AT_ONCE, STORE_GATINGS, STORE_LADDER,
+  storeLocationName, STORE_ALL_AT_ONCE, STORE_ALWAYS_OPEN, STORE_GATINGS, STORE_LADDER,
 } from "../src/data.js";
 import { isWild } from "../src/cards.js";
 
@@ -350,9 +350,10 @@ fixtures.sequences.forEach((script, index) => {
     rest.forEach((v, i) => permute([...rest.slice(0, i), ...rest.slice(i + 1)], [...acc, v]));
   };
   permute([1, 2, 3, 4, 5, 6], []);
-  // Both shapes: all at once shares one gate across every slot, so it has to
-  // cover the whole store, and this is what proves that it does.
-  for (const gating of STORE_GATINGS) {
+  // The gated shapes: all at once shares one gate across every slot, so it
+  // has to cover the whole store, and this is what proves that it does.
+  // Always open has no gate and its own invariants, below.
+  for (const gating of [STORE_LADDER, STORE_ALL_AT_ONCE]) {
     let stranded = null;
     for (let points = 0; points <= POINTS && !stranded; points += 1) {
       for (const order of orders) {
@@ -384,6 +385,69 @@ fixtures.sequences.forEach((script, index) => {
   check("the slot data word is read", store(6, 0, "all_at_once").storeGating, STORE_ALL_AT_ONCE);
   check("a seed from before the option is a ladder", store(6, 0).storeGating, STORE_LADDER);
   check("an unknown word is a ladder too", store(6, 0, "nonsense").storeGating, STORE_LADDER);
+
+  // -- always open: mirrors the always-open tests in test_session.py ---------
+  const openStore = (prices, points, raw) => {
+    const s = Phase10Session.fromSlotData(
+      { goal: 0, starting_draws: 4, checks_per_phase: 4, store_slots: prices.length,
+        store_gating: STORE_ALWAYS_OPEN, store_prices: raw === undefined ? prices : raw },
+      new Phase10Game({ seed: 0 }),
+    );
+    s.setItems(Array(points).fill(AP_POINT));
+    return s;
+  };
+  const first = openStore([3, 1, 2, 1, 1, 3], 1);
+  check("always open sells a one-point slot at one point", first.canBuy(2), null);
+  check("and refuses a dearer one only for cost", (first.canBuy(1) ?? "").includes("costs 3"), true);
+  check("always open reads its prices from slot data",
+    [1, 2, 3].map((slot) => openStore([3, 1, 2], 0).storePrice(slot)), [3, 1, 2]);
+  for (const bad of [null, "3,1", [1, 2], [0, 1, 1], [4, 1, 1], [1.5, 1, 1]]) {
+    check(`bad prices charge the worst case (${JSON.stringify(bad)})`,
+      [1, 2, 3].map((slot) => openStore([1, 1, 1], 0, bad).storePrice(slot)), [3, 3, 3]);
+  }
+  check("always open has no gate", openStore([3, 3], 0).storeGate(1), 0);
+  check("the logic counts a slot reachable at one slot's worth",
+    [1, 2, 3, 4].map((slot) => storeGate(slot, 4, STORE_ALWAYS_OPEN)), [3, 3, 3, 3]);
+
+  // What the pool guarantees: with the worst case in hand -- three a slot,
+  // which it carries as progression -- every slot buys in any order, for
+  // every way fill could have priced a four-slot store.
+  const four = [];
+  const permuteFour = (rest, acc) => {
+    if (!rest.length) { four.push(acc); return; }
+    rest.forEach((v, i) => permuteFour([...rest.slice(0, i), ...rest.slice(i + 1)], [...acc, v]));
+  };
+  permuteFour([1, 2, 3, 4], []);
+  let unsound = null;
+  for (let code = 0; code < 81 && !unsound; code += 1) {
+    const prices = [0, 1, 2, 3].map((i) => 1 + Math.floor(code / 3 ** i) % 3);
+    for (const order of four) {
+      const s = openStore(prices, 12);
+      for (const slot of order) {
+        const refusal = s.canBuy(slot);
+        if (refusal !== null) { unsound = `${prices} ${order}: ${refusal}`; break; }
+        s.buySlot(slot);
+      }
+      if (unsound) break;
+    }
+  }
+  check("with the worst case in hand everything buys in any order", unsound, null);
+
+  // A slot bought costs exactly what it releases from the reserve.
+  let moved = null;
+  for (let points = 0; points <= 20 && !moved; points += 1) {
+    const s = openStore([3, 1, 2, 1, 3, 2], points);
+    const budget = s.buffPointsLeft;
+    for (const slot of [6, 2, 4, 1, 5, 3]) {
+      if (s.canBuy(slot) === null) {
+        s.buySlot(slot);
+        if (s.buffPointsLeft !== budget) { moved = `${points} points, slot ${slot}`; break; }
+      }
+    }
+  }
+  check("buying a slot never touches the card budget", moved, null);
+  const roomy = openStore([1, 1, 1, 1, 1, 1], 18);
+  check("what the slots do not cost is spending money", [roomy.pointsReserved, roomy.buffPointsLeft], [6, 12]);
 
   const full = store(6, POINTS);
   for (const slot of [6, 5, 4, 3, 2, 1]) {
