@@ -87,7 +87,8 @@ def main() -> int:
         out.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(made, out)
 
-    text = out.read_text(encoding="utf-8")
+    text = floor_requirement(out.read_text(encoding="utf-8"))
+    out.write_text(text, encoding="utf-8")
     problems = mismatches(text)
     if problems:
         out.unlink()
@@ -97,7 +98,8 @@ def main() -> int:
               + "\n  Remove or replace that copy so Archipelago loads this "
                 "repository's world, then run this again.", file=sys.stderr)
         return 1
-    print(f"{out}  {len(text.splitlines())} lines, AP_10 {built_version()}")
+    print(f"{out}  {len(text.splitlines())} lines, AP_10 {built_version()}, "
+          f"Archipelago {minimum_ap_version()}+")
     return 0
 
 
@@ -132,6 +134,32 @@ def built_version() -> str:
     return json.loads(manifest.read_text(encoding="utf-8"))["world_version"]
 
 
+def minimum_ap_version() -> str:
+    manifest = PROJECT_ROOT / "phase10" / "archipelago.json"
+    return json.loads(manifest.read_text(encoding="utf-8"))["minimum_ap_version"]
+
+
+#: The template's `requires: version:` line, which Archipelago fills in with
+#: its own version -- that of whichever checkout rendered it.
+REQUIRES = re.compile(r"^(requires:\s*\n\s+version:\s*)([\d.]+)", re.M)
+
+
+def floor_requirement(text: str) -> str:
+    """Make the template ask for the world's floor, not the renderer's version.
+
+    Generate refuses a YAML whose required version is above its own. v1.8.0
+    shipped `version: 0.6.8` because the template was rendered by a source
+    checkout of `main`, which reports an unreleased version -- so on 0.6.7, the
+    current stable release, nobody could generate with it. The world says what
+    it needs in `minimum_ap_version`; that is the honest number for this line.
+    """
+    stamped, count = REQUIRES.subn(rf"\g<1>{minimum_ap_version()}", text, count=1)
+    if count != 1:
+        raise SystemExit("! no `requires: version:` line in the template. If "
+                         "Archipelago's layout moved, update floor_requirement.")
+    return stamped
+
+
 def declared_options() -> set[str]:
     """The option names this build's options dataclass declares.
 
@@ -152,6 +180,11 @@ def mismatches(text: str) -> list[str]:
     version = found.group(1) if found else None
     if version != built_version():
         problems.append(f"it says {GAME} {version}; this build is {built_version()}")
+    required = REQUIRES.search(text)
+    if required is None or required.group(2) != minimum_ap_version():
+        problems.append(f"it requires Archipelago "
+                        f"{required.group(2) if required else '(nothing)'}; this "
+                        f"build's floor is {minimum_ap_version()}")
     keys = set(re.findall(r"^  ([a-z_]+):", text, re.M))
     missing = sorted(declared_options() - keys)
     if missing:

@@ -1744,6 +1744,14 @@ options.
 The lesson for next time: the floor is a claim about the oldest release that
 works, not about whatever your checkout happens to say.
 
+It came back through a side door in v1.8.0. The options template carries a
+`requires: version:` line, and Archipelago fills it with *its own* version --
+so the template rendered by that same `main` checkout asked for 0.6.8, and a
+0.6.7 Generate refused it: "required version of generator is at least 0.6.8,
+however generator is of version 0.6.7". `tools/export_template.py` now writes
+`minimum_ap_version` into that line, and refuses a template whose line says
+anything else.
+
 ## Packaging
 
     python tools/build_apworld.py                          # dist/phase10.apworld
