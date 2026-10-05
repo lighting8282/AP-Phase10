@@ -13,6 +13,9 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..data import (
+    OPPONENT_PHASE_MATCH,
+    OPPONENT_PHASE_OWN,
+    OPPONENT_PHASES,
     DEFAULT_SCORE_THRESHOLD,
     MAX_SCORE_THRESHOLD,
     MIN_SCORE_THRESHOLD,
@@ -127,6 +130,10 @@ class Phase10Session:
     #: The trap the last threshold set off, for the clients to announce.
     last_score_trap: str | None = None
     opponents: int = 3
+    #: "match": the seats play your phase every round. "own": each climbs its
+    #: own from Phase 1. Absent from slot data reads as own, which is what a
+    #: seed from before the option was played as, and free play is own.
+    opponent_phase: str = OPPONENT_PHASE_OWN
     store_slots: int = 0
     #: "ladder" or "all_at_once". A seed from before the option sends
     #: nothing and reads as the ladder, which is what it was generated as --
@@ -183,6 +190,9 @@ class Phase10Session:
             score_threshold=read_score_threshold(slot_data),
             score_traps=bool(slot_data.get("score_traps", False)),
             opponents=int(slot_data.get("opponents", 3)),
+            opponent_phase=(slot_data.get("opponent_phase")
+                            if slot_data.get("opponent_phase") in OPPONENT_PHASES
+                            else OPPONENT_PHASE_OWN),
             store_slots=int(slot_data.get("store_slots", 0)),
             store_gating=(slot_data.get("store_gating")
                           if slot_data.get("store_gating") in STORE_GATINGS
@@ -399,9 +409,22 @@ class Phase10Session:
     def seats(self) -> list:
         return self.table.seats if self.table else []
 
+    def seat_phases(self, phase: int) -> list[int]:
+        """The phase each seat plays this round: yours when they match it,
+        their own otherwise."""
+        if self.opponent_phase == OPPONENT_PHASE_MATCH:
+            return [phase] * self.opponents
+        return list(self.opponent_phases)
+
     def advance_opponents(self) -> list[str]:
-        """Move every seat that cleared its phase on to the next one."""
+        """Move every seat that cleared its phase on to the next one.
+
+        Not when they match your phase: then they have no phase of their own to
+        climb, and moving one would only change a number nobody plays.
+        """
         moved = []
+        if self.opponent_phase == OPPONENT_PHASE_MATCH:
+            return moved
         for index, seat in enumerate(self.seats):
             if seat.laid_down and index < len(self.opponent_phases):
                 # One past the cap in a race, and no further. That is not a
@@ -630,11 +653,12 @@ class Phase10Session:
 
         self.table = Table()
         if self.opponents:
-            # Each seat carries its own phase between rounds, so the table
-            # gets harder to beat as the run goes on rather than resetting
-            # to three players on phase 1 every time.
+            # On your phase when they match it -- the default for a seed, so
+            # a round's difficulty is the phase you chose. Otherwise each seat
+            # carries its own phase between rounds, which in free play is the
+            # race.
             self.table.seats = build_opponents(
-                self.opponents, list(self.opponent_phases),
+                self.opponents, self.seat_phases(phase),
                 config, self.game.rng, MID,
             )
         return self.game.start_round(phase, config, table=self.table)

@@ -67,6 +67,7 @@ while to find and would be easy to reintroduce.
 - [Multiworld](#multiworld)
 - [DeathLink](#deathlink)
   - [Score traps, going-out points, and the other players' scores](#score-traps-going-out-points-and-the-other-players-scores)
+  - [The seats play your phase](#the-seats-play-your-phase)
 - [A word on the version floor](#a-word-on-the-version-floor)
 - [Packaging](#packaging)
   - [Two things packaging broke that source never would](#two-things-packaging-broke-that-source-never-would)
@@ -1693,6 +1694,31 @@ browser client and reads the room with the Python client. Its first run caught
 a bug no unit test could: the browser client saved *before* marking a threshold
 handled, so after a reconnect the next round resent the death and refired the
 trap. It also confirmed the two clients read each other's scores.
+
+### The seats play your phase
+
+`opponent_phase: match` (the default for a seed) seats the computer players on
+the phase you picked, every round. `own` is the old behaviour: each starts on
+Phase 1 and climbs as it clears. Free play is always `own`, because there the
+seats climbing is the race; a seed from before the option reads as `own` too.
+
+Why it is the default: in a seed you play phases out of order, so with `own`
+the seats' phase drifts away from yours, and their phase moves your odds a lot.
+Measured, your clear rate on Phase 1 is 78% with the seats on Phase 1 and 52%
+with them on Phase 15 (runs let them shed and go out sooner, ending your
+round). With `match`, a round's difficulty is the phase you chose and your
+items; overall it lands close to the seats-on-Phase-1 column for most phases.
+
+| you on | they on 1 | on 5 | **same** | on 15 |
+|---|---|---|---|---|
+| 1 | 78% | 76% | **78%** | 52% |
+| 4 | 67% | 62% | **58%** | 47% |
+| 10 | 21% | 17% | **20%** | 9% |
+| 18 | 61% | 59% | **49%** | 44% |
+| 20 | 42% | 38% | **39%** | 19% |
+
+Matching seats do not climb (`advance_opponents` is a no-op), but their round
+scores are still tallied.
 
 ## A word on the version floor
 

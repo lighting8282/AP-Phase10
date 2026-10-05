@@ -58,6 +58,22 @@ class SkipMode(Choice):
     default = option_dig
 
 
+class OpponentPhase(Choice):
+    """
+    Which phase the computer players play.
+
+    match:  the same phase as you, every round. How hard a round is then
+            depends only on the phase you picked and your items.
+    own:    each starts on Phase 1 and climbs as it clears its own. Since you
+            play phases out of order, their phase drifts away from yours, and
+            how fast they go out -- which can end your round -- drifts with it.
+    """
+    display_name = "Opponent Phase"
+    option_match = 0
+    option_own = 1
+    default = option_match
+
+
 class StartingDraws(Range):
     """
     How many draws you get per hand before Extra Draw items are counted.
@@ -286,6 +302,7 @@ class Phase10Options(PerGameCommonOptions):
     skip_mode: SkipMode
     starting_phases: StartingPhases
     opponents: Opponents
+    opponent_phase: OpponentPhase
     starting_draws: StartingDraws
     extra_draw_items: ExtraDrawItems
     wild_card_items: WildCardItems
@@ -304,7 +321,7 @@ class Phase10Options(PerGameCommonOptions):
 option_groups = [
     OptionGroup("Goal", [Goal, PhasesToWin, ChecksPerPhase, StoreSlots,
                          StoreGating, StoreBuffPoints, StartingPhases]),
-    OptionGroup("Difficulty", [Opponents, StartingDraws, ExtraDrawItems,
+    OptionGroup("Difficulty", [Opponents, OpponentPhase, StartingDraws, ExtraDrawItems,
                                WildCardItems, HandSizeUpgrades, SkipCardItems,
                                SkipMode]),
     OptionGroup("Deck", [TrapChance, Phase10DeathLink, ScoreThreshold, ScoreTraps]),

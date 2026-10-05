@@ -301,11 +301,15 @@ class Phase10CommandProcessor(ClientCommandProcessor):
             return
         seats = session.seats
         if not seats:
-            self.output(
-                f"{session.opponents} opponent(s) will be seated when you "
-                f"start a hand. Phases: "
-                + ", ".join(str(p) for p in session.opponent_phases)
-            )
+            if session.opponent_phase == "match":
+                self.output(f"{session.opponents} opponent(s) will be seated when you "
+                            f"start a hand, playing the same phase as you.")
+            else:
+                self.output(
+                    f"{session.opponents} opponent(s) will be seated when you "
+                    f"start a hand. Phases: "
+                    + ", ".join(str(p) for p in session.opponent_phases)
+                )
             return
         for seat in seats:
             if seat.went_out:

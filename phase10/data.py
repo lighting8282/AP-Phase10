@@ -219,6 +219,15 @@ MAX_SCORE_THRESHOLD = 1000
 DEFAULT_SCORE_THRESHOLD = 500
 
 
+#: Which phase the computer players play, from `opponent_phase`. Sent as the
+#: word. A seed from before the option sends nothing and reads as `own`, which
+#: is what it was played as; free play is always `own`, because there the seats
+#: climbing their own phases is the race.
+OPPONENT_PHASE_MATCH = "match"
+OPPONENT_PHASE_OWN = "own"
+OPPONENT_PHASES = (OPPONENT_PHASE_MATCH, OPPONENT_PHASE_OWN)
+
+
 def buff_price(buff: str) -> int:
     return BUFF_PRICES[buff]
 
