@@ -74,6 +74,27 @@ class OpponentPhase(Choice):
     default = option_match
 
 
+class HandsWonLogic(Choice):
+    """
+    What the Hands Won checks can be expected to cost.
+
+    new_phases:  Hands Won: N counts as reachable once you can clear N different
+                 phases, so nothing you need waits on replaying rounds you have
+                 already won. Hands Won: 25 and 30 need replays whatever you do,
+                 so they never hold anything required.
+    replays:     every Hands Won check is reachable from the start, since any
+                 round can be replayed. Anything can be behind them, and you
+                 may have to replay rounds to move on.
+
+    new_phases needs room: it opens with at least 2 starting phases, keeps a
+    ladder store to 6 slots, and falls back to replays at checks_per_phase 1.
+    """
+    display_name = "Hands Won Logic"
+    option_new_phases = 0
+    option_replays = 1
+    default = option_new_phases
+
+
 class StartingDraws(Range):
     """
     How many draws you get per hand before Extra Draw items are counted.
@@ -308,6 +329,7 @@ class Phase10Options(PerGameCommonOptions):
     wild_card_items: WildCardItems
     hand_size_upgrades: HandSizeUpgrades
     checks_per_phase: ChecksPerPhase
+    hands_won_logic: HandsWonLogic
     store_slots: StoreSlots
     store_gating: StoreGating
     store_buff_points: StoreBuffPoints
@@ -319,7 +341,7 @@ class Phase10Options(PerGameCommonOptions):
 
 
 option_groups = [
-    OptionGroup("Goal", [Goal, PhasesToWin, ChecksPerPhase, StoreSlots,
+    OptionGroup("Goal", [Goal, PhasesToWin, ChecksPerPhase, HandsWonLogic, StoreSlots,
                          StoreGating, StoreBuffPoints, StartingPhases]),
     OptionGroup("Difficulty", [Opponents, OpponentPhase, StartingDraws, ExtraDrawItems,
                                WildCardItems, HandSizeUpgrades, SkipCardItems,

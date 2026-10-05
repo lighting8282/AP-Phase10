@@ -6,7 +6,7 @@ from BaseClasses import Item, ItemClassification
 
 from .data import (
     AP_POINT, FILLERS, GAME_NAME, ITEM_NAME_TO_ID, MULLIGAN, PHASE_COUNT,
-    PHASE_UNLOCK, SCORE_REDUCTION, SKIP_CARD, STORE_ALWAYS_OPEN, STORE_LADDER, STORE_SLACK,
+    PHASE_UNLOCK, SCORE_REDUCTION, SKIP_CARD, STORE_LADDER, STORE_SLACK,
     TRAPS, store_prices,
 )
 from .rules import MIN_EXTRA_DRAWS, MIN_WILD_CARDS
@@ -92,6 +92,11 @@ def build_power_item_counts(world: Phase10World, capacity: int) -> dict[str, int
     return counts
 
 
+#: Easy phase unlocks placed early when the Hands Won checks wait on clears.
+#: See create_all_items.
+EARLY_PHASES = 2
+
+
 def choose_starting_phases(world: Phase10World) -> list[int]:
     """Pick which phases the player opens with, easy ones first.
 
@@ -155,19 +160,32 @@ def create_all_items(world: Phase10World) -> None:
         if p not in starting
     ]
 
+    if world.hands_won_grind_free:
+        # With the Hands Won checks waiting on clears, the opening is only the
+        # starting phases' own checks and the first milestones, and each easy
+        # phase opened adds two more -- a chain fill can strand itself in. Two
+        # more easy phases are placed early, in this world, so the first checks
+        # widen the table instead of only extending it. Measured: 1 of 300
+        # default seeds failed without, none of 1,600 with two; three made the
+        # largest store worse.
+        from .rules import EASY_PHASES
+        spare = sorted(EASY_PHASES - starting)
+        for phase in world.random.sample(spare, min(EARLY_PHASES, len(spare))):
+            world.multiworld.local_early_items[world.player][PHASE_UNLOCK.format(phase)] = 1
+
     # Points come off the top. They are required items, and the power items
     # above their floors are not, so sizing power first would spend the
     # store's own locations on Wild Cards and leave the points homeless.
     points = world.store_points
-    # Always open, the store's worst case -- three a slot -- is progression,
-    # so fill puts every point the slots could cost somewhere reachable; that
-    # is what the store's softlock-freedom stands on. The rest is slack and
-    # spending money, and leaving it progression too packed a solo seed tight
-    # enough to fail fill. The ladder keeps every point progression, as it
-    # always has.
-    needed = points
-    if world.store_gating == STORE_ALWAYS_OPEN and points:
-        needed = sum(store_prices(int(world.options.store_slots), STORE_ALWAYS_OPEN))
+    # What the slots cost is progression -- for always_open its worst case,
+    # three a slot -- so fill puts every point the store's rules count somewhere
+    # reachable; that is what the store's softlock-freedom stands on. The rest
+    # is slack and spending money, which no rule asks for, and leaving it
+    # progression packs a solo seed tight enough to fail fill. The ladder kept
+    # all of it progression until hands_won_logic took the free Hands Won
+    # checks away, which made that pressure show at the defaults.
+    needed = min(points, sum(store_prices(int(world.options.store_slots),
+                                          world.store_gating)))
     itempool += [world.create_item(AP_POINT) for _ in range(needed)]
     itempool += [create_surplus(world, AP_POINT) for _ in range(points - needed)]
 

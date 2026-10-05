@@ -17,9 +17,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from rule_builder.rules import Has, HasAll, Rule
+from rule_builder.rules import Has, HasAll, HasFromList, Rule
 
-from .data import AP_POINT, PHASE_COUNT, store_gate, store_location_name
+from .data import (
+    AP_POINT, HANDS_WON_MILESTONES, PHASE_COUNT, milestone_location_name, store_gate,
+    store_location_name,
+)
 from .options import Goal
 
 if TYPE_CHECKING:
@@ -74,7 +77,32 @@ def set_all_rules(world: Phase10World) -> None:
     set_phase_entrance_rules(world)
     set_location_rules(world)
     set_store_rules(world)
+    set_milestone_rules(world)
     set_completion_condition(world)
+
+
+def set_milestone_rules(world: Phase10World) -> None:
+    """Keep the seed from waiting on replayed rounds.
+
+    A won round is a cleared one, so after clearing N different phases you
+    have won at least N hands -- that much comes from playing forward. Anything
+    past it is replaying rounds already won. Left unruled, every milestone is
+    reachable from the start, and fill was free to put the next phase unlock on
+    Hands Won: 12 when only nine phases were open: the run could move on only
+    by winning the same rounds again.
+
+    Past PHASE_COUNT no amount of forward play reaches a milestone, so those
+    hold nothing required. Their rule asks for every phase only so that the
+    spoiler's playthrough does not visit them early.
+    """
+    if not world.hands_won_grind_free:
+        return
+    clears = [f"Phase {p} Clear" for p in range(1, PHASE_COUNT + 1)]
+    for hands in HANDS_WON_MILESTONES:
+        location = world.get_location(milestone_location_name(hands))
+        world.set_rule(location, HasFromList(*clears, count=min(hands, PHASE_COUNT)))
+        if hands > PHASE_COUNT:
+            location.item_rule = lambda item: not item.advancement
 
 
 def set_store_rules(world: Phase10World) -> None:

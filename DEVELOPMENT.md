@@ -15,6 +15,7 @@ while to find and would be easy to reintroduce.
 - [Run](#run)
 - [Apworld](#apworld)
   - [Two fill failures worth remembering](#two-fill-failures-worth-remembering)
+  - [Hands Won without replays](#hands-won-without-replays)
 - [Solo model](#solo-model)
 - [Measured difficulty](#measured-difficulty)
   - [Findings](#findings)
@@ -152,6 +153,38 @@ Both were caught by generating, not by reading the code.
 AP's own `test_empty_state_can_reach_something` and `test_fill` cover both. The
 option combinations that stress them are pinned in
 `phase10/test/test_capacity.py`.
+
+### Hands Won without replays
+
+The fix for the first failure had a cost that took a real run to see. Logic
+treated every Hands Won milestone as reachable from the start, which is true
+only because any won round can be played again. So fill was free to put the
+next phase unlock on `Hands Won: 12` with nine phases open and every one of
+them already cleared, and the only way on was to win the same rounds again.
+
+`hands_won_logic: new_phases`, the default, asks of `Hands Won: N` what forward
+play actually guarantees. A won round *is* a cleared round
+(`Phase10Game.rounds_won` counts `r.cleared`), so clearing N different phases
+is N wins with nothing replayed: the rule is N of the `Phase k Clear` events.
+25 and 30 are past what twenty phases can give, so they hold nothing required.
+The client is unchanged -- a replayed win still counts, so grinding gets a
+milestone early; it just never has to.
+
+Taking ten free checks out of sphere zero made fill fragile, and each fix was
+measured over solo seeds, which are the tightest a seed gets:
+
+| Change | Why |
+|---|---|
+| Only the store's cost is progression, for the ladder too | The ladder's slack and spending points were progression for no rule's sake |
+| Two easy phase unlocks placed early (`local_early_items`) | The opening is two checks per starting phase and each easy phase adds two: a chain. 1 of 300 default seeds failed without; three early made the big store worse |
+| `starting_phases` below 2 is raised to 2 | One starting phase opens with two checks: 8 of 300 failed |
+| A ladder store above 6 slots is cut to 6 | Its last slots end an 11- then 14-point chain: 4 of 1,000 failed at 8, 1 of 800 at 7, none of 3,000 at 6. `always_open` asks 3 a slot and keeps 8 |
+| `checks_per_phase: 1` falls back to `replays` | All but three locations already hold a required item there; it failed every seed |
+
+Each adjustment logs a warning naming the option it changed. With them, 0 of
+6,800 seeds failed across seventeen option sets, both store shapes and up to
+eight slots. `phase10/test/test_hands_won_logic.py` pins the rule and each
+adjustment.
 
 ## Solo model
 

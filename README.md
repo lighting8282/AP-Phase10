@@ -118,7 +118,7 @@ game: AP_10
 requires:
   version: 0.6.7
   game:
-    AP_10: 1.8.0
+    AP_10: 1.9.0
 ```
 
 A seed is generated against one version of the world. After updating, generate
@@ -266,12 +266,13 @@ explanation; these are the ones that change the shape of a run most.
 |---|---|---|
 | `goal` | all phases | Clear every phase, or just Phase 10 |
 | `checks_per_phase` | 2 | 1–4 checks per phase: cleared, under par, no wilds, went out |
+| `hands_won_logic` | `new_phases` | `new_phases`: nothing you need waits on replaying rounds you've already won. `replays`: anything can sit on a Hands Won check |
 | `phases_to_win` | 20 | How many phases `all_phases` asks for; `random-range-10-20` for a random length |
 | `skip_mode` | `dig` | What a Skip does: `dig` looks at three cards, `deny` costs somebody a turn |
-| `store_slots` | 6 | Checks you can buy outright with AP Points; 0 for none |
+| `store_slots` | 6 | Checks you can buy outright with AP Points; 0 for none. A `ladder` store is at most 6 under `new_phases` |
 | `store_gating` | `ladder` | `ladder` opens slots one at a time; `always_open` sells every slot from the start, priced by what it holds |
 | `store_buff_points` | 8 | Spending money for the store's one-use cards; 0 for none |
-| `starting_phases` | 2 | How many phases you open with |
+| `starting_phases` | 2 | How many phases you open with; at least 2 under `new_phases` |
 | `opponents` | 3 | Computer players at the table; 0 for the pure solo game |
 | `opponent_phase` | `match` | `match`: the computer players play your phase each round. `own`: each climbs its own from Phase 1 |
 | `starting_draws` | 6 | Draws per hand before Extra Draw items |
