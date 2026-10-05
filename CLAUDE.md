@@ -237,6 +237,11 @@ file Archipelago actually loaded, so the release stops before it publishes.
 After a release you can check the attached YAML's `AP_10:` line yourself: the
 download URL is public.
 
+Its `requires: version:` line is Archipelago's own version, so a checkout of
+`main` writes an unreleased one -- v1.8.0 first shipped asking for 0.6.8, which
+every 0.6.7 install refused to generate with. The export now rewrites that line
+to `minimum_ap_version` and refuses a template that disagrees.
+
 **Version floor and `websockets`:** AP pins `websockets==13.1` and uses APIs
 removed in 14. Any machine doing AP networking needs the venv with that pin, or
 the server crashes on every client connection — for every world, not just this
