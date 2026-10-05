@@ -81,6 +81,8 @@ class Phase10World(World):
         data["skip_mode"] = ("deny" if int(self.options.skip_mode)
                              == phase10_options.SkipMode.option_deny else "dig")
         data["store_gating"] = self.store_gating
+        data["opponent_phase"] = ("own" if int(self.options.opponent_phase)
+                                  == phase10_options.OpponentPhase.option_own else "match")
         if self.store_gating == STORE_ALWAYS_OPEN:
             data["store_prices"] = self.store_slot_prices()
         return data

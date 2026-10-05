@@ -780,6 +780,39 @@ fixtures.sequences.forEach((script, index) => {
   check("the record is score, won and cleared", mine.scoreRecord(), { score: 40, won: 0, cleared: 0 });
 }
 
+// -- opponent_phase: mirrors TestOpponentPhase -------------------------------
+{
+  const table = (slot) => {
+    const s = Phase10Session.fromSlotData(
+      { goal: 0, starting_draws: 6, checks_per_phase: 4, opponents: 3, ...slot },
+      new Phase10Game({ seed: 0 }));
+    s.setItems(Array.from({ length: 20 }, (_, i) => phaseUnlock(i + 1)));
+    return s;
+  };
+  const match = table({ opponent_phase: "match" });
+  const seen = [];
+  for (const phase of [1, 7, 18]) {
+    match.startHand(phase);
+    seen.push(match.seats.map((seat) => seat.phase));
+    match.hand.markFailed("test");
+    match.finishHand(match.hand);
+  }
+  check("matching seats play your phase", seen, [[1, 1, 1], [7, 7, 7], [18, 18, 18]]);
+  match.startHand(5);
+  for (const seat of match.seats) seat.laidDown = true;
+  check("and do not climb", match.advanceOpponents(), []);
+
+  const own = table({ opponent_phase: "own" });
+  own.startHand(9);
+  check("own seats start on phase 1", own.seats.map((seat) => seat.phase), [1, 1, 1]);
+  for (const seat of own.seats) seat.laidDown = true;
+  own.advanceOpponents();
+  check("and climb their own", own.opponentPhases, [2, 2, 2]);
+
+  check("a seed from before the option keeps its climb", table({}).opponentPhase, "own");
+  check("an unknown word does too", table({ opponent_phase: "x" }).opponentPhase, "own");
+}
+
 for (const line of failures) console.log(`  FAIL ${line}`);
 console.log(`\n${passed} passed, ${failures.length} failed`);
 process.exit(failures.length ? 1 : 0);

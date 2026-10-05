@@ -143,6 +143,11 @@ export const BUFFS = Object.freeze([BUFF_WILD, BUFF_SKIP]);
 
 export const buffPrice = (buff) => BUFF_PRICES[buff];
 
+/** Which phase the computer players play. See data.py. */
+export const OPPONENT_PHASE_MATCH = "match";
+export const OPPONENT_PHASE_OWN = "own";
+export const OPPONENT_PHASES = Object.freeze([OPPONENT_PHASE_MATCH, OPPONENT_PHASE_OWN]);
+
 /** DeathLink by round score: every this many points sends one death. See data.py. */
 export const MIN_SCORE_THRESHOLD = 100;
 export const MAX_SCORE_THRESHOLD = 1000;

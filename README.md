@@ -118,7 +118,7 @@ game: AP_10
 requires:
   version: 0.6.7
   game:
-    AP_10: 1.7.0
+    AP_10: 1.8.0
 ```
 
 A seed is generated against one version of the world. After updating, generate
@@ -273,6 +273,7 @@ explanation; these are the ones that change the shape of a run most.
 | `store_buff_points` | 8 | Spending money for the store's one-use cards; 0 for none |
 | `starting_phases` | 2 | How many phases you open with |
 | `opponents` | 3 | Computer players at the table; 0 for the pure solo game |
+| `opponent_phase` | `match` | `match`: the computer players play your phase each round. `own`: each climbs its own from Phase 1 |
 | `starting_draws` | 6 | Draws per hand before Extra Draw items |
 | `extra_draw_items` | 5 | Extra Draw items in the pool |
 | `wild_card_items` | 8 | Wilds put back into the deck, which starts with none |

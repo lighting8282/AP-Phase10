@@ -20,11 +20,12 @@ import {
   buffPrice, storeGate, storeLocationName, storePrices,
   STORE_ALL_AT_ONCE, STORE_ALWAYS_OPEN, STORE_GATINGS, STORE_LADDER, PRICE_PROGRESSION,
   DEFAULT_SCORE_THRESHOLD, MAX_SCORE_THRESHOLD, MIN_SCORE_THRESHOLD,
-} from "./data.js?v=77099614";
-import { SKIP, STOCK_WILDS, WILD } from "./cards.js?v=77099614";
-import { HAND_STATE, Table, gameConfig } from "./engine.js?v=77099614";
-import { MID, NAMES as OPPONENT_NAMES, buildOpponents } from "./opponents.js?v=77099614";
-import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js?v=77099614";
+  OPPONENT_PHASE_MATCH, OPPONENT_PHASE_OWN, OPPONENT_PHASES,
+} from "./data.js?v=de74181f";
+import { SKIP, STOCK_WILDS, WILD } from "./cards.js?v=de74181f";
+import { HAND_STATE, Table, gameConfig } from "./engine.js?v=de74181f";
+import { MID, NAMES as OPPONENT_NAMES, buildOpponents } from "./opponents.js?v=de74181f";
+import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js?v=de74181f";
 
 export const LEAN_DEAL_PENALTY = 2;
 
@@ -105,6 +106,9 @@ export class Phase10Session {
     //: The trap the last threshold set off, for the client to announce.
     this.lastScoreTrap = null;
     this.opponents = opts.opponents ?? 3;
+    //: "match": the seats play your phase every round. "own": each climbs
+    //: its own from Phase 1 -- free play, and a seed from before the option.
+    this.opponentPhase = opts.opponentPhase ?? OPPONENT_PHASE_OWN;
 
     this.items = new Map();
     this.consumedTraps = new Map();
@@ -144,6 +148,8 @@ export class Phase10Session {
       scoreThreshold: readScoreThreshold(slotData),
       scoreTraps: Boolean(slotData.score_traps ?? false),
       opponents: Number(slotData.opponents ?? 3),
+      opponentPhase: OPPONENT_PHASES.includes(slotData.opponent_phase)
+        ? slotData.opponent_phase : OPPONENT_PHASE_OWN,
       game: game ?? new Phase10Game(),
     });
   }
@@ -508,7 +514,15 @@ export class Phase10Session {
   }
 
   /** Move every seat that cleared its phase on to the next one. */
+  /** The phase each seat plays this round. Mirrors seat_phases in session.py. */
+  seatPhases(phase) {
+    if (this.opponentPhase === OPPONENT_PHASE_MATCH) return new Array(this.opponents).fill(phase);
+    return [...this.opponentPhases];
+  }
+
   advanceOpponents() {
+    // Matching seats have no phase of their own to climb.
+    if (this.opponentPhase === OPPONENT_PHASE_MATCH) return [];
     const moved = [];
     this.seats.forEach((seat, index) => {
       if (seat.laidDown && index < this.opponentPhases.length) {
@@ -607,11 +621,11 @@ export class Phase10Session {
     }
     this.table = new Table();
     if (this.opponents) {
-      // Each seat carries its own phase between rounds, so the table gets
-      // harder to beat as the run goes on rather than resetting to three
-      // players on phase 1 every time.
+      // On your phase when they match it -- the default for a seed, so a
+      // round's difficulty is the phase you chose. Otherwise each seat carries
+      // its own phase between rounds, which in free play is the race.
       this.table.seats = buildOpponents(
-        this.opponents, [...this.opponentPhases], config, this.game.random, MID,
+        this.opponents, this.seatPhases(phase), config, this.game.random, MID,
       );
     }
     return this.game.startRound(phase, config, { table: this.table, ...opts });

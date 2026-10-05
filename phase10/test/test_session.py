@@ -1221,3 +1221,40 @@ class TestPublicScore(unittest.TestCase):
 
     def test_the_key_names_team_and_slot(self) -> None:
         self.assertEqual(score_key(0, 3), "phase10_score_0_3")
+
+
+class TestOpponentPhase(unittest.TestCase):
+    """`opponent_phase`: the seats on your phase, or climbing their own."""
+
+    def play(self, s: Phase10Session, phase: int):
+        s.set_items([PHASE_UNLOCK.format(p) for p in range(1, 21)])
+        return s.start_hand(phase)
+
+    def test_matching_seats_play_your_phase(self) -> None:
+        s = session(opponent_phase="match", opponents=3)
+        for phase in (1, 7, 18):
+            self.play(s, phase)
+            self.assertEqual([seat.phase for seat in s.seats], [phase] * 3, phase)
+            s.hand.mark_failed("test")
+            s.finish_hand(s.hand)
+
+    def test_matching_seats_do_not_climb(self) -> None:
+        s = session(opponent_phase="match", opponents=3)
+        self.play(s, 5)
+        for seat in s.seats:
+            seat.laid_down = True
+        self.assertEqual(s.advance_opponents(), [])
+
+    def test_own_seats_keep_their_climb(self) -> None:
+        s = session(opponent_phase="own", opponents=3)
+        self.play(s, 9)
+        self.assertEqual([seat.phase for seat in s.seats], [1, 1, 1])
+        for seat in s.seats:
+            seat.laid_down = True
+        self.assertEqual(len(s.advance_opponents()), 3)
+        self.assertEqual(s.opponent_phases, [2, 2, 2])
+
+    def test_a_seed_from_before_the_option_keeps_its_climb(self) -> None:
+        self.assertEqual(session().opponent_phase, "own")
+        self.assertEqual(session(opponent_phase="nonsense").opponent_phase, "own")
+        self.assertEqual(session(opponent_phase="match").opponent_phase, "match")
