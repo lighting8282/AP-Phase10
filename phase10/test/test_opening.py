@@ -13,9 +13,12 @@ from ..rules import EASY_PHASES
 class TestOpening(Phase10TestBase):
     options = {"starting_phases": 2}
 
-    def test_milestones_need_no_items(self) -> None:
+    def test_first_milestones_need_no_items(self) -> None:
+        # One per starting phase: both clear on the unlock alone. Swept, as
+        # fill's state is, so those free clears are counted.
+        self.multiworld.state.sweep_for_advancements()
         self.assertTrue(self.can_reach_location("Hands Won: 1"))
-        self.assertTrue(self.can_reach_location("Hands Won: 30"))
+        self.assertTrue(self.can_reach_location("Hands Won: 2"))
 
     def test_starting_phases_are_precollected(self) -> None:
         precollected = [

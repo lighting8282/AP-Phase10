@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Mapping
 from typing import Any
 
@@ -10,6 +11,11 @@ from .data import (
     PRICE_TRAP_OR_FILLER, STORE_ALWAYS_OPEN,
     STORE_LADDER, price_for, store_location_name,
 )
+
+
+#: The largest ladder store that fills reliably when the Hands Won checks wait
+#: on clears. See generate_early.
+NEW_PHASES_LADDER_SLOTS = 6
 
 
 class Phase10World(World):
@@ -44,6 +50,8 @@ class Phase10World(World):
         """
         from .rules import MIN_EXTRA_DRAWS, MIN_WILD_CARDS
 
+        self.fit_hands_won_logic()
+
         base = PHASE_COUNT * int(self.options.checks_per_phase) + len(HANDS_WON_MILESTONES)
         floor = PHASE_COUNT + MIN_WILD_CARDS + MIN_EXTRA_DRAWS
         slots, points = items.plan_store(
@@ -51,6 +59,48 @@ class Phase10World(World):
             int(self.options.store_buff_points), self.store_gating)
         self.options.store_slots.value = slots
         self.store_points = points
+
+    def fit_hands_won_logic(self) -> None:
+        """Adjust what new_phases cannot fill, rather than fail to generate.
+
+        Without the free Hands Won checks a seed opens narrower and is denser
+        with required items, and three option settings stopped filling. Each
+        one is changed here with a warning naming it. Measured on solo seeds,
+        which are the tightest a seed gets; a multiworld has more room.
+        """
+        options = self.options
+        if not self.hands_won_grind_free:
+            return
+        new_phases = phase10_options.HandsWonLogic
+
+        # At one check a phase all but three locations already hold a required
+        # item, and new_phases takes the last three Hands Won checks from them.
+        # It failed every seed.
+        if int(options.checks_per_phase) == 1:
+            self.warn("does not fit checks_per_phase 1; using replays")
+            options.hands_won_logic.value = new_phases.option_replays
+            return
+
+        # One starting phase opens the seed with two checks, its own and Hands
+        # Won: 1, and fill strands itself in that: 8 of 300 seeds. Two starting
+        # phases, with two more easy ones placed early, failed none.
+        if int(options.starting_phases) < 2:
+            self.warn(f"opens with at least 2 phases; starting_phases raised "
+                      f"from {int(options.starting_phases)} to 2")
+            options.starting_phases.value = 2
+
+        # The ladder's last slots end one long chain -- eleven points, then
+        # fourteen -- and fill strands itself in it: 4 of 1,000 seeds at eight
+        # slots, 1 of 800 at seven, none of 3,000 at six. The always-open store
+        # asks three points a slot rather than a chain, and fills at eight.
+        if (self.store_gating == STORE_LADDER
+                and int(options.store_slots) > NEW_PHASES_LADDER_SLOTS):
+            self.warn(f"fits a ladder store of at most {NEW_PHASES_LADDER_SLOTS} "
+                      f"slots; store_slots lowered from {int(options.store_slots)}")
+            options.store_slots.value = NEW_PHASES_LADDER_SLOTS
+
+    def warn(self, what: str) -> None:
+        logging.warning(f"{self.player_name}: hands_won_logic new_phases {what}.")
 
     def create_regions(self) -> None:
         regions.create_and_connect_regions(self)
@@ -110,6 +160,12 @@ class Phase10World(World):
             else:
                 prices.append(price_for(item.advancement, item.useful))
         return prices
+
+    @property
+    def hands_won_grind_free(self) -> bool:
+        """Whether Hands Won checks wait on clearing that many phases."""
+        return (int(self.options.hands_won_logic)
+                == phase10_options.HandsWonLogic.option_new_phases)
 
     @property
     def store_gating(self) -> str:
