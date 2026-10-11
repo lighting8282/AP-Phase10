@@ -118,7 +118,7 @@ game: AP_10
 requires:
   version: 0.6.7
   game:
-    AP_10: 1.9.0
+    AP_10: 1.9.1
 ```
 
 A seed is generated against one version of the world. After updating, generate
