@@ -69,13 +69,13 @@ card_filename = _cards.card_filename
 # ---------------------------------------------------------------------------
 
 CARD_COLORS: dict[Color, tuple[float, float, float, float]] = {
-    Color.RED: (0.78, 0.22, 0.22, 1),
-    Color.BLUE: (0.20, 0.42, 0.85, 1),
-    Color.GREEN: (0.18, 0.62, 0.32, 1),
-    Color.YELLOW: (0.85, 0.68, 0.12, 1),
+    Color.RED: (0.93, 0.20, 0.24, 1),
+    Color.BLUE: (0.12, 0.47, 0.96, 1),
+    Color.GREEN: (0.07, 0.70, 0.33, 1),
+    Color.YELLOW: (0.97, 0.74, 0.04, 1),
 }
-WILD_COLOR = (0.55, 0.30, 0.78, 1)
-SKIP_COLOR = (0.42, 0.44, 0.50, 1)
+WILD_COLOR = (0.63, 0.27, 0.93, 1)
+SKIP_COLOR = (0.38, 0.45, 0.60, 1)
 
 CARD_STOCK = (248, 248, 245, 255)   # off-white rim, like real card stock
 BACK_COLOR = (0.13, 0.16, 0.28, 1)

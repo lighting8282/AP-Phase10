@@ -1,11 +1,17 @@
 :root {
-  --bg: #0b1220;
-  --panel: #131c2e;
-  --ink: #e8edf7;
-  --muted: #9fb0cc;
-  --line: #2a3855;
-  --accent: #3f6fd0;
-  --cleared: #2e8b57;
+  /* A lighter, bluer night than before, with panels that carry some colour
+     and an accent bright enough to read as one. */
+  --bg: #17224a;
+  --panel: #22306a;
+  --ink: #f2f5ff;
+  --muted: #b8c6ec;
+  --line: #3f53a0;
+  --accent: #5b8cff;
+  --accent-rgb: 91, 140, 255;
+  --cleared: #1fb866;
+  --field: #1b2858;
+  --button: #31469a;
+  --button-hover: #4059bd;
 }
 
 * { box-sizing: border-box; }
@@ -77,12 +83,12 @@ input, button {
   padding: 0.35rem 0.6rem;
   border-radius: 6px;
   border: 1px solid var(--line);
-  background: #0f1728;
+  background: var(--field);
   color: var(--ink);
 }
 
-button { cursor: pointer; background: #22304d; }
-button:hover:not(:disabled) { background: #2c3e63; }
+button { cursor: pointer; background: var(--button); }
+button:hover:not(:disabled) { background: var(--button-hover); }
 button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 #free-play-offer { margin: 0.5rem 0 0; color: var(--muted); font-size: 13px; }
@@ -219,7 +225,7 @@ header.slim #free-play-offer { display: none; }
   font: inherit;
   text-align: left;
 }
-.deny-seat:hover { border-color: var(--accent); background: rgba(63, 111, 208, 0.18); }
+.deny-seat:hover { border-color: var(--accent); background: rgba(var(--accent-rgb), 0.18); }
 .deny-seat span { color: var(--muted); font-size: 13px; }
 
 /* --- what a phase needs ------------------------------------------------ */
@@ -277,7 +283,7 @@ header.slim #free-play-offer { display: none; }
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: rgba(4, 8, 18, 0.72);
+  background: rgba(10, 16, 40, 0.72);
 }
 
 #tutorial-box {
@@ -454,7 +460,7 @@ pre {
    one is marked -- and only the newest: two highlights are no highlight. */
 .log .line.latest {
   color: var(--ink);
-  background: rgba(63, 111, 208, 0.22);
+  background: rgba(var(--accent-rgb), 0.22);
   border-left: 3px solid var(--accent);
   margin-left: -0.75rem;
   padding: 1px 0.75rem 1px calc(0.75rem - 3px);
@@ -488,7 +494,7 @@ pre {
   border: 1px solid var(--line);
   border-radius: 14px;
   background:
-    radial-gradient(ellipse at 50% 45%, #15543d 0%, #103c2c 58%, #0c2a20 100%);
+    radial-gradient(ellipse at 50% 45%, #22935f 0%, #187349 58%, #105536 100%);
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
@@ -613,7 +619,7 @@ pre {
    size as the turn moves round the table, which reads as the layout twitching.
    Colour alone would not do it: the seat colours are already four colours. */
 .seat.turn {
-  box-shadow: 0 0 0 2px var(--accent), 0 0 14px rgba(63, 111, 208, 0.45);
+  box-shadow: 0 0 0 2px var(--accent), 0 0 14px rgba(var(--accent-rgb), 0.45);
 }
 .seat.turn .what { color: var(--ink); }
 
@@ -622,8 +628,8 @@ pre {
   .seat.turn { animation: turn-pulse 1.5s ease-in-out infinite; }
 }
 @keyframes turn-pulse {
-  0%, 100% { box-shadow: 0 0 0 2px var(--accent), 0 0 10px rgba(63, 111, 208, 0.35); }
-  50%      { box-shadow: 0 0 0 3px var(--accent), 0 0 20px rgba(63, 111, 208, 0.6); }
+  0%, 100% { box-shadow: 0 0 0 2px var(--accent), 0 0 10px rgba(var(--accent-rgb), 0.35); }
+  50%      { box-shadow: 0 0 0 3px var(--accent), 0 0 20px rgba(var(--accent-rgb), 0.6); }
 }
 
 /* A colour per seat, so "who just laid down" is answered by where you are
