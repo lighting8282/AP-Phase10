@@ -57,6 +57,26 @@ header .bar {
 }
 header #connect { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
 header.slim #connect { display: none; }
+
+/* Before connecting, the header is the front door: the logo large and
+   centred, with the way in under it. It stops being sticky there, since a
+   tall header pinned to the top would cover the board. Once connected or
+   playing it shrinks back to the one-line bar above. */
+header:not(.slim) {
+  position: static;
+  padding: 1.6rem 1rem 1.2rem;
+  text-align: center;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(var(--accent-rgb), 0.28), transparent 70%),
+    var(--panel);
+}
+header:not(.slim) .bar { flex-direction: column; gap: 0.5rem; }
+header:not(.slim) .brand { flex-direction: column; gap: 0.3rem; }
+header:not(.slim) .brand img { width: 112px; height: 112px; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35)); }
+header:not(.slim) h1 { font-size: 2.2rem; letter-spacing: 0.05em; }
+header:not(.slim) .tagline { display: inline-block; font-size: 0.95rem; padding: 0.2rem 0.8rem; }
+header:not(.slim) #connect { justify-content: center; margin-top: 1rem; }
+header:not(.slim) #free-play-offer { justify-content: center; }
 h2 { margin: 1.4rem 0 0.5rem; font-size: 0.95rem; }
 h2 small { color: var(--muted); font-weight: normal; }
 
