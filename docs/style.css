@@ -72,7 +72,7 @@ header:not(.slim) {
 }
 header:not(.slim) .bar { flex-direction: column; gap: 0.5rem; }
 header:not(.slim) .brand { flex-direction: column; gap: 0.3rem; }
-header:not(.slim) .brand img { width: 112px; height: 112px; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35)); }
+header:not(.slim) .brand img { width: 200px; height: 114px; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35)); }
 header:not(.slim) h1 { font-size: 2.2rem; letter-spacing: 0.05em; }
 header:not(.slim) .tagline { display: inline-block; font-size: 0.95rem; padding: 0.2rem 0.8rem; }
 header:not(.slim) #connect { justify-content: center; margin-top: 1rem; }
