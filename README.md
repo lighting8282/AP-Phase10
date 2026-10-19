@@ -118,12 +118,17 @@ game: AP_10
 requires:
   version: 0.6.7
   game:
-    AP_10: 1.9.1
+    AP_10: 1.9.2
 ```
 
 A seed is generated against one version of the world. After updating, generate
 a new one rather than rejoining an old room with the new apworld installed:
 a release that moves the items or locations moves what those names mean.
+
+**Universal Tracker** works with seeds generated on 1.9.2 or later: it rebuilds
+the logic from the seed itself, with no YAML needed. Seeds from earlier
+versions don't record which phases you started with, so the tracker would
+guess them and show the wrong checks as reachable.
 
 ## The rules
 

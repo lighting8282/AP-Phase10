@@ -36,6 +36,13 @@ class Phase10World(World):
     location_name_to_id = locations.LOCATION_NAME_TO_ID
     item_name_to_id = items.ITEM_NAME_TO_ID
 
+    #: Universal Tracker rebuilds this world from slot data alone; see
+    #: interpret_slot_data and use_tracker_slot_data.
+    ut_can_gen_without_yaml = True
+    #: The starting phases slot data named, when Universal Tracker is
+    #: regenerating; None in a real generation, which rolls its own.
+    tracked_starting_phases: list[int] | None = None
+
     #: Decided in generate_early, because the store's locations are built
     #: before the item pool is and both have to agree on its size.
     store_points: int = 0
@@ -50,6 +57,7 @@ class Phase10World(World):
         """
         from .rules import MIN_EXTRA_DRAWS, MIN_WILD_CARDS
 
+        self.use_tracker_slot_data()
         self.fit_hands_won_logic()
 
         base = PHASE_COUNT * int(self.options.checks_per_phase) + len(HANDS_WON_MILESTONES)
@@ -59,6 +67,40 @@ class Phase10World(World):
             int(self.options.store_buff_points), self.store_gating)
         self.options.store_slots.value = slots
         self.store_points = points
+
+    @staticmethod
+    def interpret_slot_data(slot_data: dict[str, Any]) -> dict[str, Any]:
+        """Universal Tracker's hook: hand slot data back for regeneration."""
+        return slot_data
+
+    def use_tracker_slot_data(self) -> None:
+        """Under Universal Tracker, take the seed's settings from slot data.
+
+        The tracker regenerates the world to work out what is in logic, with no
+        YAML, so every option the rules or the location list read has to come
+        from slot data -- and the starting phases, which a real generation
+        rolls, have to be the ones that were rolled. Slot data carries the
+        values after fit_hands_won_logic and the store trim, so they are
+        already ones that fit.
+        """
+        tracked = getattr(self.multiworld, "re_gen_passthrough", {}).get(self.game)
+        if not tracked:
+            return
+        options = self.options
+        for name in ("goal", "phases_to_win", "checks_per_phase", "store_slots"):
+            if name in tracked:
+                getattr(options, name).value = int(tracked[name])
+        options.store_gating.value = (
+            phase10_options.StoreGating.option_always_open
+            if tracked.get("store_gating") == STORE_ALWAYS_OPEN
+            else phase10_options.StoreGating.option_ladder)
+        options.hands_won_logic.value = (
+            phase10_options.HandsWonLogic.option_replays
+            if tracked.get("hands_won_logic") == "replays"
+            else phase10_options.HandsWonLogic.option_new_phases)
+        if "starting_phase_list" in tracked:
+            self.tracked_starting_phases = [int(p) for p in tracked["starting_phase_list"]]
+            options.starting_phases.value = len(self.tracked_starting_phases)
 
     def fit_hands_won_logic(self) -> None:
         """Adjust what new_phases cannot fill, rather than fail to generate.
@@ -131,6 +173,12 @@ class Phase10World(World):
         data["skip_mode"] = ("deny" if int(self.options.skip_mode)
                              == phase10_options.SkipMode.option_deny else "dig")
         data["store_gating"] = self.store_gating
+        # For Universal Tracker, which rebuilds the logic from slot data: the
+        # rule set in use, and the starting phases this seed rolled.
+        data["hands_won_logic"] = "new_phases" if self.hands_won_grind_free else "replays"
+        data["starting_phase_list"] = sorted(
+            int(item.name.split()[1]) for item in self.multiworld.precollected_items[self.player]
+            if item.name.endswith("Unlocked"))
         data["opponent_phase"] = ("own" if int(self.options.opponent_phase)
                                   == phase10_options.OpponentPhase.option_own else "match")
         if self.store_gating == STORE_ALWAYS_OPEN:

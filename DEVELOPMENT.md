@@ -15,6 +15,7 @@ while to find and would be easy to reintroduce.
 - [Run](#run)
 - [Apworld](#apworld)
   - [Two fill failures worth remembering](#two-fill-failures-worth-remembering)
+  - [Universal Tracker](#universal-tracker)
   - [Hands Won without replays](#hands-won-without-replays)
 - [Solo model](#solo-model)
 - [Measured difficulty](#measured-difficulty)
@@ -153,6 +154,20 @@ Both were caught by generating, not by reading the code.
 AP's own `test_empty_state_can_reach_something` and `test_fill` cover both. The
 option combinations that stress them are pinned in
 `phase10/test/test_capacity.py`.
+
+### Universal Tracker
+
+The tracker regenerates the world with no YAML: `interpret_slot_data` hands the
+seed's slot data back, and `use_tracker_slot_data` (first thing in
+`generate_early`) sets every option the rules or the location list read from
+it, and makes `choose_starting_phases` return the phases the seed rolled
+rather than rolling again. Slot data carries the values *after*
+`fit_hands_won_logic` and the store trim, so a regeneration never re-applies an
+adjustment to something already adjusted. Anything new that changes logic or
+the location list has to go into slot data and into `use_tracker_slot_data`,
+or the tracker silently disagrees with the seed;
+`phase10/test/test_universal_tracker.py` regenerates on a different seed and
+compares options, starting phases, locations and what is reachable.
 
 ### Hands Won without replays
 

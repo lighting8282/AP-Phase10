@@ -106,6 +106,9 @@ def choose_starting_phases(world: Phase10World) -> list[int]:
     """
     from .rules import EASY_PHASES
 
+    if world.tracked_starting_phases is not None:
+        # Universal Tracker regenerating: the seed already rolled these.
+        return list(world.tracked_starting_phases)
     easy = sorted(EASY_PHASES)
     rest = [p for p in range(1, PHASE_COUNT + 1) if p not in EASY_PHASES]
     world.random.shuffle(easy)
