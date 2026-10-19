@@ -7,7 +7,7 @@ machine and only against a source checkout -- this is what other people can
 actually install.
 
     python tools/build_apworld.py
-    python tools/build_apworld.py --verify dist/phase10.apworld
+    python tools/build_apworld.py --verify dist/AP_10.apworld
 
 Timestamps are fixed so two builds of the same source are byte-identical;
 otherwise every build looks like a change and you cannot tell whether a
@@ -24,7 +24,12 @@ import zipfile
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
 PACKAGE = PROJECT_ROOT / "phase10"
-MODULE = "phase10"
+#: The name the world installs under, which is the file's name too: the loader
+#: imports `worlds.<stem>` and wants a single top-level folder of that name in
+#: the zip. AP_10 to match the game, rather than the repository's own folder
+#: name -- the source stays in phase10/, and every import inside it is
+#: relative, so nothing in the package depends on what it is installed as.
+MODULE = "AP_10"
 
 #: Dev-only trees. Both reference apworlds ship neither, and the test suite
 #: needs Archipelago's own test framework, so it is no use to an installer.
@@ -34,23 +39,23 @@ EXCLUDED_SUFFIXES = {".pyc", ".pyo"}
 #: A build missing any of these is broken in a way that only shows up when
 #: somebody tries to generate with it.
 REQUIRED = [
-    "phase10/__init__.py",
-    "phase10/archipelago.json",
-    "phase10/world.py",
-    "phase10/data.py",
-    "phase10/items.py",
-    "phase10/locations.py",
-    "phase10/options.py",
-    "phase10/regions.py",
-    "phase10/rules.py",
-    "phase10/web_world.py",
-    "phase10/components.py",
-    "phase10/client/context.py",
-    "phase10/client/session.py",
-    "phase10/client/game_manager.py",
-    "phase10/game/engine.py",
-    "phase10/game/phases.py",
-    "phase10/game/cards.py",
+    f"{MODULE}/__init__.py",
+    f"{MODULE}/archipelago.json",
+    f"{MODULE}/world.py",
+    f"{MODULE}/data.py",
+    f"{MODULE}/items.py",
+    f"{MODULE}/locations.py",
+    f"{MODULE}/options.py",
+    f"{MODULE}/regions.py",
+    f"{MODULE}/rules.py",
+    f"{MODULE}/web_world.py",
+    f"{MODULE}/components.py",
+    f"{MODULE}/client/context.py",
+    f"{MODULE}/client/session.py",
+    f"{MODULE}/client/game_manager.py",
+    f"{MODULE}/game/engine.py",
+    f"{MODULE}/game/phases.py",
+    f"{MODULE}/game/cards.py",
 ]
 
 #: Fixed so the build is reproducible (zip stores 1980-01-01 as its epoch).
@@ -188,7 +193,7 @@ def verify(target: pathlib.Path) -> list[str]:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--out", default="dist/phase10.apworld")
+    ap.add_argument("--out", default="dist/AP_10.apworld")
     ap.add_argument("--verify", metavar="PATH", default=None,
                     help="verify an existing package instead of building")
     args = ap.parse_args()

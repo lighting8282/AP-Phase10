@@ -1802,8 +1802,8 @@ anything else.
 
 ## Packaging
 
-    python tools/build_apworld.py                          # dist/phase10.apworld
-    python tools/build_apworld.py --verify dist/phase10.apworld
+    python tools/build_apworld.py                          # dist/AP_10.apworld
+    python tools/build_apworld.py --verify dist/AP_10.apworld
 
 Drop the result in Archipelago's `custom_worlds/`. It ships the world, the
 docs and the 51 card faces, and omits `__pycache__` and the test tree, which

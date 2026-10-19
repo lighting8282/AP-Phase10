@@ -44,7 +44,7 @@ to `npm install`. The whole runnable suite is about four seconds.
     npm test                          # the JS suite and the table check
     python tests/test_phases.py       # the solver, 37 tests
     python tests/test_game.py         # the hand loop and the table, 76 tests
-    python tools/build_apworld.py     # dist/phase10.apworld
+    python tools/build_apworld.py     # dist/AP_10.apworld
 
     python tools/serve_docs.py        # the browser client, http://127.0.0.1:8137
 
