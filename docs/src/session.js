@@ -21,11 +21,11 @@ import {
   STORE_ALL_AT_ONCE, STORE_ALWAYS_OPEN, STORE_GATINGS, STORE_LADDER, PRICE_PROGRESSION,
   DEFAULT_SCORE_THRESHOLD, MAX_SCORE_THRESHOLD, MIN_SCORE_THRESHOLD,
   OPPONENT_PHASE_MATCH, OPPONENT_PHASE_OWN, OPPONENT_PHASES,
-} from "./data.js?v=ea1ab2f1";
-import { SKIP, STOCK_WILDS, WILD } from "./cards.js?v=ea1ab2f1";
-import { HAND_STATE, Table, gameConfig } from "./engine.js?v=ea1ab2f1";
-import { MID, NAMES as OPPONENT_NAMES, buildOpponents } from "./opponents.js?v=ea1ab2f1";
-import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js?v=ea1ab2f1";
+} from "./data.js?v=c9e2a78c";
+import { SKIP, STOCK_WILDS, WILD } from "./cards.js?v=c9e2a78c";
+import { HAND_STATE, Table, gameConfig } from "./engine.js?v=c9e2a78c";
+import { MID, NAMES as OPPONENT_NAMES, buildOpponents } from "./opponents.js?v=c9e2a78c";
+import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js?v=c9e2a78c";
 
 export const LEAN_DEAL_PENALTY = 2;
 
