@@ -1,15 +1,30 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="AP_10">
-  <!-- Original mark for AP_10: a fanned hand in the deck's colours, the top
-       card reading AP over 10. Drawn by hand as plain shapes; not derived
-       from Archipelago's own logo. -->
-  <g stroke="#ffffff" stroke-width="2.2" stroke-linejoin="round">
-    <rect x="10" y="12" width="26" height="38" rx="5" fill="#ed333d" transform="rotate(-22 23 50)"/>
-    <rect x="19" y="9" width="26" height="38" rx="5" fill="#1f78f5" transform="rotate(-8 32 47)"/>
-    <rect x="28" y="12" width="26" height="38" rx="5" fill="#12b354" transform="rotate(10 41 50)"/>
-    <rect x="19" y="14" width="26" height="40" rx="5" fill="#f8bd0a"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-25 3 114 65" role="img" aria-label="AP_10">
+  <!-- Original mark for AP_10: a fanned hand from the deck (red, a Skip,
+       blue, a Wild and green) with the top card reading AP over 10. Drawn
+       by hand as plain shapes; not derived from Archipelago's own logo.
+       Every card pivots on one point below the hand, and the viewBox leaves
+       room for the outermost corners. -->
+  <defs>
+    <rect id="card" x="20" y="6" width="24" height="40" rx="4"/>
+  </defs>
+  <g stroke="#ffffff" stroke-width="2" stroke-linejoin="round">
+    <g transform="rotate(-42 32 72)"><use href="#card" fill="#ed333d"/></g>
+    <g transform="rotate(42 32 72)"><use href="#card" fill="#12b354"/></g>
+    <g transform="rotate(-21 32 72)">
+      <use href="#card" fill="#61739a"/>
+      <circle cx="32" cy="15" r="4.6" fill="none" stroke-width="1.7"/>
+      <line x1="28.9" y1="18.1" x2="35.1" y2="11.9" stroke-width="1.7"/>
+    </g>
+    <g transform="rotate(21 32 72)">
+      <use href="#card" fill="#a145ed"/>
+      <text x="32" y="19" text-anchor="middle" font-family="Arial, Helvetica, sans-serif"
+            font-weight="900" font-size="10" fill="#ffffff" stroke="none">W</text>
+    </g>
+    <use href="#card" fill="#1f78f5"/>
+    <rect x="18" y="24" width="28" height="42" rx="5" fill="#f8bd0a"/>
   </g>
-  <text x="32" y="31" text-anchor="middle" font-family="Arial, Helvetica, sans-serif"
-        font-weight="900" font-size="11" fill="#17224a">AP</text>
-  <text x="32" y="48" text-anchor="middle" font-family="Arial, Helvetica, sans-serif"
-        font-weight="900" font-size="15" fill="#17224a">10</text>
+  <text x="32" y="41" text-anchor="middle" font-family="Arial, Helvetica, sans-serif"
+        font-weight="900" font-size="12" fill="#17224a">AP</text>
+  <text x="32" y="60" text-anchor="middle" font-family="Arial, Helvetica, sans-serif"
+        font-weight="900" font-size="16" fill="#17224a">10</text>
 </svg>
