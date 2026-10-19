@@ -102,9 +102,11 @@ plays through commands in the client console:
 
 ## Install the apworld
 
-1. Download `phase10.apworld` from
+1. Download `AP_10.apworld` from
    [the latest release](https://github.com/lighting8282/AP-Phase10/releases/latest).
-2. Drop it into your Archipelago `custom_worlds/` folder.
+2. Drop it into your Archipelago `custom_worlds/` folder. Releases before 1.9.3
+   called it `phase10.apworld`; delete that one if it is there, since
+   Archipelago will not load the same game twice.
 3. Take `AP_10.yaml` from the same release for a template with every option in
    it, or generate one from the launcher. Copying a YAML from a previous seed
    works too — check the version line.
@@ -118,7 +120,7 @@ game: AP_10
 requires:
   version: 0.6.7
   game:
-    AP_10: 1.9.2
+    AP_10: 1.9.3
 ```
 
 A seed is generated against one version of the world. After updating, generate
@@ -412,8 +414,8 @@ authority:
 
 Packaging:
 
-    python tools/build_apworld.py                          # dist/phase10.apworld
-    python tools/build_apworld.py --verify dist/phase10.apworld
+    python tools/build_apworld.py                          # dist/AP_10.apworld
+    python tools/build_apworld.py --verify dist/AP_10.apworld
 
     python tools/export_template.py                        # dist/AP_10.yaml
     python tools/cut_release.py --dry-run                  # what a release would do

@@ -41,7 +41,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 MANIFEST = ROOT / "phase10" / "archipelago.json"
-ARTIFACT = ROOT / "dist" / "phase10.apworld"
+ARTIFACT = ROOT / "dist" / "AP_10.apworld"
 TEMPLATE = ROOT / "dist" / "AP_10.yaml"
 README = ROOT / "README.md"
 #: export_template.py's "no Archipelago here" code, as opposed to a real
@@ -235,7 +235,9 @@ def main() -> int:
     run(["git", "push", "origin", tag])
     print(f"  ok   tagged and pushed {tag}")
 
-    notes = ["Drop `phase10.apworld` into Archipelago's `custom_worlds/`."]
+    notes = ["Drop `AP_10.apworld` into Archipelago's `custom_worlds/`. If you "
+             "have an older `phase10.apworld` there, delete it: both are AP_10, "
+             "and Archipelago will not load the same game twice."]
     if TEMPLATE in uploads:
         notes.append(f"`{TEMPLATE.name}` is the options template, for your "
                      f"`Players/` folder.")
