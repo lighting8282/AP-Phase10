@@ -42,7 +42,10 @@ STYLE = ROOT / "docs" / "style.css"
 #: stylesheet counts: it is served with the same ten-minute cache, and half the
 #: layout lives in it, so a CSS-only deploy left the old rules in place with
 #: nothing in the markup to say so.
-SOURCES = sorted(SRC.glob("*.js")) + [STYLE]
+#: The SVGs the page shows (the logo, which is also the tab icon) count too: a
+#: new logo under an unchanged URL stayed cached, and the old one was what
+#: people saw after the redesign merged.
+SOURCES = sorted(SRC.glob("*.js")) + [STYLE] + sorted((ROOT / "docs" / "assets").glob("*.svg"))
 
 #: `from "./engine.js"` and `from "../node_modules/..."`, with or without a
 #: stamp already on them.
@@ -51,6 +54,9 @@ IMPORT = re.compile(r'(from\s+")(\.{1,2}/[^"?]+\.js)(\?v=[^"]*)?(")')
 SCRIPT = re.compile(r'(<script type="module" src=")([^"?]+)(\?v=[^"]*)?(")')
 #: And its stylesheet.
 SHEET = re.compile(r'(<link rel="stylesheet" href=")([^"?]+)(\?v=[^"]*)?(")')
+
+#: And the images it names by `assets/...svg`, in an <img> or the icon <link>.
+ASSET = re.compile(r'((?:src|href)=")(assets/[^"?]+\.svg)(\?v=[^"]*)?(")')
 
 
 def build_id() -> str:
@@ -97,6 +103,7 @@ def main() -> int:
     # different tags, and one regex for both would match neither cleanly.
     targets.append((INDEX, SCRIPT))
     targets.append((INDEX, SHEET))
+    targets.append((INDEX, ASSET))
     # index.html also carries module imports if any are ever inlined.
     for path, pattern in targets:
         text = path.read_text(encoding="utf-8")

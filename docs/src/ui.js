@@ -4,18 +4,18 @@
 // client, and holds no game state of its own. Anything it needed to remember
 // would be a second copy of something the session already owns.
 
-import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=ea1ab2f1";
+import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=c9e2a78c";
 
 //: Faces used purely as icons in the stat panel.
 const SKIP_FACE = SKIP;
 const WILD_FACE = WILD;
-import { HAND_STATE, SORT_BY_COLOR, SORT_BY_RANK } from "./engine.js?v=ea1ab2f1";
+import { HAND_STATE, SORT_BY_COLOR, SORT_BY_RANK } from "./engine.js?v=c9e2a78c";
 import {
   BUFFS, HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, buffPrice,
   STORE_ALL_AT_ONCE, STORE_ALWAYS_OPEN, milestoneLocationName, phaseLocationName, storeLocationName,
-} from "./data.js?v=ea1ab2f1";
-import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=ea1ab2f1";
-import { Phase10Client } from "./client.js?v=ea1ab2f1";
+} from "./data.js?v=c9e2a78c";
+import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=c9e2a78c";
+import { Phase10Client } from "./client.js?v=c9e2a78c";
 
 const el = (id) => document.getElementById(id);
 
