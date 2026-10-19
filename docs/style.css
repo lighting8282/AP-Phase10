@@ -33,7 +33,20 @@ header {
   border-bottom: 1px solid var(--line);
 }
 
-h1 { margin: 0; font-size: 1.1rem; letter-spacing: 0.02em; }
+h1 { margin: 0; font-size: 1.25rem; letter-spacing: 0.03em; }
+
+.brand { display: flex; align-items: center; gap: 0.45rem; color: var(--ink); text-decoration: none; }
+.brand img { display: block; }
+.tagline {
+  padding: 0.1rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.tagline a { color: #ffd479; font-weight: 600; text-decoration: none; }
+.tagline a:hover { text-decoration: underline; }
+@media (max-width: 520px) { .tagline { display: none; } }
 
 /* The one line worth keeping in a sticky header. */
 header .bar {
