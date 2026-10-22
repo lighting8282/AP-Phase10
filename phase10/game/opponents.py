@@ -54,7 +54,11 @@ class OpponentSkill:
 #: Beats a careless human, loses to a careful one. Measured against the greedy
 #: autoplayer it costs the player 1 to 13 points of clear rate across the ten
 #: phases at eight draws -- present, not punishing.
+EASY = OpponentSkill("easy", discard_awareness= 0.4, discard_error=0.5)
 MID = OpponentSkill("mid", discard_awareness=0.7, discard_error=0.25)
+HARD = OpponentSkill("high", discard_awareness= 1.0, discard_error=0.0)
+
+SKILLS = {skill.name: skill for skill in (EASY, MID, HARD)}
 
 
 class Opponent:

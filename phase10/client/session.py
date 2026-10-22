@@ -54,7 +54,7 @@ from ..data import (
 )
 from ..game.cards import SKIP, STOCK_WILDS, WILD, Card
 from ..game.engine import GameConfig, HandState, PhaseHand, Table
-from ..game.opponents import MID, NAMES as OPPONENT_NAMES, build_opponents
+from ..game.opponents import  NAMES as OPPONENT_NAMES, SKILLS, build_opponents
 from ..game.game import SAVE_VERSION, Phase10Game, RoundResult
 
 #: Traps are one-shot. Received counts only ever grow, so pending effects are
@@ -134,6 +134,8 @@ class Phase10Session:
     #: own from Phase 1. Absent from slot data reads as own, which is what a
     #: seed from before the option was played as, and free play is own.
     opponent_phase: str = OPPONENT_PHASE_OWN
+    #: easy, mid, or hard. mid is default
+    opponent_skill: str = "mid"
     store_slots: int = 0
     #: "ladder" or "all_at_once". A seed from before the option sends
     #: nothing and reads as the ladder, which is what it was generated as --
@@ -193,6 +195,9 @@ class Phase10Session:
             opponent_phase=(slot_data.get("opponent_phase")
                             if slot_data.get("opponent_phase") in OPPONENT_PHASES
                             else OPPONENT_PHASE_OWN),
+            opponent_skill =(slot_data.get("opponent_skill")
+                              if slot_data.get("opponent_skill") in SKILLS
+                              else "mid"),
             store_slots=int(slot_data.get("store_slots", 0)),
             store_gating=(slot_data.get("store_gating")
                           if slot_data.get("store_gating") in STORE_GATINGS
@@ -659,7 +664,7 @@ class Phase10Session:
             # race.
             self.table.seats = build_opponents(
                 self.opponents, self.seat_phases(phase),
-                config, self.game.rng, MID,
+                config, self.game.rng, SKILLS[self.opponent_skill],
             )
         return self.game.start_round(phase, config, table=self.table)
 

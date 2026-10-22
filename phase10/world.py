@@ -181,6 +181,7 @@ class Phase10World(World):
             if item.name.endswith("Unlocked"))
         data["opponent_phase"] = ("own" if int(self.options.opponent_phase)
                                   == phase10_options.OpponentPhase.option_own else "match")
+        data["opponent_skill"] = self.options.opponent_skill.current_key
         if self.store_gating == STORE_ALWAYS_OPEN:
             data["store_prices"] = self.store_slot_prices()
         return data
