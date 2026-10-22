@@ -110,7 +110,7 @@ export class Phase10Session {
     //: "match": the seats play your phase every round. "own": each climbs
     //: its own from Phase 1 -- free play, and a seed from before the option.
     this.opponentPhase = opts.opponentPhase ?? OPPONENT_PHASE_OWN;
-    this.opponentSkill = opts.opponentskill ?? "mid"
+    this.opponentSkill = opts.opponentSkill ?? "mid"
 
     this.items = new Map();
     this.consumedTraps = new Map();
