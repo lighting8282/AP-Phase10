@@ -337,7 +337,7 @@ class Phase10Options(PerGameCommonOptions):
     starting_phases: StartingPhases
     opponents: Opponents
     opponent_phase: OpponentPhase
-    opponentSkill = OpponentSkill
+    opponent_skill = OpponentSkill
     starting_draws: StartingDraws
     extra_draw_items: ExtraDrawItems
     wild_card_items: WildCardItems
