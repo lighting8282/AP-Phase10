@@ -73,6 +73,19 @@ class OpponentPhase(Choice):
     option_own = 1
     default = option_match
 
+class OpponentSkill(Choice):
+    """
+    How well the computer players play.
+    
+    Easy: They often ignore the discard the pile and sometimes throw the wrong card onto the discard pile!
+    Mid: Your average opponent. They can beat a player who is careless. 
+    Hard: Pay attention! They will always be paying attention and won't mess up."""
+
+    display_name = "Opponent Skill"
+    option_easy = 0
+    option_mid = 1
+    option_hard = 2
+    default = option_mid
 
 class HandsWonLogic(Choice):
     """
@@ -324,6 +337,7 @@ class Phase10Options(PerGameCommonOptions):
     starting_phases: StartingPhases
     opponents: Opponents
     opponent_phase: OpponentPhase
+    opponentSkill = OpponentSkill
     starting_draws: StartingDraws
     extra_draw_items: ExtraDrawItems
     wild_card_items: WildCardItems
@@ -343,7 +357,7 @@ class Phase10Options(PerGameCommonOptions):
 option_groups = [
     OptionGroup("Goal", [Goal, PhasesToWin, ChecksPerPhase, HandsWonLogic, StoreSlots,
                          StoreGating, StoreBuffPoints, StartingPhases]),
-    OptionGroup("Difficulty", [Opponents, OpponentPhase, StartingDraws, ExtraDrawItems,
+    OptionGroup("Difficulty", [Opponents, OpponentPhase, OpponentSkill, StartingDraws, ExtraDrawItems,
                                WildCardItems, HandSizeUpgrades, SkipCardItems,
                                SkipMode]),
     OptionGroup("Deck", [TrapChance, Phase10DeathLink, ScoreThreshold, ScoreTraps]),

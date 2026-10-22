@@ -20,12 +20,13 @@ import {
   buffPrice, storeGate, storeLocationName, storePrices,
   STORE_ALL_AT_ONCE, STORE_ALWAYS_OPEN, STORE_GATINGS, STORE_LADDER, PRICE_PROGRESSION,
   DEFAULT_SCORE_THRESHOLD, MAX_SCORE_THRESHOLD, MIN_SCORE_THRESHOLD,
-  OPPONENT_PHASE_MATCH, OPPONENT_PHASE_OWN, OPPONENT_PHASES,
-} from "./data.js?v=c9e2a78c";
-import { SKIP, STOCK_WILDS, WILD } from "./cards.js?v=c9e2a78c";
-import { HAND_STATE, Table, gameConfig } from "./engine.js?v=c9e2a78c";
-import { MID, NAMES as OPPONENT_NAMES, buildOpponents } from "./opponents.js?v=c9e2a78c";
-import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js?v=c9e2a78c";
+  OPPONENT_PHASE_MATCH, OPPONENT_PHASE_OWN, OPPONENT_PHASES, 
+} from "./data.js?v=eb2ee955";
+import { SKIP, STOCK_WILDS, WILD } from "./cards.js?v=eb2ee955";
+import { HAND_STATE, Table, gameConfig } from "./engine.js?v=eb2ee955";
+import { NAMES as OPPONENT_NAMES, SKILLS, buildOpponents } from "./opponents.js?v=eb2ee955";
+import { Phase10Game, SAVE_VERSION, roundCleared } from "./game.js?v=eb2ee955";
+
 
 export const LEAN_DEAL_PENALTY = 2;
 
@@ -109,6 +110,7 @@ export class Phase10Session {
     //: "match": the seats play your phase every round. "own": each climbs
     //: its own from Phase 1 -- free play, and a seed from before the option.
     this.opponentPhase = opts.opponentPhase ?? OPPONENT_PHASE_OWN;
+    this.opponentSkill = opts.opponentskill ?? "mid"
 
     this.items = new Map();
     this.consumedTraps = new Map();
@@ -150,6 +152,8 @@ export class Phase10Session {
       opponents: Number(slotData.opponents ?? 3),
       opponentPhase: OPPONENT_PHASES.includes(slotData.opponent_phase)
         ? slotData.opponent_phase : OPPONENT_PHASE_OWN,
+      opponentSkill: Object.hasOwn(SKILLS, slotData.opponent_skill)
+        ? slotData.opponent_skill : "mid",
       game: game ?? new Phase10Game(),
     });
   }
@@ -625,7 +629,8 @@ export class Phase10Session {
       // round's difficulty is the phase you chose. Otherwise each seat carries
       // its own phase between rounds, which in free play is the race.
       this.table.seats = buildOpponents(
-        this.opponents, this.seatPhases(phase), config, this.game.random, MID,
+        this.opponents, this.seatPhases(phase), config, this.game.random, 
+        SKILLS[this.opponentSkill],
       );
     }
     return this.game.startRound(phase, config, { table: this.table, ...opts });
