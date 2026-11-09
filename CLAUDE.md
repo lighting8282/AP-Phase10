@@ -124,6 +124,12 @@ from the code with nothing failing.
 
 ## Conventions
 
+**Keep code short and readable.** The owner reads and edits this code
+directly, so prefer the fewest lines that do the job, plain names, and simple
+steps over clever ones. Comment only what is not obvious. Never trim anything
+that changes behaviour -- if a check or a branch has to stay, keep it and say
+why in a sentence.
+
 **Commit messages** are a single imperative sentence saying what changed and,
 where it is not obvious, why — `Stamp the module URLs so a deploy cannot arrive
 half old`, `Free play has no draw budget`. No prefixes, no type tags.
