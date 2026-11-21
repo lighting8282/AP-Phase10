@@ -21,10 +21,10 @@ import {
   isWild,
   numberCard,
   COLORS,
-} from "./cards.js?v=25d2b3c9";
+} from "./cards.js?v=e4f3ca66";
 import {
   GROUP, PHASES, phaseCardCount, solveLayOptions, solveMelds, solvePhase,
-} from "./phases.js?v=25d2b3c9";
+} from "./phases.js?v=e4f3ca66";
 
 /** How deep into the stock a played Skip lets you look. */
 export const SKIP_DIG_DEPTH = 3;
@@ -465,13 +465,19 @@ export class PhaseHand {
     return this.hand;
   }
 
-  solution() {
-    return solvePhase(this.hand, this.spec, this.config.minNaturalsPerGroup);
+  /*moving one card from one position to another position*/
+  moveCard(fromIndex, toIndex) {
+    const size = this.hand.length;
+    for (const index of [fromIndex, toIndex]) {
+      if (!Number.isInteger(index) || index < 0 || index >= size) {
+        throw new Error('positions must be between 0 and ${size - 1}');
+      }
+    }
+    const [card] = this.hand.splice(fromIndex, 1);
+    this.hand.splice(toIndex, 0, card);
+    return this.hand;
   }
-
-  canLayDown() {
-    return this.solution() !== null;
-  }
+  
 
   // -- actions --------------------------------------------------------------
   /**

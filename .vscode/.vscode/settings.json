@@ -1,0 +1,6 @@
+{
+  "python.analysis.extraPaths": [
+    "C:/Users/turtl/Archipelago",
+    "./phase10"
+  ]
+}

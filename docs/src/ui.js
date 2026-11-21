@@ -4,18 +4,18 @@
 // client, and holds no game state of its own. Anything it needed to remember
 // would be a second copy of something the session already owns.
 
-import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=25d2b3c9";
+import { SKIP, WILD, cardFilename, isSkip, isWild, points } from "./cards.js?v=e4f3ca66";
 
 //: Faces used purely as icons in the stat panel.
 const SKIP_FACE = SKIP;
 const WILD_FACE = WILD;
-import { HAND_STATE, SORT_BY_COLOR, SORT_BY_RANK } from "./engine.js?v=25d2b3c9";
+import { HAND_STATE, SORT_BY_COLOR, SORT_BY_RANK } from "./engine.js?v=e4f3ca66";
 import {
   BUFFS, HANDS_WON_MILESTONES, LOCATION_NAME_TO_ID, TIERS, buffPrice,
   STORE_ALL_AT_ONCE, STORE_ALWAYS_OPEN, milestoneLocationName, phaseLocationName, storeLocationName,
-} from "./data.js?v=25d2b3c9";
-import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=25d2b3c9";
-import { Phase10Client } from "./client.js?v=25d2b3c9";
+} from "./data.js?v=e4f3ca66";
+import { PHASE_COUNT, meldName, phaseDescription } from "./phases.js?v=e4f3ca66";
+import { Phase10Client } from "./client.js?v=e4f3ca66";
 
 const el = (id) => document.getElementById(id);
 
@@ -84,6 +84,10 @@ let sortIndex = 0;
 //: How long the pause is checked against while it runs, so a change made
 //: during one takes effect in it rather than in the next.
 const SPEED_TICK_MS = 100;
+
+//: True once a card has been dragged. The automatic orders stand down until
+//: the Sort button is pressed again.
+let customOrder = false;
 
 let speedIndex = 0;
 
@@ -591,12 +595,14 @@ const ACTIONS = {
  * no turn, so a render can do it without being a move.
  */
 function applyHandSort(hand) {
+  if(customOrder) return;
   const { order } = SORTS[sortIndex];
   if (order && hand) hand.sortHand(order);
 }
 
 /** Step to the next order, remember it, and redraw the hand in it. */
 function cycleSort() {
+  customOrder = false;
   sortIndex = (sortIndex + 1) % SORTS.length;
   try {
     // By name rather than by position, so adding an order later cannot
@@ -609,9 +615,19 @@ function cycleSort() {
   render();
 }
 
+function moveCard(hand, from, to) {
+  if (from === to) return;
+  hand.moveCard(from, to);
+  customOrder = true;
+  showSort();
+  render();
+}
+
 function showSort() {
   const button = el("sort-button");
-  const { label, says } = SORTS[sortIndex];
+  const { label, says } = customOrder
+  ? {lable: "Custom", says: "in the order you dragged them"}
+  : SORTS[sortIndex]
   button.textContent = `Sort: ${label}`;
   button.setAttribute("aria-label", `Hand ${says}. Press to change.`);
   button.title = "How your hand is ordered -- it costs nothing and is not a move";
@@ -1022,6 +1038,17 @@ function renderHand(hand) {
       } else {
         button.title = "A Skip is for digging -- clicking it twice throws it away";
       }
+    }
+        if (!button.disabled) {
+      button.draggable = true;
+      button.addEventListener("dragstart", (event) => {
+        event.dataTransfer.setData("text/plain", String(index));
+      });
+      button.addEventListener("dragover", (event) => event.preventDefault());
+      button.addEventListener("drop", (event) => {
+        event.preventDefault();
+        moveCard(hand, Number(event.dataTransfer.getData("text/plain")), index);
+      });
     }
     box.append(button);
   });
