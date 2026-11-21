@@ -61,6 +61,8 @@ colour groups, or `Off` to leave cards where they land. Wilds and Skips go to
 the end either way. Once it is on it stays on, so a card you draw arrives in
 its place rather than on the end, and the choice is remembered. Sorting is not
 a move: it costs no draw, ends no turn, and works while the table is playing.
+You can now also sort your hand by dragging a card to a spot where you want it. 
+This will be overriden if you choose to sort by colour or number.
 
 ### In a browser, connected to a room
 
@@ -83,6 +85,7 @@ plays through commands in the client console:
     /play <n>   start a hand
     /hand       your cards, the discard top, draws left
     /sort [c]   order your hand by number, or by colour with `c`
+    /move <i> <j> Move card from one position <i> to another position <j>
     /draw [d]   draw from the stock, or from the discard with `d`
     /discard <i>  discard by position
     /hit <n>    play a card onto a group already on the table
@@ -120,7 +123,7 @@ game: AP_10
 requires:
   version: 0.6.7
   game:
-    AP_10: 1.10.0
+    AP_10: 1.11.0
 ```
 
 A seed is generated against one version of the world. After updating, generate
