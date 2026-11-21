@@ -21,10 +21,10 @@ import {
   isWild,
   numberCard,
   COLORS,
-} from "./cards.js?v=589afca1";
+} from "./cards.js?v=227172fb";
 import {
   GROUP, PHASES, phaseCardCount, solveLayOptions, solveMelds, solvePhase,
-} from "./phases.js?v=589afca1";
+} from "./phases.js?v=227172fb";
 
 /** How deep into the stock a played Skip lets you look. */
 export const SKIP_DIG_DEPTH = 3;
@@ -464,7 +464,8 @@ export class PhaseHand {
     this.hand.sort((a, b) => compareKeys(sortKey(a, order), sortKey(b, order)));
     return this.hand;
   }
-    solution() {
+  
+  solution() {
     return solvePhase(this.hand, this.spec, this.config.minNaturalsPerGroup);
   }
 
