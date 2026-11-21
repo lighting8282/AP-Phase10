@@ -128,6 +128,30 @@ MELD_ROW_HEIGHT = 58
 MELD_CARD_WIDTH = MELD_ROW_HEIGHT * 2 // 3
 
 
+class HandGrid(GridLayout):
+    """The hand: a click discards a card, a drag moves it where it is dropped."""
+
+    def __init__(self, on_move, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.on_move = on_move
+
+    def _index_at(self, pos):
+        return next((c.hand_index for c in self.children if c.collide_point(*pos)), None)
+
+    def on_touch_down(self, touch):
+        touch.ud["drag_from"] = self._index_at(touch.pos)
+        return super().on_touch_down(touch)
+
+    def on_touch_up(self, touch):
+        source, target = touch.ud.get("drag_from"), self._index_at(touch.pos)
+        result = super().on_touch_up(touch)
+        # After super(): the move redraws every card, so the cards finish
+        # handling this release first.
+        if source is not None and target is not None and source != target:
+            self.on_move(source, target)
+        return result
+
+
 class Phase10View(BoxLayout):
     """The tab body. Reads the session; writes only through commands."""
 
@@ -148,7 +172,9 @@ class Phase10View(BoxLayout):
                            halign="left", valign="middle")
         self.stats.bind(size=lambda w, _: setattr(w, "text_size", w.size))
 
-        self.hand_grid = GridLayout(cols=8, spacing=4, size_hint_y=None, height=110)
+        self.hand_grid = HandGrid(
+            lambda source, target: self.run(f"/move {source} {target}"),
+            cols=8, spacing=4, size_hint_y=None, height=110)
         self.dig_row = BoxLayout(size_hint_y=None, height=0, spacing=4)
         self.seats = Label(text="", markup=True, size_hint_y=None, height=24,
                            halign="left", valign="middle")
@@ -161,7 +187,7 @@ class Phase10View(BoxLayout):
         self.phase_grid = GridLayout(cols=10, spacing=4, size_hint_y=None, height=38)
 
         for widget in (self.header, self.objective, self.stats, self.seats,
-                       Label(text="[b]Your hand[/b] -- click a card to discard it",
+                       Label(text="[b]Your hand[/b] -- click a card to discard it, drag one to move it",
                              markup=True, size_hint_y=None, height=22),
                        self.melds, self.hand_grid, self.dig_row, self.actions,
                        Label(text="[b]Phases[/b]", markup=True, size_hint_y=None, height=22),
@@ -343,6 +369,7 @@ class Phase10View(BoxLayout):
             return
         for index, card in enumerate(hand.hand):
             button = make_card(card)
+            button.hand_index = index
             button.bind(on_release=lambda _w, i=index: self.run(f"/discard {i}"))
             self.hand_grid.add_widget(button)
 

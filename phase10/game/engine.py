@@ -405,6 +405,19 @@ class PhaseHand:
         self.hand.sort(key=lambda card: sort_key(card, order))
         return self.hand
 
+    def move_card(self, from_index: int, to_index: int) -> list[Card]:
+        """Be able to move one card to another position. Free to do at anytime, and not a move.
+        
+        By position, NEVER by value: This is because a hand can hold two of the same card, they
+        are the same object, which is why looking up by value is not the way to go"""
+
+        size = len(self.hand)
+        if not(0 <= from_index <size and 0 <= to_index < size):
+                raise ValueError(f"positions must be between 0 and {size - 1}")
+        card = self.hand.pop(from_index)
+        self.hand.insert(to_index, card)
+        return self.hand
+    
     def solution(self) -> Layout | None:
         return solve_phase(self.hand, self.spec,
                            min_naturals_per_group=self.config.min_naturals_per_group)
