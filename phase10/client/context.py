@@ -143,6 +143,23 @@ class Phase10CommandProcessor(ClientCommandProcessor):
         self.output(f"sorted by {'colour' if chosen == SORT_BY_COLOR else 'number'}")
         self._cmd_hand()
 
+    def _cmd_move(self, source: str, target: str) -> None:
+        """Move a card to another position. Usage: /move 2 5
+
+        Positions start at 0, as in /discard. Not a move: it costs no draw and
+        does not end your turn.
+        """
+        hand = self._require_hand()
+        if hand is None:
+            return
+        try:
+            card = hand.hand[int(source)]
+            hand.move_card(int(source), int(target))
+        except (ValueError, IndexError):
+            self.output(f"Pick positions between 0 and {len(hand.hand) - 1}.")
+            return
+        self.output(f"moved {card} to position {int(target)}")
+
     def _cmd_hand(self) -> None:
         """Show your hand, the discard top, and your remaining draws."""
         hand = self.ctx.session.hand
